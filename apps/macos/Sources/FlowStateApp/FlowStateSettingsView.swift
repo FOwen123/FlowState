@@ -1,3 +1,4 @@
+import AppKit
 import FlowStateCore
 import SwiftUI
 
@@ -14,7 +15,7 @@ enum FlowStateSettingsSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .personalMail: "Gmail in Brave"
-        case .cloud: "Cloud account / 雲端帳戶"
+        case .cloud: "Account"
         case .voice: "Voice & activation"
         case .tasks: "Tasks & history"
         case .memory: "Memory"
@@ -46,6 +47,7 @@ enum PaperStyle {
 
 struct FlowStateSettingsView: View {
     @ObservedObject var model: FlowStateAppModel
+    @ObservedObject private var localization = UILocalization.shared
     @State private var section: FlowStateSettingsSection = .voice
 
     var body: some View {
@@ -54,10 +56,12 @@ struct FlowStateSettingsView: View {
             Divider().overlay(PaperStyle.divider)
             content
         }
-        .frame(minWidth: 960, minHeight: 700)
+        .frame(minWidth: 820, minHeight: 560)
         .background(PaperStyle.canvas)
         .foregroundStyle(PaperStyle.text)
         .preferredColorScheme(.dark)
+        .environment(\.locale, Locale(identifier: InterfaceLanguage.resolve(localization.language).rawValue))
+        .navigationTitle(L10n.text("Flow State Settings"))
     }
 
     private var sidebar: some View {
@@ -65,7 +69,7 @@ struct FlowStateSettingsView: View {
             HStack(spacing: 8) {
                 WaveMark()
                     .frame(width: 30, height: 30)
-                Text("Flow State")
+                Text(L10n.text("Flow State"))
                     .font(.custom("Space Grotesk", size: 20))
             }
             .padding(.horizontal, 12)
@@ -78,7 +82,8 @@ struct FlowStateSettingsView: View {
                     HStack(spacing: 10) {
                         Image(systemName: item.icon)
                             .frame(width: 20)
-                        Text(item.title)
+                        Text(L10n.text(item.title))
+                            .lineLimit(1)
                             .font(.system(size: 14))
                         Spacer()
                     }
@@ -89,14 +94,22 @@ struct FlowStateSettingsView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(item.title)
+                .accessibilityLabel(L10n.text(item.title))
                 .accessibilityAddTraits(section == item ? .isSelected : [])
             }
 
             Spacer()
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Help & feedback ↗")
-                Text("Flow State · Development preview")
+            VStack(alignment: .leading, spacing: 8) {
+                Text(L10n.text("App language"))
+                Picker(L10n.text("App language"), selection: $localization.language) {
+                    ForEach(InterfaceLanguage.allCases, id: \.self) { language in
+                        Text(language.displayName).tag(language)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(maxWidth: .infinity)
+                Text("Flow State 0.1")
             }
             .font(.system(size: 13))
             .foregroundStyle(PaperStyle.muted)
@@ -105,7 +118,8 @@ struct FlowStateSettingsView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 28)
-        .frame(width: 224)
+        .frame(width: 204)
+        .frame(maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -114,7 +128,7 @@ struct FlowStateSettingsView: View {
         case .personalMail:
             PersonalMailView()
         case .cloud:
-            ScrollView { CloudAccountView(model: model) }
+            CloudAccountView(model: model)
         case .voice:
             VoiceSettingsView(model: model)
         case .tasks:
@@ -128,6 +142,7 @@ struct FlowStateSettingsView: View {
 }
 
 private struct VoiceSettingsView: View {
+    @ObservedObject private var localization = UILocalization.shared
     @ObservedObject var model: FlowStateAppModel
 
     var body: some View {
@@ -149,7 +164,7 @@ private struct VoiceSettingsView: View {
                 )
                 PickerRow(
                     title: "Voice mode",
-                    subtitle: "Command words execute only in command mode.",
+                    subtitle: "Choose whether to dictate text or control apps.",
                     selection: Binding(
                         get: { model.speechSettings.mode },
                         set: { updateMode($0) }
@@ -158,7 +173,7 @@ private struct VoiceSettingsView: View {
                 )
                 PickerRow(
                     title: "Language",
-                    subtitle: "English and Traditional Chinese are explicit launch languages.",
+                    subtitle: "Choose the language you speak.",
                     selection: Binding(
                         get: { model.speechSettings.language },
                         set: { updateLanguage($0) }
@@ -176,7 +191,7 @@ private struct VoiceSettingsView: View {
                     )
                 }
                 PickerRow(
-                    title: "Keyboard shortcut / 鍵盤快捷鍵",
+                    title: "Keyboard shortcut",
                     subtitle: "Hold to speak. Choose a shortcut unused by your other apps.",
                     selection: Binding(
                         get: { model.speechSettings.shortcut },
@@ -185,26 +200,26 @@ private struct VoiceSettingsView: View {
                     options: VoiceShortcut.allCases
                 )
                 if let error = model.shortcutError {
-                    Text(error).font(.caption).foregroundStyle(.orange)
+                    Text(L10n.text(error)).font(.caption).foregroundStyle(.orange)
                 }
             }
 
             settingsPanel {
-                Text(model.voiceStatus).font(.headline)
-                    .accessibilityLabel("Voice status: \(model.voiceStatus)")
-                Text(model.latestTranscript.isEmpty ? "Your transcript will appear here. / 辨識文字將顯示在此。" : model.latestTranscript)
+                Text(L10n.text(model.voiceStatus)).font(.headline)
+                    .accessibilityLabel(L10n.format("Voice status: %@", L10n.text(model.voiceStatus)))
+                Text(model.latestTranscript.isEmpty ? L10n.text("Your transcript will appear here.") : model.latestTranscript)
                     .textSelection(.enabled)
-                    .accessibilityLabel("Latest transcript: \(model.latestTranscript)")
+                    .accessibilityLabel(L10n.format("Latest transcript: %@", model.latestTranscript))
                 HStack {
-                    Button("Start listening / 開始聆聽") { model.startVoiceSession() }
-                    Button("Finish / 完成") { model.finishVoiceSession() }
-                    Button("Stop / 停止") { model.stopVoiceSession() }
+                    Button(L10n.text("Start listening")) { model.startVoiceSession() }
+                    Button(L10n.text("Finish")) { model.finishVoiceSession() }
+                    Button(L10n.text("Stop")) { model.stopVoiceSession() }
                 }
             }
 
             settingsPanel {
-                Button("Install selected language model / 安裝所選語言模型") { model.installSpeechLanguage() }
-                Text("Speech stays on this Mac. A one-time model download may be needed. / 語音只在本機處理。")
+                Button(L10n.text("Install selected language model")) { model.installSpeechLanguage() }
+                Text(L10n.text("Speech stays on this Mac. A one-time model download may be needed."))
                     .font(.caption).foregroundStyle(PaperStyle.muted)
                 SettingRow(
                     title: "Microphone",
@@ -213,14 +228,14 @@ private struct VoiceSettingsView: View {
                 )
                 SettingRow(
                     title: "Speech & output",
-                    subtitle: "SpeechAnalyzer processes active-session audio on this Mac.",
-                    trailing: { Text("On-device").foregroundStyle(PaperStyle.muted) }
+                    subtitle: "Your speech is processed on this Mac.",
+                    trailing: { Text(L10n.text("On-device")).foregroundStyle(PaperStyle.muted) }
                 )
             }
 
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "info.circle")
-                Text("Flow State does not listen while idle. Stop is handled on this Mac before any cloud workflow can continue.")
+                Text(L10n.text("Flow State listens only when you start a session. Stop ends listening and cancels current actions."))
                     .font(.system(size: 13))
                     .foregroundStyle(PaperStyle.muted)
             }
@@ -262,20 +277,18 @@ private struct VoiceSettingsView: View {
 }
 
 private struct TasksSettingsView: View {
+    @ObservedObject private var localization = UILocalization.shared
     @ObservedObject var model: FlowStateAppModel
 
     var body: some View {
         settingsColumn {
             pageHeading(title: "Tasks & history", subtitle: "Review what Flow State is doing before it acts.")
             settingsPanel {
-                TextFieldRow(
-                    title: "Input grant target",
-                    subtitle: "This app is separate from screen capture and must be approved explicitly.",
-                    text: $model.inputBundleIdentifier
-                )
+                ApplicationTargetPicker(title: "App to control", selection: $model.inputBundleIdentifier)
+                    .padding(.vertical, 20)
                 ForEach(DesktopActionKind.allCases, id: \.rawValue) { action in
                     ToggleRow(
-                        title: action.rawValue.capitalized,
+                        title: L10n.actionName(action),
                         subtitle: "Allow this action only for the selected target app.",
                         isOn: Binding(
                             get: { model.allowedInputActions.contains(action) },
@@ -284,16 +297,16 @@ private struct TasksSettingsView: View {
                     )
                 }
                 HStack(spacing: 12) {
-                    Button("Grant desktop control") { model.beginInputTask() }
+                    Button(L10n.text("Grant desktop control")) { model.beginInputTask() }
                         .buttonStyle(PaperBorderButtonStyle())
-                    Button("Cancel") { model.cancelInputTask() }
+                    Button(L10n.text("Cancel")) { model.cancelInputTask() }
                         .buttonStyle(PaperBorderButtonStyle())
-                    Button("Resume") { model.resumeInputTask() }
+                    Button(L10n.text("Resume")) { model.resumeInputTask() }
                         .buttonStyle(PaperBorderButtonStyle())
-                    Button("Undo last edit") { model.undoLastDesktopAction() }
+                    Button(L10n.text("Undo last edit")) { model.undoLastDesktopAction() }
                         .buttonStyle(PaperBorderButtonStyle())
                 }
-                Text(model.desktopStatus)
+                Text(L10n.text(model.desktopStatus))
                     .font(.system(size: 13))
                     .foregroundStyle(model.desktopState == .pausedForUser ? .orange : PaperStyle.muted)
                     .padding(.vertical, 12)
@@ -304,7 +317,7 @@ private struct TasksSettingsView: View {
             }
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "clock.arrow.circlepath")
-                Text("Task history is read-only until a managed Convex session is connected. A reconnect never replays a native action.")
+                Text(L10n.text("Sign in to view cloud tasks. Reconnecting will not repeat completed actions."))
                     .font(.system(size: 13))
                     .foregroundStyle(PaperStyle.muted)
             }
@@ -313,6 +326,7 @@ private struct TasksSettingsView: View {
 }
 
 private struct MemorySettingsView: View {
+    @ObservedObject private var localization = UILocalization.shared
     @ObservedObject var model: FlowStateAppModel
     @State private var trigger = ""
     @State private var value = ""
@@ -323,7 +337,7 @@ private struct MemorySettingsView: View {
             HStack(alignment: .top) {
                 pageHeading(title: "Memory", subtitle: "Your words. Your preferences. Always editable.")
                 Spacer()
-                Button("Add preference") { addPreference() }
+                Button(L10n.text("Add preference")) { addPreference() }
                     .buttonStyle(PaperBorderButtonStyle())
                     .disabled(trigger.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
@@ -331,7 +345,7 @@ private struct MemorySettingsView: View {
             settingsPanel {
                 TextFieldRow(title: "When I say", subtitle: "A phrase you want Flow State to remember.", text: $trigger)
                 TextFieldRow(title: "Use", subtitle: "The preferred word, app or style.", text: $value)
-                PickerRow(title: "Category", subtitle: "Explicit entries always take precedence.", selection: $category, options: MemoryCategory.allCases)
+                PickerRow(title: "Category", subtitle: "Your saved preferences take priority.", selection: $category, options: MemoryCategory.allCases)
             }
 
             settingsPanel {
@@ -341,10 +355,10 @@ private struct MemorySettingsView: View {
                             .frame(width: 160, alignment: .leading)
                         Text(preference.value)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        Text(preference.source == .explicit ? "You told me" : "Learned")
+                        Text(L10n.text(preference.source == .explicit ? "Saved by you" : "Suggested"))
                             .font(.system(size: 12))
                             .foregroundStyle(PaperStyle.muted)
-                        Button("Delete") { model.deleteMemory(id: preference.id) }
+                        Button(L10n.text("Delete")) { model.deleteMemory(id: preference.id) }
                             .buttonStyle(PaperBorderButtonStyle())
                     }
                     .font(.system(size: 14))
@@ -352,7 +366,7 @@ private struct MemorySettingsView: View {
                     Divider().overlay(PaperStyle.divider)
                 }
                 if model.memorySnapshot.preferences.isEmpty {
-                    Text("No preferences saved yet.")
+                    Text(L10n.text("No preferences saved yet."))
                         .foregroundStyle(PaperStyle.muted)
                         .padding(.vertical, 16)
                 }
@@ -369,7 +383,7 @@ private struct MemorySettingsView: View {
                 )
                 ToggleRow(
                     title: "Allow learned preferences",
-                    subtitle: "Opt-in only. Automatic learning is not connected yet; explicit entries take precedence.",
+                    subtitle: "Automatic suggestions are not available yet. Your saved preferences take priority.",
                     isOn: Binding(
                         get: { model.memorySnapshot.learningEnabled },
                         set: { model.setMemoryLearning($0) }
@@ -387,11 +401,12 @@ private struct MemorySettingsView: View {
 }
 
 private struct PermissionsSettingsView: View {
+    @ObservedObject private var localization = UILocalization.shared
     @ObservedObject var model: FlowStateAppModel
 
     var body: some View {
         settingsColumn {
-            pageHeading(title: "Permissions", subtitle: "Grant access per capability. Flow State asks only when you choose.")
+            pageHeading(title: "Permissions", subtitle: "Choose what Flow State can access on your Mac.")
             settingsPanel {
                 ForEach(MacPermission.allCases.filter { $0 != .speechRecognition }, id: \.rawValue) { permission in
                     SettingRow(
@@ -399,13 +414,13 @@ private struct PermissionsSettingsView: View {
                         subtitle: explanation(for: permission),
                         trailing: { HStack(spacing: 10) {
                             permissionBadge(model.permissionSnapshot[permission])
-                            Button("Manage") { model.requestPermission(permission) }
+                            Button(L10n.text("Manage")) { model.requestPermission(permission) }
                                 .buttonStyle(PaperBorderButtonStyle())
                         } }
                     )
                 }
             }
-            Text("Sensitive apps such as Passwords, Keychain and password managers remain excluded from screen capture. Full-window capture is disclosed before it is used.")
+            Text(L10n.text("Sensitive apps such as Passwords, Keychain and password managers remain excluded from screen capture. Full-window capture is disclosed before it is used."))
                 .font(.system(size: 13))
                 .foregroundStyle(PaperStyle.muted)
                 .padding(16)
@@ -415,14 +430,15 @@ private struct PermissionsSettingsView: View {
     private func explanation(for permission: MacPermission) -> String {
         switch permission {
         case .microphone: "Required only for an active speech session."
-        case .speechRecognition: "Legacy server-recognition permission; not used by SpeechAnalyzer."
-        case .accessibility: "Required for approved focus, press, scroll and text actions."
-        case .screenRecording: "Required only for an approved task's selected window."
+        case .speechRecognition: "Required only for an active speech session."
+        case .accessibility: "Allow Flow State to control the apps you approve."
+        case .screenRecording: "Allow screenshots of windows you approve during a task."
         }
     }
 }
 
 private struct SettingRow<Trailing: View>: View {
+    @ObservedObject private var localization = UILocalization.shared
     let title: String
     let subtitle: String
     let trailing: Trailing
@@ -436,8 +452,8 @@ private struct SettingRow<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .center, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(title).font(.system(size: 16, weight: .medium))
-                Text(subtitle).font(.system(size: 14)).foregroundStyle(PaperStyle.muted)
+                Text(L10n.text(title)).font(.system(size: 16, weight: .medium))
+                Text(L10n.text(subtitle)).font(.system(size: 14)).foregroundStyle(PaperStyle.muted)
             }
             Spacer()
             trailing
@@ -447,6 +463,7 @@ private struct SettingRow<Trailing: View>: View {
 }
 
 private struct ToggleRow: View {
+    @ObservedObject private var localization = UILocalization.shared
     let title: String
     let subtitle: String
     @Binding var isOn: Bool
@@ -454,20 +471,21 @@ private struct ToggleRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(title).font(.system(size: 16, weight: .medium))
-                Text(subtitle).font(.system(size: 14)).foregroundStyle(PaperStyle.muted)
+                Text(L10n.text(title)).font(.system(size: 16, weight: .medium))
+                Text(L10n.text(subtitle)).font(.system(size: 14)).foregroundStyle(PaperStyle.muted)
             }
             Spacer()
             Toggle("", isOn: $isOn)
                 .labelsHidden()
                 .toggleStyle(.switch)
-                .accessibilityLabel(title)
+                .accessibilityLabel(L10n.text(title))
         }
         .padding(.vertical, 20)
     }
 }
 
 private struct PickerRow<Value: Hashable & CaseIterable & RawRepresentable>: View where Value.RawValue: StringProtocol {
+    @ObservedObject private var localization = UILocalization.shared
     let title: String
     let subtitle: String
     @Binding var selection: Value
@@ -483,13 +501,13 @@ private struct PickerRow<Value: Hashable & CaseIterable & RawRepresentable>: Vie
     var body: some View {
         HStack(alignment: .center, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(title).font(.system(size: 16, weight: .medium))
-                Text(subtitle).font(.system(size: 14)).foregroundStyle(PaperStyle.muted)
+                Text(L10n.text(title)).font(.system(size: 16, weight: .medium))
+                Text(L10n.text(subtitle)).font(.system(size: 14)).foregroundStyle(PaperStyle.muted)
             }
             Spacer()
-            Picker(title, selection: $selection) {
+            Picker(L10n.text(title), selection: $selection) {
                 ForEach(options, id: \.self) { option in
-                    Text(displayName(option)).tag(option)
+                    Text(L10n.text(displayName(option))).tag(option)
                 }
             }
             .pickerStyle(.menu)
@@ -509,6 +527,7 @@ private struct PickerRow<Value: Hashable & CaseIterable & RawRepresentable>: Vie
 }
 
 private struct TextFieldRow: View {
+    @ObservedObject private var localization = UILocalization.shared
     let title: String
     let subtitle: String
     @Binding var text: String
@@ -516,11 +535,11 @@ private struct TextFieldRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(title).font(.system(size: 16, weight: .medium))
-                Text(subtitle).font(.system(size: 14)).foregroundStyle(PaperStyle.muted)
+                Text(L10n.text(title)).font(.system(size: 16, weight: .medium))
+                Text(L10n.text(subtitle)).font(.system(size: 14)).foregroundStyle(PaperStyle.muted)
             }
             Spacer()
-            TextField(title, text: $text)
+            TextField(L10n.text(title), text: $text)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 220)
         }
@@ -531,17 +550,18 @@ private struct TextFieldRow: View {
 private func settingsColumn(@ViewBuilder content: () -> some View) -> some View {
     ScrollView {
         VStack(alignment: .leading, spacing: 26, content: content)
+            .frame(maxWidth: 720, alignment: .leading)
+            .padding(.horizontal, 32)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 48)
             .padding(.vertical, 40)
     }
 }
 
 private func pageHeading(title: String, subtitle: String) -> some View {
     VStack(alignment: .leading, spacing: 8) {
-        Text(title)
-            .font(.custom("Space Grotesk", size: 32))
-        Text(subtitle)
+        Text(L10n.text(title))
+            .font(.system(size: 26, weight: .semibold))
+        Text(L10n.text(subtitle))
             .font(.system(size: 15))
             .foregroundStyle(PaperStyle.muted)
     }
@@ -560,13 +580,13 @@ private func permissionBadge(_ status: MacPermissionStatus) -> some View {
         Circle()
             .fill(status.isGranted ? Color.green : PaperStyle.iron)
             .frame(width: 7, height: 7)
-        Text(status.isGranted ? "Ready" : status.rawValue.replacingOccurrences(of: "notDetermined", with: "Not set"))
+        Text(L10n.text(status.isGranted ? "Ready" : status.rawValue.replacingOccurrences(of: "notDetermined", with: "Not set")))
             .font(.system(size: 12))
             .foregroundStyle(status.isGranted ? PaperStyle.secondary : PaperStyle.muted)
     }
 }
 
-private struct PaperBorderButtonStyle: ButtonStyle {
+struct PaperBorderButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 13))
@@ -588,5 +608,39 @@ private struct WaveMark: View {
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+
+struct ApplicationTargetPicker: View {
+    let title: String
+    @Binding var selection: String
+    @ObservedObject private var localization = UILocalization.shared
+    @State private var applications: [NSRunningApplication] = []
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Picker(L10n.text(title), selection: $selection) {
+                Text(L10n.text("Choose an app")).tag("")
+                ForEach(applications, id: \.processIdentifier) { app in
+                    Text(app.localizedName ?? L10n.text("Application")).tag(app.bundleIdentifier ?? "")
+                }
+                if !selection.isEmpty && !applications.contains(where: { $0.bundleIdentifier == selection }) {
+                    Text(L10n.text("Previously selected app")).tag(selection)
+                }
+            }
+            Button { refresh() } label: { Image(systemName: "arrow.clockwise") }
+                .accessibilityLabel(L10n.text("Refresh app list"))
+                .help(L10n.text("Open an app, then refresh this list."))
+        }
+        .onAppear { refresh() }
+    }
+    private func refresh() {
+        var seen = Set<String>()
+        applications = NSWorkspace.shared.runningApplications.filter {
+            guard $0.activationPolicy == .regular, let identifier = $0.bundleIdentifier,
+                  identifier != Bundle.main.bundleIdentifier else { return false }
+            return seen.insert(identifier).inserted
+        }.sorted { ($0.localizedName ?? "").localizedCaseInsensitiveCompare($1.localizedName ?? "") == .orderedAscending }
     }
 }

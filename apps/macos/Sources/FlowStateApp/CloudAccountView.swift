@@ -1,41 +1,117 @@
+import AppKit
 import SwiftUI
 import FlowStateCloud
 
 struct CloudAccountView: View {
     @ObservedObject var model: FlowStateAppModel
-    @AppStorage("FlowState.convexURL") private var deploymentURL = ""
-    @AppStorage("FlowState.clerkPublishableKey") private var publishableKey = ""
+    @ObservedObject private var localization = UILocalization.shared
     @State private var configurationError: String?
+    @State private var didAttemptConfiguration = false
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Cloud account / 雲端帳戶").font(.title2)
-            if let session = model.cloudSession {
-                CloudConnectedView(model:model, cloud: session)
-            } else {
-                Text("Connect your Flow State account for public research and reviewed email. Provider API keys stay on the backend.")
-                    .foregroundStyle(.secondary)
-                TextField("Convex HTTPS URL", text: $deploymentURL)
-                TextField("Clerk publishable key (pk_…)", text: $publishableKey)
-                Button("Connect / 連線") { configure() }
-                if let configurationError { Text(configurationError).foregroundStyle(.red) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 34) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(accountText("account.title"))
+                        .font(.system(size: 26, weight: .semibold))
+                    Text(accountText("account.subtitle"))
+                        .font(.system(size: 15))
+                        .foregroundStyle(PaperStyle.muted)
+                }
+
+                if let session = model.cloudSession {
+                    CloudConnectedView(model: model, cloud: session)
+                } else if configurationError != nil {
+                    AccountUnavailableView(retry: retryConfiguration)
+                } else {
+                    ProgressView()
+                        .accessibilityLabel(accountText("account.signing_in"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
-        }.padding(28)
+            .frame(maxWidth: 640, alignment: .leading)
+            .padding(.top, 32)
+            .padding(.horizontal, 32)
+            .padding(.bottom, 48)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(PaperStyle.canvas)
+        .foregroundStyle(PaperStyle.text)
         .task {
-            if deploymentURL.isEmpty { deploymentURL = Bundle.main.object(forInfoDictionaryKey: "FlowStateConvexURL") as? String ?? "" }
-            if publishableKey.isEmpty { publishableKey = Bundle.main.object(forInfoDictionaryKey: "FlowStateClerkPublishableKey") as? String ?? "" }
-            if !deploymentURL.isEmpty && !publishableKey.isEmpty { configure() }
+            configureBundledAccount()
         }
     }
-    private func configure() {
-        do { model.connectCloud(try CloudConfiguration(deploymentURL: deploymentURL.trimmingCharacters(in: .whitespacesAndNewlines), publishableKey: publishableKey.trimmingCharacters(in: .whitespacesAndNewlines))); configurationError = nil }
-        catch { configurationError = "Use a valid HTTPS deployment URL and a public pk_ Clerk key. Never enter a provider secret here." }
+
+    private func accountText(_ key: String) -> String {
+        _ = localization.language
+        return L10n.text(key, table: "Account")
+    }
+
+    private func configureBundledAccount() {
+        guard !didAttemptConfiguration, model.cloudSession == nil else { return }
+        didAttemptConfiguration = true
+
+        guard
+            let deploymentURL = Bundle.main.object(forInfoDictionaryKey: "FlowStateConvexURL") as? String,
+            let publishableKey = Bundle.main.object(forInfoDictionaryKey: "FlowStateClerkPublishableKey") as? String,
+            !deploymentURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            !publishableKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            configurationError = accountText("account.unavailable.message")
+            return
+        }
+
+        do {
+            let configuration = try CloudConfiguration(
+                deploymentURL: deploymentURL.trimmingCharacters(in: .whitespacesAndNewlines),
+                publishableKey: publishableKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            model.connectCloud(configuration)
+            configurationError = nil
+        } catch {
+            configurationError = accountText("account.unavailable.message")
+        }
+    }
+
+    private func retryConfiguration() {
+        didAttemptConfiguration = false
+        configurationError = nil
+        configureBundledAccount()
+    }
+}
+
+private struct AccountUnavailableView: View {
+    let retry: () -> Void
+    @ObservedObject private var localization = UILocalization.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.system(size: 30))
+                .foregroundStyle(PaperStyle.secondary)
+                .accessibilityHidden(true)
+            Text(text("account.unavailable.title"))
+                .font(.system(size: 20, weight: .semibold))
+            Text(text("account.unavailable.message"))
+                .font(.system(size: 14))
+                .foregroundStyle(PaperStyle.muted)
+            Button(text("account.retry"), action: retry)
+                .buttonStyle(PaperBorderButtonStyle())
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func text(_ key: String) -> String {
+        _ = localization.language
+        return L10n.text(key, table: "Account")
     }
 }
 
 private struct CloudConnectedView: View {
     @ObservedObject var model: FlowStateAppModel
-    @State private var command = ""
     @ObservedObject var cloud: CloudSession
+    @ObservedObject private var localization = UILocalization.shared
+    @State private var command = ""
     @State private var query = ""
     @State private var language = "en"
     @State private var recipient = ""
@@ -44,73 +120,395 @@ private struct CloudConnectedView: View {
     @State private var reviewedSender = ""
     @State private var error: String?
     @State private var busy = false
+
+    @ViewBuilder
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if cloud.signedIn {
-                HStack { Text("Connected / 已連線"); Spacer(); Button("Sign out / 登出") { Task { await cloud.signOut() } } }
-                Text("Queries and public source content are processed by Convex, Firecrawl, TypeSafe and OpenAI. Nothing from your screen or microphone is uploaded here.").font(.callout).foregroundStyle(.secondary)
-                GroupBox("Managed commands / 雲端指令") {
-                    VStack(alignment:.leading,spacing:10) {
-                        Toggle("Interpret unfamiliar voice commands / 理解不熟悉的語音指令",isOn:Binding(get:{model.useManagedCommands},set:{model.useManagedCommands=$0;UserDefaults.standard.set($0,forKey:"FlowState.managedCommands")}))
-                        Text("Command text and the selected app name go to TypeSafe/OpenAI. You review the actions before they run. Screen images and audio are not included.").font(.caption)
-                        TextField("What should Flow State do? / 想執行什麼操作？",text:$command)
-                        Button("Prepare plan / 準備操作") { model.prepareCloudCommand(command) }.disabled(command.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || model.executingPlan)
-                        Text(model.cloudStatus).font(.caption)
-                        if let plan = cloud.proposal {
-                            ForEach(Array(plan.actions.enumerated()),id:\.offset) { index,action in
-                                Text("\(index+1). \(action.summary)").textSelection(.enabled)
-                            }
-                            Text("Approved only until \(Date(timeIntervalSince1970:plan.expiresAt/1000).formatted()). / 授權到期後需重新確認。").font(.caption)
-                            HStack {
-                                Button("Confirm and run / 確認執行") { model.executeCloudPlan(plan) }.disabled(model.executingPlan)
-                                Button("Discard plan / 放棄操作") { model.cancelInputTask() }
-                            }
-                        }
-                    }.padding(8)
-                }
-                Picker("Answer language / 回答語言", selection: $language) { Text("English").tag("en"); Text("繁體中文").tag("zh-Hant") }
-                TextField("Research a public topic / 研究公開主題", text: $query)
-                HStack {
-                    Button("Research / 研究") { perform { try await cloud.research(query: query + (language == "zh-Hant" ? "\n請以繁體中文回答並附上來源。" : "\nAnswer in English with sources.")) } }.disabled(busy || query.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
-                    Button("Cancel research / 取消研究") { Task { do { try await cloud.cancelResearch() } catch { self.error = error.localizedDescription } } }
-                }
-                if let run = cloud.run {
-                    Text("Status / 狀態: \(run.status)").font(.caption)
-                    if run.status == "uncertain" { Text("Check AgentMail sent history before any further send. Retry is disabled to avoid duplicates. / 請先檢查寄件紀錄，避免重複寄送。") }
-                    if let note = run.note {
-                        Text(note.title).font(.headline)
-                        ScrollView { Text(note.body).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.frame(maxHeight: 180)
-                        TextField("Recipient / 收件人", text: $recipient)
-                        Button("Review email / 檢視郵件") { reviewed = note; reviewedRecipient = recipient; reviewedSender = cloud.run?.sender ?? "" }
-                            .disabled(busy || note.status != "ready" || recipient.isEmpty || cloud.run?.sender == nil)
-                    }
-                }
-                if let snapshot = reviewed {
-                    GroupBox("Confirm email / 確認郵件") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("From: \(reviewedSender)")
-                            Text("To: \(reviewedRecipient)")
-                            Text(snapshot.title).font(.headline)
-                            ScrollView { Text(snapshot.body).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.frame(maxHeight: 200)
-                            Text("Sent from the configured Flow State assistant inbox, not your personal mailbox.").font(.caption)
-                            HStack {
-                                Button("Confirm send / 確認寄出") { perform { try await cloud.sendReviewedNote(snapshot, recipient: reviewedRecipient, sender: reviewedSender); reviewed = nil } }.disabled(busy || cloud.run?.note != snapshot || cloud.run?.sender != reviewedSender)
-                                Button("Cancel / 取消") { reviewed = nil }.disabled(busy)
-                            }
-                        }.padding(8)
-                    }
-                }
-            } else {
-                Text("Sign in through Clerk. Your password stays in the system browser authentication flow.")
-                Button(cloud.connecting ? "Connecting…" : "Sign in / 登入") { perform { try await cloud.signIn() } }.disabled(busy || cloud.connecting)
-            }
-            if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
-            if let error = cloud.error { Text(error).foregroundStyle(.red) }
+        if cloud.signedIn {
+            signedInContent
+        } else {
+            signedOutContent
         }
     }
-    private func perform(_ action: @escaping @MainActor () async throws -> Void) {
+
+    private var signedOutContent: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            Image(systemName: "person.crop.circle")
+                .font(.system(size: 42, weight: .light))
+                .foregroundStyle(PaperStyle.secondary)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(text("account.signed_out.title"))
+                    .font(.system(size: 24, weight: .semibold))
+                Text(text("account.signed_out.subtitle"))
+                    .font(.system(size: 15))
+                    .foregroundStyle(PaperStyle.muted)
+            }
+
+            VStack(alignment: .leading, spacing: 16) {
+                benefit(
+                    icon: "magnifyingglass",
+                    title: text("account.benefit.research.title"),
+                    detail: text("account.benefit.research.detail")
+                )
+                Divider().overlay(PaperStyle.divider)
+                benefit(
+                    icon: "envelope.open",
+                    title: text("account.benefit.email.title"),
+                    detail: text("account.benefit.email.detail")
+                )
+            }
+
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "safari")
+                    .foregroundStyle(PaperStyle.muted)
+                    .accessibilityHidden(true)
+                Text(text("account.browser_reassurance"))
+                    .font(.system(size: 13))
+                    .foregroundStyle(PaperStyle.muted)
+            }
+
+            Button {
+                perform({ try await cloud.signIn() }, failureKey: "account.error.sign_in")
+            } label: {
+                HStack(spacing: 8) {
+                    if busy || cloud.connecting {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(PaperStyle.text)
+                    }
+                    Text(busy || cloud.connecting ? text("account.signing_in") : text("account.sign_in"))
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(PaperBorderButtonStyle())
+            .disabled(busy || cloud.connecting)
+
+            if let error {
+                Text(text(error))
+                    .font(.system(size: 13))
+                    .foregroundStyle(.orange)
+                    .textSelection(.enabled)
+            }
+            if cloud.error != nil {
+                Text(text("account.error.sign_in"))
+                    .font(.system(size: 13))
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private var signedInContent: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(text("account.connected"))
+                        .font(.system(size: 20, weight: .semibold))
+                    Text(text("account.connected.subtitle"))
+                        .font(.system(size: 14))
+                        .foregroundStyle(PaperStyle.muted)
+                }
+                Spacer()
+                Button(text("account.sign_out")) {
+                    Task { await cloud.signOut() }
+                }
+                .buttonStyle(PaperBorderButtonStyle())
+            }
+
+            Divider().overlay(PaperStyle.divider)
+            managedCommandsSection
+            Divider().overlay(PaperStyle.divider)
+            researchSection
+
+            if let reviewed {
+                Divider().overlay(PaperStyle.divider)
+                reviewedEmailSection(reviewed)
+            }
+
+            if let error {
+                Text(text(error))
+                    .font(.system(size: 13))
+                    .foregroundStyle(.orange)
+                    .textSelection(.enabled)
+            }
+            if cloud.error != nil {
+                Text(text("account.error.data"))
+                    .font(.system(size: 13))
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private var managedCommandsSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionHeading(
+                title: text("account.managed.title"),
+                detail: text("account.managed.description")
+            )
+
+            Toggle(text("account.managed.toggle"), isOn: Binding(
+                get: { model.useManagedCommands },
+                set: {
+                    model.useManagedCommands = $0
+                    UserDefaults.standard.set($0, forKey: "FlowState.managedCommands")
+                }
+            ))
+            .toggleStyle(.switch)
+
+            TextField(text("account.managed.command.placeholder"), text: $command)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel(text("account.managed.command.placeholder"))
+
+            Button(model.executingPlan ? text("account.managed.preparing") : text("account.managed.prepare")) {
+                model.prepareCloudCommand(command)
+            }
+            .buttonStyle(PaperBorderButtonStyle())
+            .disabled(command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.executingPlan)
+
+            Text(L10n.text(model.cloudStatus))
+                .font(.system(size: 13))
+                .foregroundStyle(PaperStyle.muted)
+
+            if let plan = cloud.proposal {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(plan.actions.enumerated()), id: \.offset) { index, action in
+                        let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: action.targetBundleIdentifier)
+                        let appName = appURL.map { FileManager.default.displayName(atPath: $0.path) } ?? action.targetBundleIdentifier
+                        let summary = L10n.planSummary(action.parameters, appName: appName)
+                        Text(accountFormat("account.plan.action", index + 1, summary))
+                            .textSelection(.enabled)
+                            .accessibilityLabel(summary)
+                    }
+                    Text(accountFormat(
+                        "account.plan.expires",
+                        Date(timeIntervalSince1970: plan.expiresAt/1000).formatted()
+                    ))
+                    .font(.system(size: 13))
+                    .foregroundStyle(PaperStyle.muted)
+                    HStack {
+                        Button(text("account.managed.confirm")) {
+                            model.executeCloudPlan(plan)
+                        }
+                        .buttonStyle(PaperBorderButtonStyle())
+                        .disabled(model.executingPlan)
+                        Button(text("account.managed.discard")) {
+                            model.cancelInputTask()
+                        }
+                        .buttonStyle(PaperBorderButtonStyle())
+                    }
+                }
+            }
+        }
+    }
+
+    private var researchSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionHeading(
+                title: text("account.research.title"),
+                detail: text("account.research.placeholder")
+            )
+
+            Picker(text("account.language.label"), selection: $language) {
+                Text(text("account.language.english")).tag("en")
+                Text(text("account.language.traditional_chinese")).tag("zh-Hant")
+            }
+            .pickerStyle(.menu)
+
+            TextField(text("account.research.placeholder"), text: $query)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel(text("account.research.placeholder"))
+
+            HStack {
+                Button(text("account.research.action")) {
+                    perform {
+                        try await cloud.research(
+                            query: query + (language == "zh-Hant"
+                                ? "\n請以繁體中文回答並附上來源。"
+                                : "\nAnswer in English with sources.")
+                        )
+                    }
+                }
+                .buttonStyle(PaperBorderButtonStyle())
+                .disabled(busy || query.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+
+                Button(text("account.research.cancel")) {
+                    perform { try await cloud.cancelResearch() }
+                }
+                .buttonStyle(PaperBorderButtonStyle())
+                .disabled(busy)
+            }
+
+            if let run = cloud.run {
+                Text(accountFormat("account.research.status", runStatusText(run.status)))
+                    .font(.system(size: 13))
+                    .foregroundStyle(PaperStyle.muted)
+
+                if run.status == "uncertain" {
+                    Text(text("account.research.uncertain"))
+                        .font(.system(size: 13))
+                        .foregroundStyle(.orange)
+                }
+
+                if let note = run.note {
+                    Text(note.title)
+                        .font(.headline)
+                        .textSelection(.enabled)
+                    ScrollView {
+                        Text(note.body)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 180)
+
+                    TextField(text("account.mail.recipient.placeholder"), text: $recipient)
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel(text("account.mail.recipient.placeholder"))
+
+                    Button(text("account.mail.review")) {
+                        reviewed = note
+                        reviewedRecipient = recipient
+                        reviewedSender = cloud.run?.sender ?? ""
+                    }
+                    .buttonStyle(PaperBorderButtonStyle())
+                    .disabled(
+                        busy ||
+                        note.status != "ready" ||
+                        recipient.isEmpty ||
+                        cloud.run?.sender == nil
+                    )
+                }
+            }
+        }
+    }
+
+    private func reviewedEmailSection(_ snapshot: CloudNote) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(text("account.mail.confirm.title"))
+                .font(.system(size: 18, weight: .semibold))
+            Text(accountFormat("account.mail.from", reviewedSender))
+            Text(accountFormat("account.mail.to", reviewedRecipient))
+            Text(snapshot.title)
+                .font(.headline)
+                .textSelection(.enabled)
+            ScrollView {
+                Text(snapshot.body)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 200)
+            Text(text("account.mail.sender_note"))
+                .font(.system(size: 13))
+                .foregroundStyle(PaperStyle.muted)
+            HStack {
+                Button(text("account.mail.send")) {
+                    perform {
+                        try await cloud.sendReviewedNote(
+                            snapshot,
+                            recipient: reviewedRecipient,
+                            sender: reviewedSender
+                        )
+                        reviewed = nil
+                    }
+                }
+                .buttonStyle(PaperBorderButtonStyle())
+                .disabled(
+                    busy ||
+                    cloud.run?.note != snapshot ||
+                    cloud.run?.sender != reviewedSender
+                )
+                Button(text("account.mail.cancel")) {
+                    reviewed = nil
+                }
+                .buttonStyle(PaperBorderButtonStyle())
+                .disabled(busy)
+            }
+        }
+    }
+
+    private func benefit(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .frame(width: 20)
+                .foregroundStyle(PaperStyle.secondary)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 14, weight: .medium))
+                Text(detail)
+                    .font(.system(size: 13))
+                    .foregroundStyle(PaperStyle.muted)
+            }
+        }
+    }
+
+    private func sectionHeading(title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.system(size: 18, weight: .semibold))
+            Text(detail)
+                .font(.system(size: 13))
+                .foregroundStyle(PaperStyle.muted)
+        }
+    }
+
+    private func text(_ key: String) -> String {
+        _ = localization.language
+        return L10n.text(key, table: "Account")
+    }
+
+    private func accountFormat(_ key: String, _ value: CVarArg) -> String {
+        _ = localization.language
+        return L10n.format(key, value, table: "Account")
+    }
+
+    private func accountFormat(_ key: String, _ first: CVarArg, _ second: CVarArg) -> String {
+        _ = localization.language
+        return L10n.format(key, first, second, table: "Account")
+    }
+
+    private func runStatusText(_ status: String) -> String {
+        switch status {
+        case "queued": return text("account.run.queued")
+        case "running": return text("account.run.running")
+        case "awaiting_approval": return text("account.run.awaiting_approval")
+        case "approved": return text("account.run.approved")
+        case "sending": return text("account.run.sending")
+        case "completed": return text("account.run.completed")
+        case "uncertain": return text("account.run.uncertain")
+        case "failed": return text("account.run.failed")
+        case "cancelled": return text("account.run.cancelled")
+        default: return text("account.run.unknown")
+        }
+    }
+
+    private func cloudErrorText(_ error: Error) -> String {
+        guard let cloudError = error as? CloudSessionError else {
+            return "account.error.request"
+        }
+        switch cloudError {
+        case .signInRequired:
+            return "account.status.signin_required"
+        case .reviewChanged:
+            return "account.error.review_changed"
+        case .busy:
+            return "account.error.busy"
+        }
+    }
+
+    private func perform(
+        _ action: @escaping @MainActor () async throws -> Void,
+        failureKey: String? = nil
+    ) {
         guard !busy else { return }
-        busy = true; error = nil
-        Task { do { try await action() } catch { self.error = error.localizedDescription }; busy = false }
+        busy = true
+        error = nil
+        Task { @MainActor in
+            do {
+                try await action()
+            } catch {
+                self.error = failureKey ?? cloudErrorText(error)
+            }
+            busy = false
+        }
     }
 }

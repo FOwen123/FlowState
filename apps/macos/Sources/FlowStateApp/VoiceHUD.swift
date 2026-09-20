@@ -84,6 +84,7 @@ private final class VoiceHUDPanel: NSPanel {
 }
 
 private struct VoiceHUDView: View {
+    @ObservedObject private var localization = UILocalization.shared
     @ObservedObject var model: VoiceHUDModel
 
     var body: some View {
@@ -91,13 +92,13 @@ private struct VoiceHUDView: View {
             HStack(spacing: 10) {
                 VoiceHUDWaveform(isListening: model.isListening)
                     .frame(width: 64, height: 30)
-                    .accessibilityLabel(model.isListening ? "Listening" : "Processing")
+                    .accessibilityLabel(L10n.text(model.isListening ? "Listening" : "Processing"))
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Flow State")
+                    Text(L10n.text("Flow State"))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(VoiceHUDPalette.text)
-                    Text(model.status)
+                    Text(L10n.text(model.status))
                         .font(.system(size: 12))
                         .foregroundStyle(VoiceHUDPalette.muted)
                         .lineLimit(2)
@@ -106,14 +107,14 @@ private struct VoiceHUDView: View {
                 Spacer(minLength: 12)
 
                 HStack(spacing: 8) {
-                    Button("Finish", action: model.onFinish)
+                    Button(L10n.text("Finish"), action: model.onFinish)
                         .buttonStyle(VoiceHUDButtonStyle(tint: VoiceHUDPalette.accent))
-                        .accessibilityLabel("Finish voice session")
+                        .accessibilityLabel(L10n.text("Finish voice session"))
                         .disabled(!model.isListening)
                         .opacity(model.isListening ? 1 : 0.45)
-                    Button("Stop", action: model.onStop)
+                    Button(L10n.text("Stop"), action: model.onStop)
                         .buttonStyle(VoiceHUDButtonStyle(tint: VoiceHUDPalette.stop))
-                        .accessibilityLabel("Stop voice session")
+                        .accessibilityLabel(L10n.text("Stop voice session"))
                 }
             }
 
@@ -121,12 +122,12 @@ private struct VoiceHUDView: View {
                 .overlay(VoiceHUDPalette.divider)
                 .padding(.vertical, 12)
 
-            Text(model.transcript.isEmpty ? (model.isListening ? "Listening for your voice…" : "No transcript yet") : model.transcript)
+            Text(model.transcript.isEmpty ? (model.isListening ? L10n.text("Listening for your voice…") : L10n.text("No transcript yet")) : model.transcript)
                 .font(.system(size: 13))
                 .foregroundStyle(model.transcript.isEmpty ? VoiceHUDPalette.muted : VoiceHUDPalette.text)
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel("Latest transcript")
+                .accessibilityLabel(L10n.text("Latest transcript"))
         }
         .padding(16)
         .frame(width: 460, height: 156)

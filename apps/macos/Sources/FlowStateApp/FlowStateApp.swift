@@ -110,7 +110,7 @@ final class FlowStateAppModel: ObservableObject {
             guard taskGeneration == statusGeneration else { return }
             grant = nextGrant
             isTaskActive = true
-            taskStatus = "Active for \(bundle) — capture only runs on request"
+            taskStatus = L10n.format("Active for %@. Screenshots are taken only when requested.", L10n.appName(bundle))
         }
     }
 
@@ -162,7 +162,7 @@ final class FlowStateAppModel: ObservableObject {
                 }
                 currentInputGrant = inputGrant
                 desktopState = await desktopController.state
-                desktopStatus = "Input granted for \(bundle) — Flow State will pause on your input"
+                desktopStatus = L10n.format("Control allowed for %@. Using your mouse or keyboard pauses actions.", L10n.appName(bundle))
                 installTakeoverMonitor(for: epoch)
             } catch {
                 guard inputEpoch.isCurrent(epoch) else { return }
@@ -283,7 +283,7 @@ final class FlowStateAppModel: ObservableObject {
             do {
                 let frame = try await controller.capture(bundleIdentifier: bundle, grant: grant)
                 guard taskGeneration == statusGeneration else { return }
-                taskStatus = "Captured \(frame.image.width)×\(frame.image.height) in memory"
+                taskStatus = L10n.format("Screenshot captured (%d × %d).", frame.image.width, frame.image.height)
             } catch {
                 guard taskGeneration == statusGeneration else { return }
                 taskStatus = error.localizedDescription
@@ -300,11 +300,11 @@ final class FlowStateAppModel: ObservableObject {
         }
         onResearch = { [weak self, weak session] query in
             guard let self, let session else { return }
-            guard session.signedIn else { self.cloudStatus = "Sign in before research / 請先登入"; return }
-            self.cloudStatus = "Researching public sources / 正在研究公開來源"
+            guard session.signedIn else { self.cloudStatus = "Sign in before research"; return }
+            self.cloudStatus = "Researching public sources"
             Task {
-                do { try await session.research(query: query); self.cloudStatus = "Research ready in Cloud account / 研究結果已就緒" }
-                catch { self.cloudStatus = "Research stopped. Check the connection and sign-in. / 研究已停止。" }
+                do { try await session.research(query: query); self.cloudStatus = "Research ready in Cloud account" }
+                catch { self.cloudStatus = "Research stopped. Check the connection and sign-in." }
             }
         }
         onCancelCloud = { [weak session] in
@@ -316,17 +316,17 @@ final class FlowStateAppModel: ObservableObject {
     }
 
     func prepareCloudCommand(_ command: String) {
-        guard let cloudSession, cloudSession.signedIn else { cloudStatus = "Sign in before managed commands / 請先登入"; return }
-        guard let grant = currentInputGrant, grant.expiresAt > Date(), let target = grant.allowedBundleIdentifiers.first else { cloudStatus = "Grant input for an app first / 請先授權操作應用程式"; return }
-        cloudStatus = "Preparing a plan for review / 正在準備待確認的操作"
+        guard let cloudSession, cloudSession.signedIn else { cloudStatus = "Sign in before managed commands"; return }
+        guard let grant = currentInputGrant, grant.expiresAt > Date(), let target = grant.allowedBundleIdentifiers.first else { cloudStatus = "Grant input for an app first"; return }
+        cloudStatus = "Preparing a plan for review"
         Task {
-            do { try await cloudSession.preparePlan(command:command,targetBundleIdentifier:target,locale:speechSettings.language == .traditionalChinese ? "zh-Hant" : "en"); cloudStatus = "Review the proposed actions in Cloud account / 請至雲端帳戶檢視操作" }
-            catch { cloudStatus = "This request needs clarification or could not be planned. / 請重新說明操作。" }
+            do { try await cloudSession.preparePlan(command:command,targetBundleIdentifier:target,locale:speechSettings.language == .traditionalChinese ? "zh-Hant" : "en"); cloudStatus = "Review the proposed actions in Cloud account" }
+            catch { cloudStatus = "This request needs clarification or could not be planned." }
         }
     }
 
     func executeCloudPlan(_ plan: CloudProposal) {
-        guard !executingPlan, let session = cloudSession, let grant = currentInputGrant, grant.expiresAt > Date(), let target = grant.allowedBundleIdentifiers.first else { cloudStatus = "Renew the app input grant before continuing / 請重新授權"; return }
+        guard !executingPlan, let session = cloudSession, let grant = currentInputGrant, grant.expiresAt > Date(), let target = grant.allowedBundleIdentifiers.first else { cloudStatus = "Renew the app input grant before continuing"; return }
         executingPlan = true
         let epoch = inputEpoch.current
         Task {
@@ -354,11 +354,11 @@ final class FlowStateAppModel: ObservableObject {
                     try await session.finishStep(plan,ordinal:index,verified:true)
                     reserved = nil
                 }
-                cloudStatus = "Plan completed / 操作已完成"
+                cloudStatus = "Plan completed"
             } catch {
                 if let reserved { try? await session.finishStep(plan,ordinal:reserved,verified:false) }
                 await session.cancelPlan()
-                cloudStatus = "Plan stopped. Check the last action before trying again. / 操作已停止，請檢查最後一步。"
+                cloudStatus = "Plan stopped. Check the last action before trying again."
             }
             desktopState = await desktopController.state
         }
@@ -387,7 +387,7 @@ final class FlowStateAppModel: ObservableObject {
         let voiceToken = voiceGeneration
         preparingVoice = true
         isListening = true
-        voiceStatus = "Preparing on-device speech / 正在準備本機語音辨識"
+        voiceStatus = "Preparing on-device speech"
         Task { [weak self] in
             guard let self, voiceToken == voiceGeneration else { return }
             let currentSettings = speechSettings
@@ -408,7 +408,7 @@ final class FlowStateAppModel: ObservableObject {
                 preparingVoice = false
                 isListening = true
                 voiceStatus = currentSettings.activation == .wakePhrase
-                    ? "Listening for \(currentSettings.wakePhrase)"
+                    ? L10n.format("Listening for %@", currentSettings.wakePhrase)
                     : "Listening — say a command or press Stop"
             } catch {
                 guard voiceToken == voiceGeneration else { return }
@@ -425,12 +425,12 @@ final class FlowStateAppModel: ObservableObject {
         if preparingVoice {
             preparingVoice = false; voiceGeneration &+= 1; speechCapture.stop()
             Task { await speechCoordinator.localStop() }
-            voiceStatus = "Released before speech was ready. Hold again. / 請再次按住快捷鍵。"
+            voiceStatus = "Released before speech was ready. Hold again."
             return
         }
         speechCapture.finish()
         Task { await speechCoordinator.pushToTalkUp() }
-        voiceStatus = "Finishing transcription / 正在完成辨識"
+        voiceStatus = "Finishing transcription"
     }
 
     func stopVoiceSession() {
@@ -451,11 +451,11 @@ final class FlowStateAppModel: ObservableObject {
     }
 
     func installSpeechLanguage() {
-        voiceStatus = "Installing on-device language model… / 正在安裝語音模型"
+        voiceStatus = "Installing on-device language model…"
         let language = speechSettings.language
         Task {
-            do { try await AnalyzerSpeechCapture.installLanguage(language); voiceStatus = "Language model ready / 語音模型已就緒" }
-            catch { voiceStatus = "Could not install language model. Check your connection. / 無法安裝語音模型。" }
+            do { try await AnalyzerSpeechCapture.installLanguage(language); voiceStatus = "Language model ready" }
+            catch { voiceStatus = "Could not install language model. Check your connection." }
         }
     }
 
@@ -516,8 +516,8 @@ final class FlowStateAppModel: ObservableObject {
         if result.isFinal {
             isListening = false
             voiceStatus = result.transcript.isEmpty
-                ? "No speech detected. Try again. / 未偵測到語音，請重試。"
-                : "Transcript ready / 辨識完成"
+                ? "No speech detected. Try again."
+                : "Transcript ready"
         }
         Task {
             if speechSettings.activation == .wakePhrase,
@@ -550,13 +550,13 @@ final class FlowStateAppModel: ObservableObject {
                 executeDesktopAction(.scroll(lines: lines))
             case let .openApp(bundle):
                 guard bundle == inputBundleIdentifier else {
-                    desktopStatus = "Open \(bundle) requires an explicit input grant for that app"
+                    desktopStatus = L10n.format("Allow control of %@ before opening it.", L10n.appName(bundle))
                     return
                 }
                 executeDesktopAction(.openApplication(bundleIdentifier: bundle))
             case let .research(query):
                 if let onResearch { onResearch(query); voiceStatus = cloudStatus }
-                else { voiceStatus = "Connect your cloud account before research / 請先連結雲端帳戶" }
+                else { voiceStatus = "Connect your cloud account before research" }
             case .resume:
                 resumeInputTask()
             case .undo:
@@ -585,8 +585,8 @@ final class FlowStateAppModel: ObservableObject {
                 guard inputEpoch.isCurrent(epoch), currentInputGrant != nil else { return }
                 lastVerifiedAction = verified.undoSupport == .restoreText ? verified : nil
                 desktopState = await desktopController.state
-                desktopStatus = "Verified \(action.kind.rawValue) for \(bundle)"
-                voiceStatus = "Completed: \(action.kind.rawValue)"
+                desktopStatus = L10n.format("Completed %@ in %@.", L10n.actionName(action.kind), L10n.appName(bundle))
+                voiceStatus = L10n.format("Completed: %@", L10n.actionName(action.kind))
             } catch {
                 guard inputEpoch.isCurrent(epoch) else { return }
                 desktopState = await desktopController.state
@@ -607,7 +607,7 @@ final class FlowStateAppModel: ObservableObject {
                 guard let self, self.voiceGeneration == token else { return }
                 self.stopVoiceSession()
                 self.showsVoiceHUD = true
-                self.voiceStatus = "Speech recognition stopped. Check microphone and on-device language support. / 語音辨識已停止。"
+                self.voiceStatus = "Speech recognition stopped. Check microphone and on-device language support."
             }
         })
     }
@@ -628,12 +628,13 @@ final class FlowStateAppModel: ObservableObject {
 
 struct FlowStateMenuView: View {
     @Environment(\.openSettings) private var openSettings
+    @ObservedObject private var localization = UILocalization.shared
     @ObservedObject var model: FlowStateAppModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Flow State")
+                Text(L10n.text("Flow State"))
                     .font(.custom("Space Grotesk", size: 20, relativeTo: .headline))
                 Spacer()
                 Button {
@@ -641,61 +642,57 @@ struct FlowStateMenuView: View {
                     openSettings()
                 } label: {
                     Image(systemName: "gearshape")
-                        .accessibilityLabel("Open settings")
+                        .accessibilityLabel(L10n.text("Open settings"))
                 }
                 .buttonStyle(.plain)
             }
-            Text("A voice controller for your Mac. Sessions start only when you ask.")
+            Text(L10n.text("A voice controller for your Mac. Sessions start only when you ask."))
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
 
             statusRow("Voice", detail: model.voiceStatus, icon: "waveform")
             if !model.latestTranscript.isEmpty {
                 Text(model.latestTranscript).textSelection(.enabled)
-                    .accessibilityLabel("Latest transcript: \(model.latestTranscript)")
+                    .accessibilityLabel(L10n.format("Latest transcript: %@", model.latestTranscript))
             }
-            Button("Start voice session") { model.startVoiceSession() }
+            Button(L10n.text("Start voice session")) { model.startVoiceSession() }
 
-            Button("Stop listening") { model.stopVoiceSession() }
+            Button(L10n.text("Stop listening")) { model.stopVoiceSession() }
 
             Divider()
             statusRow("Screen capture", detail: model.permissionStatus, icon: "lock.shield")
             HStack {
-                Button("Request permission") { model.requestScreenPermission() }
-                Button("Refresh") { model.refreshPermissionStatus() }
+                Button(L10n.text("Request permission")) { model.requestScreenPermission() }
+                Button(L10n.text("Refresh")) { model.refreshPermissionStatus() }
             }
 
             Divider()
-            TextField("Approved app bundle ID", text: $model.bundleIdentifier)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Approved application bundle identifier")
+            ApplicationTargetPicker(title: "App to observe", selection: $model.bundleIdentifier)
             HStack {
-                Button("Begin task") { model.beginTask() }
+                Button(L10n.text("Begin task")) { model.beginTask() }
                     .disabled(model.isTaskActive)
-                Button("Revoke") { model.revokeTask() }
+                Button(L10n.text("Revoke")) { model.revokeTask() }
                     .disabled(!model.isTaskActive)
             }
-            Button("Capture approved window") { model.captureApprovedWindow() }
+            Button(L10n.text("Capture approved window")) { model.captureApprovedWindow() }
                 .disabled(!model.isTaskActive)
-            Text(model.taskStatus)
+            Text(L10n.text(model.taskStatus))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
 
             Divider()
-            Text("Desktop control")
+            Text(L10n.text("Desktop control"))
                 .font(.system(size: 14, weight: .medium))
-            TextField("Input grant target bundle ID", text: $model.inputBundleIdentifier)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel("Desktop input grant target bundle identifier")
+            ApplicationTargetPicker(title: "App to control", selection: $model.inputBundleIdentifier)
             HStack {
-                Button("Grant input") { model.beginInputTask() }
-                Button("Cancel") { model.cancelInputTask() }
+                Button(L10n.text("Grant input")) { model.beginInputTask() }
+                Button(L10n.text("Cancel")) { model.cancelInputTask() }
             }
             HStack {
-                Button("Resume") { model.resumeInputTask() }
-                Button("Undo last edit") { model.undoLastDesktopAction() }
+                Button(L10n.text("Resume")) { model.resumeInputTask() }
+                Button(L10n.text("Undo last edit")) { model.undoLastDesktopAction() }
             }
-            Text(model.desktopStatus)
+            Text(L10n.text(model.desktopStatus))
                 .font(.system(size: 12))
                 .foregroundStyle(model.desktopState == .pausedForUser ? .orange : .secondary)
         }
@@ -711,8 +708,8 @@ struct FlowStateMenuView: View {
                 .frame(width: 18)
                 .foregroundStyle(PaperStyle.secondary)
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.system(size: 14, weight: .medium))
-                Text(detail).font(.system(size: 12)).foregroundStyle(PaperStyle.muted)
+                Text(L10n.text(title)).font(.system(size: 14, weight: .medium))
+                Text(L10n.text(detail)).font(.system(size: 12)).foregroundStyle(PaperStyle.muted)
             }
         }
     }
@@ -731,5 +728,6 @@ struct FlowStateApp: App {
         Settings {
             FlowStateSettingsView(model: model)
         }
+        .defaultSize(width: 960, height: 680)
     }
 }

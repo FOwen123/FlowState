@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "FlowStateMac",
+    defaultLocalization: "en",
     platforms: [
         .macOS("26.2")
     ],
@@ -18,7 +19,7 @@ let package = Package(
     targets: [
         .target(name: "FlowStateCore"),
         .target(name: "FlowStateCloud", dependencies: ["FlowStateCore", .product(name: "ClerkConvex", package: "clerk-convex-swift"), .product(name: "ClerkKit", package: "clerk-ios"), .product(name: "ConvexMobile", package: "convex-swift")]),
-        .executableTarget(name: "FlowStateApp", dependencies: ["FlowStateCore", "FlowStateCloud"]),
+        .executableTarget(name: "FlowStateApp", dependencies: ["FlowStateCore", "FlowStateCloud"], resources: [.process("Resources")]),
         .testTarget(name: "FlowStateCoreTests", dependencies: ["FlowStateCore"]),
         .testTarget(name: "FlowStateCloudTests", dependencies: ["FlowStateCloud"]),
         .testTarget(name: "FlowStateAppTests", dependencies: ["FlowStateApp"])
