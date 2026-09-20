@@ -36,6 +36,7 @@ export default defineSchema({
     name: v.optional(v.string()),
     createdAt: v.number(),
     lastSeenAt: v.number(),
+    revokedAt: v.optional(v.number()),
   })
     .index("by_owner_device", ["ownerKey", "deviceId"])
     .index("by_device_id", ["deviceId"]),
@@ -94,6 +95,7 @@ export default defineSchema({
     ownerKey: v.string(),
     runId: v.id("workflowRuns"),
     actionKind: v.string(),
+    sender: v.optional(v.string()),
     recipient: v.string(),
     subject: v.string(),
     body: v.string(),
@@ -144,4 +146,67 @@ export default defineSchema({
     selected: v.boolean(),
     createdAt: v.number(),
   }).index("by_run", ["runId", "createdAt"]),
+
+  actionPlans: defineTable({
+    ownerKey: v.string(),
+    deviceId: v.string(),
+    command: v.string(),
+    completedSteps: v.optional(v.number()),
+    executingStep: v.optional(v.number()),
+    locale: v.union(v.literal("en"), v.literal("zh-Hant")),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("planning"),
+      v.literal("awaiting_approval"),
+      v.literal("approved"),
+      v.literal("executing"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("cancelled"),
+      v.literal("uncertain"),
+    ),
+    explanation: v.optional(v.string()),
+    actionsJson: v.optional(v.string()),
+    capabilitiesJson: v.optional(v.string()),
+    planFingerprint: v.optional(v.string()),
+    cancellationGeneration: v.number(),
+    expiresAt: v.number(),
+    errorCode: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["ownerKey", "updatedAt"])
+    .index("by_owner_device", ["ownerKey", "deviceId", "updatedAt"]),
+
+  usageCounters: defineTable({
+    ownerKey: v.string(),
+    period: v.string(),
+    researchCount: v.number(),
+    planningCount: v.number(),
+    mailCount: v.number(),
+    providerBytes: v.number(),
+    updatedAt: v.number(),
+  }).index("by_owner_period", ["ownerKey", "period"]),
+
+  agentMailEvents: defineTable({
+    eventId: v.string(),
+    eventType: v.string(),
+    inboxId: v.string(),
+    threadId: v.optional(v.string()),
+    messageId: v.optional(v.string()),
+    deliveryState: v.optional(
+      v.union(
+        v.literal("sent"),
+        v.literal("delivered"),
+        v.literal("bounced"),
+        v.literal("complained"),
+        v.literal("rejected"),
+        v.literal("received"),
+      ),
+    ),
+    receivedAt: v.number(),
+    payloadJson: v.string(),
+  })
+    .index("by_event_id", ["eventId"])
+    .index("by_message_id", ["messageId"]),
 });

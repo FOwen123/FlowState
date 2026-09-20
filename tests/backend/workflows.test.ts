@@ -28,6 +28,7 @@ afterEach(() => {
 });
 
 async function createReadyRun() {
+  process.env.FLOWSTATE_AGENTMAIL_INBOX_ID ??= "flowstate@example.com";
   const t = convexTest(schema, modules);
   const user = t.withIdentity(ownerA);
   await user.mutation(api.workflows.registerDevice, { deviceId: "device-owner-a" });
@@ -76,6 +77,7 @@ describe("authenticated workflow state", () => {
 
     await expect(
       user.mutation(api.workflows.approveResearchEmail, {
+        sender: process.env.FLOWSTATE_AGENTMAIL_INBOX_ID ?? "flowstate@example.com",
         runId,
         recipient: "owner@example.com",
         subject: "Changed title",
@@ -85,24 +87,114 @@ describe("authenticated workflow state", () => {
 
     await expect(
       user.mutation(api.workflows.approveResearchEmail, {
+        sender: process.env.FLOWSTATE_AGENTMAIL_INBOX_ID ?? "flowstate@example.com",
         runId,
         recipient: "owner@example.com",
         subject: "Example article",
         body: "A reviewed public article note.",
       }),
     ).resolves.toMatchObject({ status: "approved" });
+  });
+
+  it("allows explicit reapproval of an unchanged draft without a delivery attempt", async () => {
+    process.env.FLOWSTATE_ALLOWED_TEST_RECIPIENTS = "owner@example.com";
+    process.env.FLOWSTATE_AGENTMAIL_INBOX_ID = "flowstate@example.com";
+    const { t, user, runId } = await createReadyRun();
+    const reviewed = {
+      sender: "flowstate@example.com",
+      runId,
+      recipient: "owner@example.com",
+      subject: "Example article",
+      body: "A reviewed public article note.",
+    };
+
+    const first = await user.mutation(api.workflows.approveResearchEmail, reviewed);
+    const second = await user.mutation(api.workflows.approveResearchEmail, reviewed);
+
+    expect(second.approvalId).not.toBe(first.approvalId);
     await expect(
-      user.mutation(api.workflows.approveResearchEmail, {
+      t.run(async (ctx) => ctx.db.query("approvals").withIndex("by_run", (q) => q.eq("runId", runId)).collect()),
+    ).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ _id: first.approvalId, status: "expired" }),
+      expect.objectContaining({ _id: second.approvalId, status: "approved" }),
+    ]));
+    await expect(
+      user.action(api.workflows.sendApprovedResearchEmail, { runId, approvalId: first.approvalId }),
+    ).rejects.toThrow("no longer approved");
+  });
+
+  it("requires a fresh approved draft to keep recipient, sender, subject, and body exact", async () => {
+    process.env.FLOWSTATE_ALLOWED_TEST_RECIPIENTS = "owner@example.com,other@example.com";
+    process.env.FLOWSTATE_AGENTMAIL_INBOX_ID = "flowstate@example.com";
+    const { user, runId } = await createReadyRun();
+    const reviewed = {
+      sender: "flowstate@example.com",
+      runId,
+      recipient: "owner@example.com",
+      subject: "Example article",
+      body: "A reviewed public article note.",
+    };
+    await user.mutation(api.workflows.approveResearchEmail, reviewed);
+
+    await expect(user.mutation(api.workflows.approveResearchEmail, { ...reviewed, recipient: "other@example.com" })).rejects.toThrow("approved email changed");
+    await expect(user.mutation(api.workflows.approveResearchEmail, { ...reviewed, sender: "other@example.com" })).rejects.toThrow("sender changed");
+    await expect(user.mutation(api.workflows.approveResearchEmail, { ...reviewed, subject: "Changed subject" })).rejects.toThrow("approved email changed");
+    await expect(user.mutation(api.workflows.approveResearchEmail, { ...reviewed, body: "Changed body" })).rejects.toThrow("approved email changed");
+  });
+
+  it("rejects fresh approval while a prior delivery is pending, uncertain, or sent", async () => {
+    process.env.FLOWSTATE_ALLOWED_TEST_RECIPIENTS = "owner@example.com";
+    process.env.FLOWSTATE_AGENTMAIL_INBOX_ID = "flowstate@example.com";
+    for (const status of ["pending", "uncertain", "succeeded"] as const) {
+      const { t, user, runId } = await createReadyRun();
+      const reviewed = {
+        sender: "flowstate@example.com",
         runId,
         recipient: "owner@example.com",
         subject: "Example article",
         body: "A reviewed public article note.",
-      }),
-    ).rejects.toThrow("not awaiting email approval");
+      };
+      const { approvalId } = await user.mutation(api.workflows.approveResearchEmail, reviewed);
+      await t.run(async (ctx) => {
+        await ctx.db.patch(runId, { status: "approved" });
+        await ctx.db.insert("deliveryAttempts", {
+          ownerKey: ownerA.tokenIdentifier,
+          runId,
+          approvalId,
+          provider: "agentmail",
+          idempotencyKey: `prior-${status}`,
+          status,
+          requestFingerprint: "prior-fingerprint",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      });
+      await expect(user.mutation(api.workflows.approveResearchEmail, reviewed)).rejects.toThrow("pending or uncertain");
+    }
   });
 });
 
 describe("delivery recovery", () => {
+  it("binds a reviewed sender inbox and rejects a changed sender before provider calls", async () => {
+    process.env.FLOWSTATE_ALLOWED_TEST_RECIPIENTS = "owner@example.com";
+    process.env.FLOWSTATE_AGENTMAIL_INBOX_ID = "bound@example.com";
+    const { user, runId } = await createReadyRun();
+    const { approvalId } = await user.mutation(api.workflows.approveResearchEmail, {
+        sender: process.env.FLOWSTATE_AGENTMAIL_INBOX_ID ?? "flowstate@example.com",
+      runId,
+      recipient: "owner@example.com",
+      subject: "Example article",
+      body: "A reviewed public article note.",
+    });
+    process.env.FLOWSTATE_AGENTMAIL_INBOX_ID = "different@example.com";
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ message_id: "bad", thread_id: "bad" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    await expect(
+      user.action(api.workflows.sendApprovedResearchEmail, { runId, approvalId }),
+    ).rejects.toThrow("sender");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("runs public research through Firecrawl, Jev, OpenAI, and AgentMail", async () => {
     process.env.FLOWSTATE_ALLOWED_TEST_RECIPIENTS = "owner@example.com";
     process.env.FLOWSTATE_AGENTMAIL_INBOX_ID = "flowstate@example.com";
@@ -171,8 +263,12 @@ describe("delivery recovery", () => {
       title: "Example article",
     });
     const preview = await user.query(api.workflows.getResearchRun, { runId });
-    expect(preview.note).toMatchObject({ title: "Example article", body: "A sourced research note." });
+    expect(preview.note).toMatchObject({
+      title: "Example article",
+      body: expect.stringContaining("A sourced research note."),
+    });
     const { approvalId } = await user.mutation(api.workflows.approveResearchEmail, {
+        sender: process.env.FLOWSTATE_AGENTMAIL_INBOX_ID ?? "flowstate@example.com",
       runId,
       recipient: "owner@example.com",
       subject: preview.note?.title ?? "",
@@ -201,6 +297,7 @@ describe("delivery recovery", () => {
     process.env.AGENTMAIL_API_KEY = "am-test";
     const { t, user, runId } = await createReadyRun();
     const { approvalId } = await user.mutation(api.workflows.approveResearchEmail, {
+        sender: process.env.FLOWSTATE_AGENTMAIL_INBOX_ID ?? "flowstate@example.com",
       runId,
       recipient: "owner@example.com",
       subject: "Example article",
@@ -232,6 +329,7 @@ describe("delivery recovery", () => {
     process.env.AGENTMAIL_API_KEY = "am-test";
     const { user, runId } = await createReadyRun();
     const { approvalId } = await user.mutation(api.workflows.approveResearchEmail, {
+        sender: process.env.FLOWSTATE_AGENTMAIL_INBOX_ID ?? "flowstate@example.com",
       runId,
       recipient: "owner@example.com",
       subject: "Example article",
@@ -329,4 +427,23 @@ describe("delivery recovery", () => {
       sources: [],
     });
   });
+});
+
+it("rejects an inbox change between review and approval", async () => {
+  process.env.FLOWSTATE_ALLOWED_TEST_RECIPIENTS = "owner@example.com";
+  process.env.FLOWSTATE_AGENTMAIL_INBOX_ID = "changed@example.com";
+  const { user, runId } = await createReadyRun();
+  await expect(user.mutation(api.workflows.approveResearchEmail, {runId, sender:"reviewed@example.com", recipient:"owner@example.com",subject:"Example article",body:"A reviewed public article note."})).rejects.toThrow("sender changed");
+});
+
+it("rejects legacy approvals without an exact reviewed sender", async () => {
+  process.env.FLOWSTATE_ALLOWED_TEST_RECIPIENTS = "owner@example.com";
+  process.env.AGENTMAIL_API_KEY = "synthetic-test-key";
+  const { t, user, runId } = await createReadyRun();
+  const { approvalId } = await user.mutation(api.workflows.approveResearchEmail, {runId, sender:"flowstate@example.com",recipient:"owner@example.com",subject:"Example article",body:"A reviewed public article note."});
+  await t.run(ctx => ctx.db.patch(approvalId,{sender:undefined}));
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({message_id:"test",thread_id:"test-thread"}),{status:200}));
+  vi.stubGlobal("fetch",fetch);
+  await expect(user.action(api.workflows.sendApprovedResearchEmail,{runId,approvalId})).rejects.toThrow("sender");
+  expect(fetch).not.toHaveBeenCalled();
 });

@@ -19,7 +19,8 @@
     "@clerk/react": "^6.16.1",
     "convex": "^1.46.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "svix": "2.5.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

@@ -24,11 +24,14 @@ vi.mock("convex/react", () => ({
   },
   useAction: () => mocks.send,
   useQuery: (ref: Parameters<typeof getFunctionName>[0], args: unknown) => {
+    if (getFunctionName(ref) === "deliveries:forRun")
+      return [{ eventType: "message.delivered", receivedAt: 1 }];
     if (getFunctionName(ref) === "history:recent")
       return [{ id: "run1", title: "Saved note", status: mocks.status }];
     if (args === "skip") return undefined;
     return {
       id: "run1",
+      sender: "assistant@example.test",
       status: mocks.status,
       error: null,
       note:
@@ -74,6 +77,7 @@ it("renders the flat backend run and approves the exact note before sending", as
     }),
   );
   expect(mocks.approve).toHaveBeenCalledWith({
+    sender: "assistant@example.test",
     runId: "run1",
     recipient: "test@example.com",
     subject: "Saved note",
@@ -100,4 +104,12 @@ it("can cancel running research without offering email retraction", async () => 
   await waitFor(() =>
     expect(mocks.cancel).toHaveBeenCalledWith({ runId: "run1" }),
   );
+});
+
+it("shows server delivery evidence separately from provider acceptance", () => {
+  mocks.status = "completed";
+  openRun();
+  expect(
+    screen.getByText(/Delivered to the recipient.s mail server/),
+  ).toBeTruthy();
 });

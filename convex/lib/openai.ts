@@ -14,6 +14,7 @@ export type OpenAIResponseResult = {
   outputText: string;
 };
 
+
 type OpenAIClientOptions = {
   apiKey?: string;
   baseUrl?: string;
@@ -96,5 +97,6 @@ export function createOpenAIClient(options: OpenAIClientOptions) {
         outputText: parseOutputText(response),
       };
     },
+
   };
 }

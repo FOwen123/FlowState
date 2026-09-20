@@ -1,6 +1,6 @@
 # FlowState implementation checklist
 
-Updated September 20, 2026. Product authority: [PRODUCT.md](PRODUCT.md). Contributor rules: [AGENTS.md](AGENTS.md). Account/configuration checklist: [ENVIRONMENT.md](ENVIRONMENT.md).
+Updated September 20, 2026. Current implementation scope: sections 1–11. Product authority: [PRODUCT.md](PRODUCT.md). Contributor rules: [AGENTS.md](AGENTS.md). Account/configuration checklist: [ENVIRONMENT.md](ENVIRONMENT.md).
 
 Implementation has started. See [verification results](docs/testing/results.md) for completed evidence and [setup instructions](docs/setup.md) for configuration. Unchecked items remain open acceptance gates; some contain partial implementation. Paths below are planning targets and may be consolidated in the actual code. Keep modules together until their responsibilities justify splitting them. Complete each slice with failing behavioral tests, implementation, relevant checks, and observed user-facing behavior. Do not start servers, production builds, or deployments merely to check this document.
 
@@ -12,13 +12,17 @@ Verified on the current local host, September 20, 2026:
 |---|---|---|
 | Primary Mac | MacBook Pro; Apple M5 Pro, 15 CPU cores; 24 GB unified memory; macOS 26.6.2 | Native UI, microphone, bilingual speech, Accessibility, capture, physical takeover, performance and end-to-end workflows |
 | Installed tools | Xcode 27.0; Swift 6.4; Node 24.15.0; pnpm 11.10.0 | Baseline inventory; validate dependency compatibility and pin supported versions during setup |
-| Development services | Separate Convex development deployment and provider test resources; not yet configured | Authentication, database isolation, model calls, research and approved email tests |
+| Development services | Convex development deployment configured; real provider checks and one approved AgentMail delivery verified | Authentication, database isolation, model calls, research and approved email tests |
 | Browser on primary Mac | Brave for intended daily use; Safari for native baseline | Public web companion, cross-app workflows and focus checks; record installed versions at test time |
 | Release validation | Separate macOS test account, then a second clean supported Mac when available | Fresh onboarding, signing, permissions, update and uninstall; second computer not yet supplied |
 
-Native unit tests now run with synthetic capture data; the native app has not been exercised interactively. Do not infer Intel, older macOS, lower-memory, or other Mac compatibility from this machine. Hostinger VPS is not required for the selected managed architecture and cannot validate native macOS behavior. Cloud CI can later run portable checks, but does not replace microphone, permissions, or input-control tests on a Mac.
+Native unit tests now run with synthetic capture data; the native app has not been exercised interactively. Do not infer Intel, older macOS, lower-memory, or other Mac compatibility from this machine. Hostinger VPS is not required for the selected managed architecture and cannot validate native macOS behavior. Microphone, permissions and input-control checks require a real Mac.
 
 For every measured run, record commit, OS/app/model versions, test language, target app, peak memory, latency, result, corrections and physical interventions in `docs/testing/results.md`. Keep raw private audio/screenshots out of test evidence.
+
+## Current implementation boundary
+
+Sections 1–11 remain the target, not a completion claim. Implemented slices include the Paper-derived web/settings UI, local speech and desktop execution, managed command review, owner-scoped Convex preferences/grants/usage/deletion, and live public research plus AgentMail delivery. Real microphone/Accessibility acceptance, authenticated Clerk sessions, visual interaction, Gmail-in-Brave automation, attachments, synchronized Mac/web memory, and complete creative workflows remain open. The app currently requires macOS 26.2 or newer. See the verification record for evidence and limitations.
 
 ## 1. Repository and contract foundation
 
@@ -29,7 +33,7 @@ Files: `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `tsconfig.json`,
 - [x] Ignore credentials, local configuration and generated output. Capture currently stays in memory; no recording persistence is implemented.
 - [ ] Define concrete action/run/step/result schemas and shared Swift/TypeScript fixtures; reject unknown fields/actions.
 - [ ] Add actual typecheck, lint and test commands; document native test invocation after the scheme exists.
-- [x] Add placeholder-only configuration examples from ENVIRONMENT.md; validate missing required settings clearly (presence only; live validity remains unverified).
+- [x] Add placeholder-only configuration examples from ENVIRONMENT.md; validate missing required settings clearly (presence only; live development provider checks recorded in docs/testing/results.md).
 
 Verify: primary Mac; fixture parity and invalid-input tests pass, scripts resolve, no secrets tracked. Scaffold does not count as a working controller.
 
@@ -148,7 +152,7 @@ Files: `convex/research.ts`, `convex/mail.ts`, `convex/http.ts`, `convex/deliver
 - [ ] Add Firecrawl current-public-page extraction and multi-source research with citations.
 - [ ] Keep private browser sessions/cookies outside public retrieval requests.
 - [ ] Add AgentMail assistant inbox, threads, attachments and reviewed draft/send flow.
-- [ ] Implement personal mailbox access through an approved provider connection or desktop adapter; choose after provider is known.
+- [ ] Implement personal mailbox access through Gmail in Brave (selected by Owen); keep assistant AgentMail identity separate.
 - [ ] Show sender, recipient, subject, body and attachments before authorized sending.
 - [ ] Verify webhook authenticity, deduplicate events and distinguish accepted from delivered.
 - [ ] Enforce guest isolation, allowed public requests, retention and usage limits.
@@ -170,9 +174,8 @@ Verify: primary Mac; distinguish mocked tests from live service/UI evidence. Use
 
 ## 12. Distribution and hackathon submission
 
-Files: `docs/release.md`, `docs/setup.md`, `docs/security.md`, `.github/workflows/checks.yml`, `apps/web/src/pages/Demo.tsx`, `README.md`, `HACKATHON_REQUIREMENTS.md`, `hackathon.md`.
+Files: `docs/release.md`, `docs/setup.md`, `docs/security.md`, `apps/web/src/pages/Demo.tsx`, `README.md`, `HACKATHON_REQUIREMENTS.md`, `hackathon.md`.
 
-- [ ] Add CI for implemented checks using compatible runners; native interactive tests stay on real Macs.
 - [ ] Verify clean-account onboarding and release credential availability.
 - [ ] Configure signing/notarization and a supported update path; exercise installation/update/uninstall when authorized to produce a release.
 - [ ] Reconcile old stack recommendations in HACKATHON_REQUIREMENTS.md and recheck official event rules.

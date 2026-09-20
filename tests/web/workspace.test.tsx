@@ -132,3 +132,26 @@ describe("research workspace", () => {
     expect(screen.getByRole("button", { name: "研究文章" })).toBeTruthy();
   });
 });
+it("shows the configured sender in the exact email review", () => {
+  render(
+    <Workspace
+      configured
+      sender="assistant@example.com"
+      onSend={vi.fn()}
+      note={{
+        id: "run1",
+        title: "Summary",
+        body: "Content",
+        url: "https://example.com",
+        status: "ready",
+      }}
+    />,
+  );
+  fireEvent.change(screen.getByLabelText("Recipient"), {
+    target: { value: "test@example.com" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Review email" }));
+  expect(screen.getByRole("dialog").textContent).toContain(
+    "assistant@example.com",
+  );
+});

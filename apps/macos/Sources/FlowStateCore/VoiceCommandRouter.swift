@@ -1,6 +1,6 @@
 import Foundation
 
-public enum VoiceMode: String, CaseIterable, Sendable {
+public enum VoiceMode: String, CaseIterable, Codable, Sendable {
     case command
     case dictation
 }
@@ -9,6 +9,9 @@ public enum VoiceCommand: Equatable, Sendable {
     case stop
     case scroll(Int32)
     case openApp(String)
+    case research(String)
+    case resume
+    case undo
     case dictate(String)
     case unknown
 }
@@ -20,8 +23,16 @@ public enum VoiceCommandRouter {
         guard !text.isEmpty else { return .unknown }
         guard mode == .command else { return .dictate(text) }
         let command = text.lowercased().trimmingCharacters(in: .punctuationCharacters)
+        for prefix in ["research ", "研究 ", "查詢 ", "搜尋 "] {
+            if command.hasPrefix(prefix) {
+                let query = String(text.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+                return query.isEmpty ? .unknown : .research(query)
+            }
+        }
         switch command {
         case "stop", "cancel", "停止", "取消": return .stop
+        case "resume", "continue", "繼續", "恢復": return .resume
+        case "undo", "撤銷", "復原": return .undo
         case "scroll down", "往下捲動", "向下滾動", "往下滾動": return .scroll(-3)
         case "scroll up", "往上捲動", "向上滾動", "往上滾動": return .scroll(3)
         case "open brave", "開啟 brave", "打開 brave": return .openApp("com.brave.Browser")

@@ -6,6 +6,7 @@ import { Workspace } from "./Workspace";
 type RunView = {
   id: string;
   status: string;
+  sender?: string | null;
   note: {
     id: string;
     title: string;
@@ -40,7 +41,13 @@ const getRun = makeFunctionReference<
 >("workflows:getResearchRun");
 const approveEmail = makeFunctionReference<
   "mutation",
-  { runId: string; recipient: string; subject: string; body: string },
+  {
+    runId: string;
+    recipient: string;
+    subject: string;
+    body: string;
+    sender: string;
+  },
   { approvalId: string }
 >("workflows:approveResearchEmail");
 const sendEmail = makeFunctionReference<
@@ -48,6 +55,12 @@ const sendEmail = makeFunctionReference<
   { runId: string; approvalId: string },
   unknown
 >("workflows:sendApprovedResearchEmail");
+
+const deliveryReceipts = makeFunctionReference<
+  "query",
+  { runId: string },
+  Array<{ eventType: string; receivedAt: number }>
+>("deliveries:forRun");
 
 const recentRuns = makeFunctionReference<
   "query",
@@ -75,6 +88,7 @@ export function LiveWorkspace() {
   const send = useAction(sendEmail);
   const data = useQuery(getRun, runId ? { runId } : "skip");
   const note = data?.note;
+  const receipts = useQuery(deliveryReceipts, runId ? { runId } : "skip");
   const history = useQuery(recentRuns, {});
   return (
     <>
@@ -144,7 +158,23 @@ export function LiveWorkspace() {
         </div>
       )}
       {cancelError && <p role="alert">{cancelError}</p>}
+      {data?.status === "completed" && (
+        <p className="auth" role="status">
+          {receipts?.some((r) =>
+            [
+              "message.bounced",
+              "message.rejected",
+              "message.complained",
+            ].includes(r.eventType),
+          )
+            ? "Delivery problem reported. Check the assistant inbox. / 郵件傳遞發生問題。"
+            : receipts?.some((r) => r.eventType === "message.delivered")
+              ? "Delivered to the recipient’s mail server. Inbox placement is not confirmed. / 已送達收件伺服器。"
+              : "Accepted for sending. Delivery has not been confirmed. / 已接受寄送，尚未確認送達。"}
+        </p>
+      )}
       <Workspace
+        sender={data?.sender ?? undefined}
         configured
         note={note ?? undefined}
         onResearch={async (url, language) => {
@@ -176,7 +206,12 @@ export function LiveWorkspace() {
         onSend={async (id, recipient) => {
           if (!note || note.id !== id)
             throw new Error("The note changed. Review it again.");
+          if (!data?.sender)
+            throw new Error(
+              "Sender inbox is unavailable. Review again after configuration.",
+            );
           const approval = await approve({
+            sender: data.sender,
             runId: id,
             recipient,
             subject: note.title,

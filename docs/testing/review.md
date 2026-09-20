@@ -1,11 +1,23 @@
-# Independent foundation review
+# Independent core review
 
-Date: September 20, 2026. Branch: `codex/flowstate-foundation`.
+September 20, 2026. Branch: `codex/flowstate-foundation`. Implementation and review agents use separate Git worktrees. The reviews below were completed before committing the implementation.
 
-A separate read-only review agent reviewed the final frozen source before commit. It found no remaining must-fix source issue for this development foundation.
+The backend reviewer checked ownership, device revocation, grant scope, retry quotas, exact sender approval, retention, signed AgentMail receipts and the native execution reservation path. Its backend run passed 46 tests and TypeScript checking; root's later cancellation regression raised the combined suite count. No automatic email retry was introduced.
 
-Verified regressions: cached successful-send replay, one provider call for concurrent sends, rejection of duplicate approvals, generation-guarded research cancellation, removal of debug logging, configured web/backend contract, cancellation UI, uncertain-delivery guidance and ownership isolation.
+Native review found an embedded application-target mismatch and focused-element races. Corrections bind the opened app to its grant, compare actual AX element identity before effects, and recheck text before undo. The reviewer observed failing regressions before fixes; the two new focused tests and its core suite passed. Root integrated the changes and its full native suite passed. The review worktree's cloud fixture test failed because it lacked the shared JSON fixture; the main-worktree cloud suite passed with that fixture present.
 
-The reviewer independently ran 38 TypeScript/web tests, 2 Chromium tests, 9 Swift tests, TypeScript checking, formatting and diff checks successfully. Its final documentation finding was a missing review record; this file resolves that finding.
+Another finding showed that finishing while SpeechAnalyzer was preparing could leave startup active. Root reproduced that state in a failing test and fixed finish to cancel preparation. It also prevents an obsolete startup failure from stopping a newer session.
 
-This is not a production-readiness approval. Live Convex code generation/authentication, real provider calls, deployment, actual native screen capture and the broader voice/controller features remain unverified or unimplemented as listed in [results.md](results.md). Uncertain mail acceptance currently requires manual sent-history inspection; no automatic reconciliation or unsafe retry is exposed.
+The typed native planner bridge initially used capability/executor names different from the backend. The bridge now uses actual backend fixtures and rejects unsupported actions, visual targets, mismatched capability/approval flags and unknown fields. Live planning initially failed safely on a missing scroll target; explicit per-action schema instructions corrected the probe.
+
+The latest independent review found a missing post-response validity check in cloud step claiming; the client now rechecks authentication, plan identity, generation and expiry before returning to native execution. The native lifecycle integration cancels desktop work on session loss and physical takeover, and ignores Flow State's own settings events. The approved-but-unsent email finding was reproduced and fixed: explicit reapproval of an unchanged draft expires the prior approval, while pending, uncertain or sent attempts block recovery. The focused recovery tests and 49-test backend suite passed. No provider sends were made.
+
+The review found no new personal-mail binding defect; compose fields are frozen for review, literal plus signs are encoded, and the helper has no send operation. Remote plans/grants cannot be guaranteed cancelled after credentials are already revoked; local effects stop, while server authorization expires. An OS activation already dispatched may complete after Stop; the app does not claim it can undo that external effect.
+
+A final review found stale local-action and takeover callbacks. Root reproduced the missing synchronous paused/cancelled state in a failing test, then added immediate model-state changes, grant/epoch checks, monitor-generation guards and isolated cleanup. The final Swift suite passes. The reviewer confirmed those fixes, then found an older cancellation could mutate a newly granted controller. Controller lifecycle mutations now accept monotonic epochs and reject older transitions; a new regression and the full Swift suite pass. The independent reviewer confirmed the final epoch fix closes the reported regrant race. The bounded review is complete; unresolved acceptance items are recorded in the test results. These reviews do not establish microphone, Accessibility, authentication or full workflow acceptance; see [results.md](results.md).
+
+## Packaged menu, audio and HUD follow-up
+
+The user reported unresponsive Settings/Start controls. Root reproduced the Settings gear failure through the real Accessibility button; explicit activation and openSettings fixed that same check. Start first required an app-installed language asset, then exposed a main-actor assertion on the real audio callback thread. Explicit `@Sendable` on the tap closure fixed the reproduced crash. Live Start/Stop then passed, and the owner's screenshot confirmed a real microphone transcript in both menu and HUD.
+
+The native worker implemented the nonactivating HUD in its separate worktree. The independent reviewer checked the audio callback, HUD model wiring and Settings change, then found a stale Stop status overwrite. A captured voice generation now guards that asynchronous status write; the reviewer confirmed the correction. Final cosmetic feedback changes do not broaden routing or grant scope. Recognition of free-form requests, actual shortcut use and approved multi-app control still need acceptance.

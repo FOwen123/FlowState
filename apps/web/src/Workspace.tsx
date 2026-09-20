@@ -9,6 +9,7 @@ export type Note = {
 };
 type Props = {
   configured: boolean;
+  sender?: string;
   note?: Note;
   onResearch?: (url: string, language: "en" | "zh-Hant") => Promise<void>;
   onSearch?: (query: string, language: "en" | "zh-Hant") => Promise<void>;
@@ -74,6 +75,7 @@ const labels = {
 
 export function Workspace({
   configured,
+  sender,
   note,
   onResearch,
   onSearch,
@@ -84,13 +86,18 @@ export function Workspace({
   const [mode, setMode] = useState<"article" | "topic">("article");
   const [topic, setTopic] = useState("");
   const [recipient, setRecipient] = useState("");
-  const [approval, setApproval] = useState<{ note: Note; recipient: string }>();
+  const [approval, setApproval] = useState<{
+    note: Note;
+    recipient: string;
+    sender?: string;
+  }>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const l = labels[language];
   const approvalCurrent =
     configured &&
+    approval?.sender === sender &&
     note?.status === "ready" &&
     approval?.note.id === note.id &&
     approval.note.title === note.title &&
@@ -215,7 +222,7 @@ export function Workspace({
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  setApproval({ note: { ...note }, recipient });
+                  setApproval({ note: { ...note }, recipient, sender });
                 }}
               >
                 <label htmlFor="recipient">{l.recipient}</label>
@@ -253,6 +260,9 @@ export function Workspace({
       {approval && approvalCurrent && (
         <section className="approval" role="dialog" aria-label={l.dialog}>
           <h2>{l.dialog}</h2>
+          <p>
+            From / 寄件人: {approval.sender ?? "Configured assistant inbox"}
+          </p>
           <p>
             {l.recipient}: <strong>{approval.recipient}</strong>
           </p>

@@ -67,6 +67,10 @@ test("actual app starts without keys and makes no provider calls", async ({
   await page.setContent('<div id="root"></div>');
   await page.addScriptTag({ content: bundle.outputFiles[0].text });
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    "Your Mac,in your words.",
+  );
+  await page.getByRole("button", { name: "Open workspace" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Less effort. More flow.",
   );
   await expect(
@@ -74,4 +78,49 @@ test("actual app starts without keys and makes no provider calls", async ({
   ).toBeDisabled();
   expect(errors).toEqual([]);
   expect(requests).toEqual([]);
+});
+
+test("Paper landing remains usable on desktop and mobile", async ({ page }) => {
+  const bundle = await build({
+    stdin: {
+      contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import {Landing} from './apps/web/src/Landing'; createRoot(document.getElementById('root')).render(<Landing onOpen={()=>{window.__opened=true}} />)`,
+      resolveDir: process.cwd(),
+      loader: "tsx",
+    },
+    bundle: true,
+    write: false,
+    format: "iife",
+    define: { "process.env.NODE_ENV": '"test"' },
+  });
+  await page.setViewportSize({ width: 1440, height: 1068 });
+  await page.setContent('<div id="root"></div>');
+  await page.addStyleTag({
+    content: await readFile("apps/web/src/style.css", "utf8"),
+  });
+  await page.addScriptTag({ content: bundle.outputFiles[0].text });
+  await expect(
+    page.getByRole("button", { name: "Download for Mac" }),
+  ).toBeDisabled();
+  await page.screenshot({
+    path: "test-results/paper-landing-desktop.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Privacy", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Privacy", exact: true }),
+  ).toBeFocused();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.getByRole("button", { name: "Open workspace" }).click();
+  expect(await page.evaluate("window.__opened")).toBe(true);
+  await page.screenshot({
+    path: "test-results/paper-landing-mobile.png",
+    fullPage: true,
+  });
 });
