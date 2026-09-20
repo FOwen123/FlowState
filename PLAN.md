@@ -111,8 +111,8 @@ Verify: mocked contract tests first, then configured development provider calls;
 
 Files: `apps/macos/FlowState/Safety/PermissionPolicy.swift`, `Safety/GrantStore.swift`, `UI/ControlSettingsView.swift`, `UI/ApprovalView.swift`, `Actions/FileActions.swift`, `Context/ApprovedFiles.swift`, `convex/grants.ts`, `convex/retention.ts`, `apps/macos/FlowStateTests/PolicyTests.swift`, `convex/tests/grants.test.ts`, `docs/privacy.md`.
 
-- [ ] Separate per-app observation, input, file access, upload, send and spending grants.
-- [ ] Display duration, expiry, revoke controls and grants used by the current task.
+- [ ] Use macOS Accessibility access for automatic active/named-app control. Keep runtime app/window scopes internal; retain separate Screen Recording and cloud screenshot consent, file access, upload, send and spending permissions.
+- [ ] Display the automatically resolved target, current activity and recovery controls. Renew internal desktop scopes automatically for a new command; expose file/send/spending approvals when needed.
 - [ ] Capture only authorized active-task windows; show capture status and sensitive-app exclusions.
 - [ ] Restrict file candidates to current selection/approved folders; preview destination and attachment.
 - [ ] Bind approvals to exact action arguments; invalidate changed/expired approvals.

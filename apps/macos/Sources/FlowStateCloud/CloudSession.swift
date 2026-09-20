@@ -121,7 +121,7 @@ public final class CloudSession: ObservableObject {
             for action in grant.allowedActions {
                 capabilities.insert(action == .openApplication ? "app.open" : (action == .insertText || action == .press) ? "app.input" : "app.control")
             }
-            for target in grant.allowedBundleIdentifiers {
+            for target in grant.allowedBundleIdentifiers where target == context.focusedAppBundleIdentifier {
                 for capability in capabilities.sorted() {
                     guard signedIn, token == intentGeneration, grant.expiresAt > Date() else { throw CancellationError() }
                     try await client.mutation("grants:grant", with: ["deviceId": deviceID, "capability": capability,
@@ -129,7 +129,16 @@ public final class CloudSession: ObservableObject {
                 }
             }
         }
-        if observation != nil, let expiry = observationAllowedUntil, expiry > Date(),
+        if let grant, grant.expiresAt > Date(), grant.allowedActions.contains(.openApplication) {
+            let targets = Set(context.targetCandidates.filter { $0.kind == "app" }.compactMap(\.bundleIdentifier))
+                .intersection(grant.allowedBundleIdentifiers).sorted()
+            if !targets.isEmpty {
+                guard signedIn, token == intentGeneration else { throw CancellationError() }
+                try await client.mutation("grants:grantApplicationOpenTargets", with: ["deviceId": deviceID,
+                    "targets": targets.map { $0 as ConvexEncodable? }, "expiresAt": grant.expiresAt.timeIntervalSince1970 * 1000])
+            }
+        }
+        if let expiry = observationAllowedUntil, expiry > Date(),
            let target = context.focusedAppBundleIdentifier {
             for capability in ["app.observe", "app.upload"] {
                 guard signedIn, token == intentGeneration else { throw CancellationError() }
@@ -142,7 +151,7 @@ public final class CloudSession: ObservableObject {
         let response: IntentDecision = try await client.action("intents:route", with: [
             "deviceId": deviceID, "sessionId": sessionID, "utteranceId": utteranceID,
             "contextRevision": Double(contextRevision), "utterance": utterance, "mode": mode,
-            "context": context, "supportedActions": ["openApplication", "scroll", "focus", "select", "press", "insertText"],
+            "context": context, "supportedActions": (grant?.allowedActions ?? []).map { $0.rawValue as ConvexEncodable? },
             "supportedCapabilities": capabilities.sorted().map { $0 as (any ConvexEncodable)? }, "policyVersion": "intent-v1", "observation": observation,
         ])
         try requireCurrentIntent(signedIn: signedIn, currentGeneration: intentGeneration, requestGeneration: token,

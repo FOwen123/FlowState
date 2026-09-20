@@ -1,6 +1,6 @@
 // Opt-in acceptance check against the already-running development app.
 // `settings` opens Settings; `voice` checks capture; `hud` also checks control-settings navigation.
-// Disable desktop/cloud grants before voice checks. No transcript text is logged.
+// Run in a quiet room: this briefly activates the microphone. No transcript text is logged.
 import AppKit
 import ApplicationServices
 guard ProcessInfo.processInfo.environment["FLOWSTATE_UI_SMOKE"] == "1" else {
@@ -47,15 +47,26 @@ if mode == "settings" {
  print("Settings window opened:",opened)
  if !opened {exit(1)}
 } else {
- let statuses = voiceStatuses()
- let listening = statuses.contains { $0.contains("Listening") }
+ var listening = false
+ for _ in 0..<50 {
+  listening = voiceStatuses().contains { $0.contains("Listening") }
+  if listening { break }
+  Thread.sleep(forTimeInterval:0.1)
+ }
  print("Visible listening indicator:", listening)
  var controlsOpened = mode != "hud"
  if mode == "hud", let settings=windows().compactMap({find($0,{attr($0,"AXDescription") as? String == "Open control settings"})}).first {
   print("HUD settings press", AXUIElementPerformAction(settings,kAXPressAction as CFString).rawValue)
   Thread.sleep(forTimeInterval:0.6)
   controlsOpened = windows().contains { w in
-   attr(w,"AXTitle") as? String == "Flow State Settings" && find(w,{attr($0,"AXDescription") as? String == "Allow desktop control"}) != nil
+   guard attr(w,"AXTitle") as? String == "Flow State Settings" else { return false }
+   func hasText(_ text: String) -> Bool {
+    find(w,{ element in ["AXValue", "AXDescription", "AXTitle"].contains { name in (attr(element,name) as? String ?? "").contains(text) } }) != nil
+   }
+   let automatic = hasText("Uses the active app or the app named in your command.")
+   let permissionRecovery = hasText("Allow Flow State to control the active app or an app named in your command.") && hasText("Denied")
+   print("Automatic targeting page:", automatic, "Accessibility recovery page:", permissionRecovery)
+   return (automatic || permissionRecovery) && !hasText("Allow desktop control")
   }
   print("Control settings opened:",controlsOpened)
  }

@@ -235,6 +235,106 @@ func revalidationRejectsRevocationAndCancellationDuringAwait() async throws {
     #expect(cancelledError == .cancelled)
 }
 
+@Test("switching capture targets invalidates the previous observation and grant")
+func switchingCaptureTargetsInvalidatesPreviousObservationAndGrant() async throws {
+    let capturedAt = Date(timeIntervalSince1970: 1_700_000_000)
+    let targetA = testObservation(capturedAt: capturedAt)
+    let provider = RevalidationCaptureProvider(captured: targetA, current: targetA)
+    let controller = ScreenCaptureController(provider: provider, now: { capturedAt })
+    let grantA = await controller.beginTask(allowedBundleIdentifiers: [targetA.bundleIdentifier])
+    let capturedA = try await controller.capture(
+        bundleIdentifier: targetA.bundleIdentifier,
+        grant: grantA
+    )
+
+    let targetB = "com.example.Writer"
+    let grantB = await controller.beginTask(allowedBundleIdentifiers: [targetB])
+
+    let uploadError = await captureError {
+        _ = try await controller.revalidate(capturedA.observation, grant: grantA, forUpload: true)
+    }
+    #expect(uploadError == .staleObservation)
+
+    let captureError = await captureError {
+        _ = try await controller.capture(bundleIdentifier: targetA.bundleIdentifier, grant: grantA)
+    }
+    #expect(captureError == .staleGeneration)
+    #expect(grantB.generation != grantA.generation)
+}
+
+@Test("restarting an unexpired same-target task reuses its grant and observations")
+func restartingSameTargetTaskReusesGrantAndObservations() async throws {
+    let capturedAt = Date(timeIntervalSince1970: 1_700_000_000)
+    let target = testObservation(capturedAt: capturedAt)
+    let provider = RevalidationCaptureProvider(captured: target, current: target)
+    let controller = ScreenCaptureController(provider: provider, now: { capturedAt })
+    let grant = await controller.beginTask(
+        allowedBundleIdentifiers: [target.bundleIdentifier],
+        duration: 60
+    )
+    let captured = try await controller.capture(
+        bundleIdentifier: target.bundleIdentifier,
+        grant: grant
+    )
+
+    let reusedGrant = await controller.beginTask(
+        allowedBundleIdentifiers: [target.bundleIdentifier],
+        duration: 300
+    )
+
+    #expect(reusedGrant == grant)
+    #expect(reusedGrant.expiresAt == capturedAt.addingTimeInterval(60))
+    try await controller.revalidate(captured.observation, grant: reusedGrant, forUpload: true)
+}
+
+@Test("a stale automatic revoke cannot invalidate a newer target grant")
+func staleAutomaticRevokeCannotInvalidateNewerTargetGrant() async throws {
+    let controller = ScreenCaptureController(provider: ImmediateCaptureProvider())
+    let grantA = try await controller.beginAutomaticTask(
+        allowedBundleIdentifiers: ["com.example.Reader"],
+        lifecycleEpoch: 1
+    )
+    let grantB = try await controller.beginAutomaticTask(
+        allowedBundleIdentifiers: ["com.example.Writer"],
+        lifecycleEpoch: 2
+    )
+
+    await controller.revoke(lifecycleEpoch: 1)
+
+    _ = try await controller.capture(bundleIdentifier: "com.example.Writer", grant: grantB)
+    let staleBeginError = await captureError {
+        _ = try await controller.beginAutomaticTask(
+            allowedBundleIdentifiers: ["com.example.Reader"],
+            lifecycleEpoch: 1
+        )
+    }
+    #expect(staleBeginError == .staleGeneration)
+    #expect(grantB.generation != grantA.generation)
+}
+
+@Test("a stale automatic begin cannot resurrect capture after revoke")
+func staleAutomaticBeginCannotResurrectCaptureAfterRevoke() async throws {
+    let controller = ScreenCaptureController(provider: ImmediateCaptureProvider())
+    let grant = try await controller.beginAutomaticTask(
+        allowedBundleIdentifiers: ["com.example.Reader"],
+        lifecycleEpoch: 2
+    )
+    await controller.revoke(lifecycleEpoch: 2)
+
+    let staleBeginError = await captureError {
+        _ = try await controller.beginAutomaticTask(
+            allowedBundleIdentifiers: ["com.example.Writer"],
+            lifecycleEpoch: 1
+        )
+    }
+    #expect(staleBeginError == .staleGeneration)
+
+    let revokedCaptureError = await captureError {
+        _ = try await controller.capture(bundleIdentifier: "com.example.Reader", grant: grant)
+    }
+    #expect(revokedCaptureError == .staleGeneration)
+}
+
 @Test("expired grant is rejected by revalidation using an injected clock")
 func revalidationRejectsExpiredGrant() async throws {
     let now = LockedDate(Date(timeIntervalSince1970: 1_700_000_000))

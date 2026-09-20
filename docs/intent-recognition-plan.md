@@ -112,9 +112,9 @@ Add: `convex/lib/intent_router.ts`, `convex/intents.ts`, `apps/macos/Sources/Flo
 
 - [x] Add authenticated, device-scoped intent requests with utterance/session ID, context revision, supported capabilities and policy version. Reject stale/cross-device results. Keep provider keys server-side and redact stored diagnostics.
 - [x] Integrate the evaluated policy in Auto mode. Exact local bypasses require tested unambiguous commands/explicit prefixes; a word match inside dictation must not bypass Jev.
-- [x] Bind “open Brave” to installed-app candidates, not only already-running apps. Offer a scoped app-opening grant so authorized launch does not require granting arbitrary typing/clicking. Preserve per-app input grants for scrolling/text.
+- [x] Bind “open Brave” to installed-app candidates, not only already-running apps. Apply an internal scoped app-opening authorization so authorized launch does not require granting arbitrary typing/clicking. Resolve input targets from the active app or an app named in the command; runtime execution grants may remain internally scoped to that resolved target for scrolling/text.
 - [x] For dictation, capture the intended editable target before awaiting cloud results and verify it again before insertion. Never type into a newly focused app, protected field or stale selection.
-- [x] For visual fallback, require observation and upload authorization, capture only the relevant non-sensitive window, attach observation ID/time/geometry, and discard the image after use. Content from the screen is data, not authority. Refresh/revalidate before action.
+- [x] For visual fallback, require native Screen Recording permission plus a separate cloud screen-context opt-in, capture only the relevant non-sensitive window, attach observation ID/time/geometry, and discard the image after use. Content from the screen is data, not authority. Refresh/revalidate before action.
 - [x] Add click/focus/press only where a verified executor and matching contract tests exist; otherwise clarify unsupported requests. Validate display scaling and moved/closed windows before coordinate input.
 - [ ] Execute reversible permitted actions automatically; retain policy-specific approval for consequential actions. Enforce exactly-once desktop dispatch locally and retain existing external-effect idempotency.
 - [ ] Show Listening → Understanding → Opening Brave → Opened, plus actual clarification/error/permission states. Show when cloud/screen processing is used. Stop remains reachable throughout.
@@ -136,7 +136,7 @@ Test computer: the existing MacBook Pro, Apple M5 Pro (15 CPU cores), 24 GB unif
 
 Existing projects and `.env.local` are already supplied. During implementation, check presence/access without printing secrets: TypeSafe key and evaluated Jev model, OpenAI key and text/vision model IDs, Convex development URL/deployment, and native/web auth public configuration. Map to existing environment variable names; add placeholder-only examples for new settings. Keep thresholds in versioned evaluated policy, not unreviewed environment overrides.
 
-Synthetic/mocked work needs no new input. Live acceptance later needs microphone, Accessibility and relevant screen permissions, scoped desktop grants and consent for any real voice samples/screenshots used in evaluation. Use a small explicit live-call budget before scaling experiments. No new Firecrawl/AgentMail configuration is required for the intent router itself.
+Synthetic/mocked work needs no new input. Live acceptance later needs microphone, Accessibility and relevant screen permissions, runtime-scoped desktop checks and consent for any real voice samples/screenshots used in evaluation. Use a small explicit live-call budget before scaling experiments. No new Firecrawl/AgentMail configuration is required for the intent router itself.
 
 ## References
 

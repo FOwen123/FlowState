@@ -703,43 +703,51 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
                   target.bundleIdentifier == expectedObservation.bundleIdentifier else { throw DesktopExecutionError.targetChanged }
             let applicationElement = AXUIElementCreateApplication(target.processIdentifier)
             guard let windowValue = copyAttribute(applicationElement, kAXFocusedWindowAttribute as CFString),
-                  CFGetTypeID(windowValue) == AXUIElementGetTypeID(),
-                  let scrollbar = verticalScrollbar(in: windowValue as! AXUIElement),
-                  let before = copyAttribute(scrollbar, kAXValueAttribute as CFString) as? NSNumber,
-                  (0...1).contains(before.doubleValue) else {
+                  CFGetTypeID(windowValue) == AXUIElementGetTypeID() else {
                 throw DesktopExecutionError.nativeFailure("This window does not expose an unambiguous accessible vertical scrollbar.")
             }
-            var settable: DarwinBoolean = false
-            guard AXUIElementIsAttributeSettable(scrollbar, kAXValueAttribute as CFString, &settable) == .success, settable.boolValue else {
-                throw DesktopExecutionError.nativeFailure("This app does not allow accessible scrolling.")
-            }
-            // ponytail: normalized increments where the app omits its scroll increment;
-            // visual scrolling needs a separate verified target, never a global wheel event.
-            let increment = (copyAttribute(scrollbar, kAXValueIncrementAttribute as CFString) as? NSNumber)?.doubleValue ?? 0.01
-            guard increment.isFinite, increment > 0, increment <= 1 else { throw DesktopExecutionError.verificationFailed }
-            let desired = min(1, max(0, before.doubleValue - Double(lines) * increment))
-            if desired == before.doubleValue { return DesktopActionResult(verified:true) }
-            guard await authorize() else { throw DesktopExecutionError.staleGeneration }
-            guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier,
-                  let currentWindow = copyAttribute(applicationElement, kAXFocusedWindowAttribute as CFString),
-                  CFEqual(currentWindow, windowValue),
-                  let scrollWindow = copyAttribute(scrollbar, kAXWindowAttribute as CFString),
-                  CFEqual(scrollWindow, windowValue),
-                  sameElementIdentity((try? focusedElement()).map(retainedElementIdentifier), expectedObservation.focusedElementID) else {
+            let window = windowValue as! AXUIElement
+            guard sameElementIdentity((try? focusedElement()).map(retainedElementIdentifier), expectedObservation.focusedElementID) else {
                 throw DesktopExecutionError.targetChanged
             }
-            guard AXUIElementSetAttributeValue(scrollbar, kAXValueAttribute as CFString, NSNumber(value:desired)) == .success else {
-                return DesktopActionResult(verified:false)
-            }
-            for _ in 0..<10 {
-                guard await authorize() else { throw DesktopExecutionError.staleGeneration }
-                if let after = copyAttribute(scrollbar, kAXValueAttribute as CFString) as? NSNumber,
-                   (lines < 0 && after.doubleValue > before.doubleValue) || (lines > 0 && after.doubleValue < before.doubleValue) {
-                    return DesktopActionResult(verified:true)
+            if let scrollbar = verticalScrollbar(in: window) {
+                guard let before = copyAttribute(scrollbar, kAXValueAttribute as CFString) as? NSNumber,
+                      (0...1).contains(before.doubleValue) else {
+                    throw DesktopExecutionError.nativeFailure("This window does not expose an unambiguous accessible vertical scrollbar.")
                 }
-                try await Task.sleep(for:.milliseconds(50))
+                var settable: DarwinBoolean = false
+                guard AXUIElementIsAttributeSettable(scrollbar, kAXValueAttribute as CFString, &settable) == .success, settable.boolValue else {
+                    throw DesktopExecutionError.nativeFailure("This app does not allow accessible scrolling.")
+                }
+                // ponytail: normalized increments where the app omits its scroll increment;
+                // visual scrolling needs a separate verified target, never a global wheel event.
+                let increment = (copyAttribute(scrollbar, kAXValueIncrementAttribute as CFString) as? NSNumber)?.doubleValue ?? 0.01
+                guard increment.isFinite, increment > 0, increment <= 1 else { throw DesktopExecutionError.verificationFailed }
+                let desired = min(1, max(0, before.doubleValue - Double(lines) * increment))
+                if desired == before.doubleValue { return DesktopActionResult(verified:true) }
+                guard await authorize() else { throw DesktopExecutionError.staleGeneration }
+                guard NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier,
+                      let currentWindow = copyAttribute(applicationElement, kAXFocusedWindowAttribute as CFString),
+                      CFEqual(currentWindow, windowValue),
+                      let scrollWindow = copyAttribute(scrollbar, kAXWindowAttribute as CFString),
+                      CFEqual(scrollWindow, windowValue),
+                      sameElementIdentity((try? focusedElement()).map(retainedElementIdentifier), expectedObservation.focusedElementID) else {
+                    throw DesktopExecutionError.targetChanged
+                }
+                guard AXUIElementSetAttributeValue(scrollbar, kAXValueAttribute as CFString, NSNumber(value:desired)) == .success else {
+                    return DesktopActionResult(verified:false)
+                }
+                for _ in 0..<10 {
+                    guard await authorize() else { throw DesktopExecutionError.staleGeneration }
+                    if let after = copyAttribute(scrollbar, kAXValueAttribute as CFString) as? NSNumber,
+                       (lines < 0 && after.doubleValue > before.doubleValue) || (lines > 0 && after.doubleValue < before.doubleValue) {
+                        return DesktopActionResult(verified:true)
+                    }
+                    try await Task.sleep(for:.milliseconds(50))
+                }
+                return DesktopActionResult(verified:false, effectAttempted: true)
             }
-            return DesktopActionResult(verified:false, effectAttempted: true)
+            return try await scrollWebContent(in: window, lines: lines, expectedFocus: expectedObservation.focusedElementID, authorize: authorize)
         case .focus, .focusTarget, .select, .selectTarget, .press, .keyPress, .insertText:
             guard AXIsProcessTrusted() else { throw DesktopExecutionError.accessibilityDenied }
             let focused = try focusedElement(matching: expectedObservation)
@@ -1048,6 +1056,134 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
         return index == queue.count ? found : nil
     }
 
+    private struct ScrollCandidate {
+        let element: AXUIElement
+        let frame: CGRect
+    }
+
+    private func scrollWebContent(
+        in window: AXUIElement,
+        lines: Int32,
+        expectedFocus: String?,
+        authorize: @escaping @Sendable () async -> Bool
+    ) async throws -> DesktopActionResult {
+        guard let context = webScrollContext(in: window) else {
+            throw DesktopExecutionError.nativeFailure("This window does not expose an accessible scroll target.")
+        }
+        let frames = context.candidates.map(\.frame)
+        guard let targetIndex = axScrollTargetIndex(candidates: frames, viewport: context.viewport, lines: lines) else {
+            throw DesktopExecutionError.nativeFailure("No more accessible content was found in that direction.")
+        }
+        let target = context.candidates[targetIndex]
+        guard await authorize() else { throw DesktopExecutionError.staleGeneration }
+        let currentViewport = frame(of: context.webArea)
+        let currentTargetFrame = frame(of: target.element)
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == context.processIdentifier,
+              let currentWindow = copyAttribute(
+                  AXUIElementCreateApplication(context.processIdentifier),
+                  kAXFocusedWindowAttribute as CFString
+              ),
+              CFEqual(currentWindow, window),
+              sameElementIdentity((try? focusedElement()).map(retainedElementIdentifier), expectedFocus),
+              let currentViewport,
+              currentViewport == context.viewport,
+              let currentTargetFrame,
+              currentTargetFrame == target.frame else {
+            throw DesktopExecutionError.targetChanged
+        }
+        guard AXUIElementPerformAction(target.element, "AXScrollToVisible" as CFString) == .success else {
+            return DesktopActionResult(verified: false, effectAttempted: true)
+        }
+        for _ in 0..<10 {
+            guard await authorize() else { throw DesktopExecutionError.staleGeneration }
+            if let after = frame(of: target.element), after.width > 0, after.height > 0,
+               (lines < 0 && after.minY < target.frame.minY) ||
+                (lines > 0 && after.maxY > target.frame.maxY) {
+                return DesktopActionResult(verified: true)
+            }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        return DesktopActionResult(verified: false, effectAttempted: true)
+    }
+
+    private struct WebScrollContext {
+        let processIdentifier: pid_t
+        let webArea: AXUIElement
+        let viewport: CGRect
+        let candidates: [ScrollCandidate]
+    }
+
+    private func webScrollContext(in window: AXUIElement) -> WebScrollContext? {
+        var webAreas: [AXUIElement] = []
+        var queue = [window]
+        var index = 0
+        while index < queue.count, index < 4096 {
+            let element = queue[index]
+            index += 1
+            if copyAttribute(element, kAXRoleAttribute as CFString) as? String == "AXWebArea" {
+                webAreas.append(element)
+                continue
+            }
+            if let children = copyAttribute(element, kAXChildrenAttribute as CFString) as? [AXUIElement] {
+                queue.append(contentsOf: children)
+            }
+        }
+        guard index == queue.count else { return nil }
+        guard webAreas.count == 1,
+              let viewport = frame(of: webAreas[0]) else { return nil }
+
+        var candidates: [ScrollCandidate] = []
+        queue = [webAreas[0]]
+        index = 0
+        while index < queue.count, index < 4096 {
+            let element = queue[index]
+            index += 1
+            if element !== webAreas[0],
+               let role = copyAttribute(element, kAXRoleAttribute as CFString) as? String,
+               ["AXStaticText", "AXHeading", "AXLink"].contains(role),
+               actionNames(for: element).contains("AXScrollToVisible"),
+               let frame = frame(of: element),
+               frame.width > 0, frame.height >= 0 {
+                candidates.append(ScrollCandidate(element: element, frame: frame))
+            }
+            if let children = copyAttribute(element, kAXChildrenAttribute as CFString) as? [AXUIElement] {
+                queue.append(contentsOf: children)
+            }
+        }
+        guard index == queue.count else { return nil }
+        guard !candidates.isEmpty,
+              let application = NSWorkspace.shared.frontmostApplication else { return nil }
+        return WebScrollContext(
+            processIdentifier: application.processIdentifier,
+            webArea: webAreas[0],
+            viewport: viewport,
+            candidates: candidates
+        )
+    }
+
+    private func actionNames(for element: AXUIElement) -> [String] {
+        var values: CFArray?
+        guard AXUIElementCopyActionNames(element, &values) == .success,
+              let values else { return [] }
+        return (values as NSArray).compactMap { $0 as? String }
+    }
+
+    private func frame(of element: AXUIElement) -> CGRect? {
+        guard let positionValue = copyAttribute(element, kAXPositionAttribute as CFString),
+              CFGetTypeID(positionValue) == AXValueGetTypeID(),
+              let sizeValue = copyAttribute(element, kAXSizeAttribute as CFString),
+              CFGetTypeID(sizeValue) == AXValueGetTypeID() else { return nil }
+        let position = positionValue as! AXValue
+        let size = sizeValue as! AXValue
+        guard AXValueGetType(position) == .cgPoint,
+              AXValueGetType(size) == .cgSize else { return nil }
+        var origin = CGPoint.zero
+        var dimensions = CGSize.zero
+        guard AXValueGetValue(position, .cgPoint, &origin),
+              AXValueGetValue(size, .cgSize, &dimensions) else { return nil }
+        return CGRect(origin: origin, size: dimensions)
+    }
+
     private func selectedTextRange(for element: AXUIElement) -> CFRange? {
         guard let value = copyAttribute(element, kAXSelectedTextRangeAttribute as CFString) else {
             return nil
@@ -1086,6 +1222,25 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
             value: Int64(bitPattern: InputTakeoverMonitor.automationEventTag)
         )
     }
+}
+
+func axScrollTargetIndex(candidates: [CGRect], viewport: CGRect, lines: Int32) -> Int? {
+    guard lines != 0,
+          viewport.width > 0,
+          viewport.height > 0 else { return nil }
+    let valid = candidates.enumerated().filter { _, frame in
+        frame.width > 0 && frame.height >= 0
+    }
+    if lines < 0 {
+        return valid
+            .filter { $0.element.minY >= viewport.maxY }
+            .min { $0.element.minY < $1.element.minY }?
+            .offset
+    }
+    return valid
+        .filter { $0.element.minY <= viewport.minY && $0.element.maxY <= viewport.minY + 1 }
+        .max { $0.element.maxY == $1.element.maxY ? $0.offset < $1.offset : $0.element.maxY < $1.element.maxY }?
+        .offset
 }
 
 private func sameElementIdentity(_ lhs: String?, _ rhs: String?) -> Bool {

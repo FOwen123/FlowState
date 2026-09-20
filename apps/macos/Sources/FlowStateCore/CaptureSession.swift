@@ -185,6 +185,7 @@ public actor ScreenCaptureController {
     private let provider: any ScreenCaptureProvider
     private let now: @Sendable () -> Date
     private var generation: UInt64 = 0
+    private var latestLifecycleEpoch: UInt64 = 0
     private var activeGrant: CaptureGrant?
     private var issuedObservations: [UUID: CaptureObservation] = [:]
 
@@ -206,6 +207,13 @@ public actor ScreenCaptureController {
         allowedBundleIdentifiers: Set<String>,
         duration: TimeInterval = CaptureGrant.defaultDuration
     ) -> CaptureGrant {
+        let currentDate = now()
+        if let activeGrant,
+           activeGrant.expiresAt > currentDate,
+           activeGrant.allowedBundleIdentifiers == allowedBundleIdentifiers {
+            return activeGrant
+        }
+
         generation &+= 1
         issuedObservations.removeAll(keepingCapacity: true)
         let safeDuration = duration.isFinite && duration > 0
@@ -214,16 +222,40 @@ public actor ScreenCaptureController {
         let grant = CaptureGrant(
             allowedBundleIdentifiers: allowedBundleIdentifiers,
             generation: generation,
-            expiresAt: now().addingTimeInterval(safeDuration)
+            expiresAt: currentDate.addingTimeInterval(safeDuration)
         )
         activeGrant = grant
         return grant
     }
 
-    public func revoke() {
+    /// Starts an automatic capture task only if its lifecycle epoch is current.
+    /// Older queued starts cannot resurrect a task after a newer revoke.
+    public func beginAutomaticTask(
+        allowedBundleIdentifiers: Set<String>,
+        duration: TimeInterval = CaptureGrant.defaultDuration,
+        lifecycleEpoch: UInt64
+    ) throws -> CaptureGrant {
+        guard acceptLifecycleEpoch(lifecycleEpoch) else {
+            throw CaptureError.staleGeneration
+        }
+        return beginTask(
+            allowedBundleIdentifiers: allowedBundleIdentifiers,
+            duration: duration
+        )
+    }
+
+    public func revoke(lifecycleEpoch: UInt64? = nil) {
+        guard acceptLifecycleEpoch(lifecycleEpoch) else { return }
         generation &+= 1
         activeGrant = nil
         issuedObservations.removeAll(keepingCapacity: true)
+    }
+
+    private func acceptLifecycleEpoch(_ lifecycleEpoch: UInt64?) -> Bool {
+        guard let lifecycleEpoch else { return true }
+        guard lifecycleEpoch >= latestLifecycleEpoch else { return false }
+        latestLifecycleEpoch = lifecycleEpoch
+        return true
     }
 
     public func capture(

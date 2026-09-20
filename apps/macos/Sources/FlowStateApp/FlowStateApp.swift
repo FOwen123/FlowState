@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import Combine
 import FlowStateCore
 import FlowStateCloud
 import SwiftUI
@@ -16,13 +17,21 @@ final class FlowStateAppModel: ObservableObject {
     }
     @Published var allowCloudScreenContext = false {
         didSet {
+            preferences?.set(allowCloudScreenContext, forKey: "FlowState.allowCloudScreenContext")
             if !allowCloudScreenContext {
                 intentTask?.cancel()
                 cloudSession?.cancelIntent()
                 pendingIntent = nil; pendingIntentSummary = nil
+                revokeTask()
             }
         }
     }
+    private let preferences: UserDefaults?
+    private let accessibilityGranted: () -> Bool
+    private let frontmostApplication: () -> String?
+    private var applicationActivationObserver: AnyCancellable?
+    private var lastExternalApplication: String?
+
     private var voiceSessionID = UUID().uuidString
     private var intentTask: Task<Void, Never>?
     private var contextRevision = 0
@@ -37,6 +46,8 @@ final class FlowStateAppModel: ObservableObject {
     @Published private(set) var isListening = false { didSet { updateVoiceHUD() } }
     private var preparingVoice = false
     private var voiceGeneration: UInt64 = 0
+    private var utteranceGeneration: UInt64 = 0
+    private var captureLifecycleEpoch: UInt64 = 0
     @Published var bundleIdentifier = ""
     @Published var speechSettings = SpeechSettings()
     @Published private(set) var shortcutError: String?
@@ -49,7 +60,9 @@ final class FlowStateAppModel: ObservableObject {
     @Published private(set) var memorySnapshot = MemorySnapshot(preferences: [], syncEnabled: false, learningEnabled: false)
     @Published var settingsSection: FlowStateSettingsSection = .voice
     @Published var inputBundleIdentifier = ""
-    @Published private(set) var allowedInputActions: Set<DesktopActionKind> = Set(DesktopActionKind.allCases)
+    @Published private(set) var allowedInputActions: Set<DesktopActionKind> = Set(DesktopActionKind.allCases) {
+        didSet { preferences?.set(allowedInputActions.map(\.rawValue).sorted(), forKey: "FlowState.allowedInputActions") }
+    }
     @Published private(set) var desktopState = DesktopAutomationState.idle
     @Published private(set) var desktopStatus = "Desktop control is idle"
 
@@ -67,7 +80,7 @@ final class FlowStateAppModel: ObservableObject {
     let memoryStore = ExplicitMemoryStore()
     private let controller: ScreenCaptureController
     private let desktopController: DesktopAutomationController
-    private let speechCoordinator = SpeechSessionCoordinator()
+    private let speechCoordinator: SpeechSessionCoordinator
     private let speechCapture = AnalyzerSpeechCapture()
     private let takeoverMonitor = InputTakeoverMonitor()
     private let shortcutMonitor = GlobalVoiceShortcutMonitor()
@@ -78,10 +91,32 @@ final class FlowStateAppModel: ObservableObject {
     private var cloudPlanTarget: (id: String, observation: DesktopObservation, epoch: UInt64)?
     private var statusGeneration: UInt64 = 0
 
-    init(desktopController: DesktopAutomationController = DesktopAutomationController()) {
+    init(desktopController: DesktopAutomationController = DesktopAutomationController(),
+         accessibilityGranted: @escaping () -> Bool = { MacPermissionManager.accessibilityStatus().isGranted },
+         frontmostApplication: @escaping () -> String? = { NSWorkspace.shared.frontmostApplication?.bundleIdentifier },
+         speechCoordinator: SpeechSessionCoordinator = SpeechSessionCoordinator(), preferences: UserDefaults? = nil) {
+        self.preferences = preferences
+        self.accessibilityGranted = accessibilityGranted
+        self.frontmostApplication = frontmostApplication
+        self.speechCoordinator = speechCoordinator
         self.desktopController = desktopController
         controller = ScreenCaptureController()
+        allowCloudScreenContext = preferences?.bool(forKey: "FlowState.allowCloudScreenContext") ?? false
+        if let stored = preferences?.stringArray(forKey: "FlowState.allowedInputActions") {
+            allowedInputActions = Set(stored.compactMap(DesktopActionKind.init(rawValue:)))
+        }
         speechSettings = SpeechSettingsStore.load()
+        if let bundle = frontmostApplication(), bundle != Bundle.main.bundleIdentifier, bundle != "com.flowstate.dev" {
+            lastExternalApplication = bundle
+        }
+        applicationActivationObserver = NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)
+            .sink { [weak self] notification in
+                let bundle = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier
+                Task { @MainActor [weak self] in
+                    guard let bundle, bundle != Bundle.main.bundleIdentifier, bundle != "com.flowstate.dev" else { return }
+                    self?.lastExternalApplication = bundle
+                }
+            }
         refreshPermissionStatus()
         Task { await refreshMemory() }
         if let url = Bundle.main.object(forInfoDictionaryKey: "FlowStateConvexURL") as? String,
@@ -126,22 +161,41 @@ final class FlowStateAppModel: ObservableObject {
     }
 
     func beginTask() {
-        allowCloudScreenContext = false
         let bundle = bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !bundle.isEmpty else {
-            taskStatus = "Enter an approved application bundle ID first"
+            taskStatus = "Open an app or name it in your command."
             return
         }
 
         statusGeneration &+= 1
         let taskGeneration = statusGeneration
+        captureLifecycleEpoch &+= 1
+        let captureEpoch = captureLifecycleEpoch
         Task {
-            let nextGrant = await controller.beginTask(allowedBundleIdentifiers: [bundle])
+            guard let nextGrant = try? await controller.beginAutomaticTask(allowedBundleIdentifiers: [bundle], lifecycleEpoch: captureEpoch) else { return }
             guard taskGeneration == statusGeneration else { return }
             grant = nextGrant
             isTaskActive = true
             taskStatus = L10n.format("Active for %@. Screenshots are taken only when requested.", L10n.appName(bundle))
         }
+    }
+
+    private func prepareAutomaticObservation(bundle: String) async -> CaptureGrant? {
+        guard !Task.isCancelled, allowCloudScreenContext, MacPermissionManager.snapshot().screenRecording.isGranted else { return nil }
+        let epoch = inputEpoch.current
+        captureLifecycleEpoch &+= 1
+        let captureEpoch = captureLifecycleEpoch
+        guard let next = try? await controller.beginAutomaticTask(allowedBundleIdentifiers: [bundle], lifecycleEpoch: captureEpoch),
+              captureEpoch == captureLifecycleEpoch, inputEpoch.isCurrent(epoch), allowCloudScreenContext else { return nil }
+        guard !Task.isCancelled else {
+            await controller.revoke(lifecycleEpoch: captureEpoch)
+            return nil
+        }
+        bundleIdentifier = bundle
+        grant = next
+        isTaskActive = true
+        taskStatus = L10n.format("Screen context ready for %@ when needed.", L10n.appName(bundle))
+        return next
     }
 
     func captureGrantForCloud(bundleIdentifier: String) -> CaptureGrant? {
@@ -151,58 +205,65 @@ final class FlowStateAppModel: ObservableObject {
     }
 
     func revokeTask() {
-        allowCloudScreenContext = false
         statusGeneration &+= 1
         grant = nil
         isTaskActive = false
         taskStatus = "Revoked — screen capture is off"
-        Task { await controller.revoke() }
+        captureLifecycleEpoch &+= 1
+        let captureEpoch = captureLifecycleEpoch
+        Task { await controller.revoke(lifecycleEpoch: captureEpoch) }
     }
 
     func setInputAction(_ action: DesktopActionKind, enabled: Bool) {
         if enabled { allowedInputActions.insert(action) }
         else { allowedInputActions.remove(action) }
+        if currentInputGrant != nil { cancelInputTask() }
     }
 
-    func beginInputTask() {
+    @discardableResult
+    func beginInputTask(ifCurrent: @escaping () -> Bool = { true }) -> Task<Void, Never>? {
         let bundle = inputBundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !bundle.isEmpty else {
-            desktopStatus = "Choose an app before allowing controls"
-            return
+            desktopStatus = "Open an app or name it in your command."
+            return nil
         }
         guard !allowedInputActions.isEmpty else {
             desktopStatus = "Choose at least one desktop action"
-            return
+            return nil
         }
         let epoch = inputEpoch.advance()
         currentInputGrant = nil
         lastVerifiedAction = nil
         takeoverMonitor.stop()
         statusGeneration &+= 1
-        let nextGeneration = statusGeneration
         let inputGrant = DesktopExecutionGrant(
             allowedBundleIdentifiers: [bundle],
             allowedActions: allowedInputActions,
-            generation: nextGeneration,
+            generation: epoch,
             expiresAt: Date().addingTimeInterval(CaptureGrant.defaultDuration)
         )
-        Task { [weak self] in
+        return Task { [weak self] in
             guard let self else { return }
             do {
-                guard inputEpoch.isCurrent(epoch) else { return }
+                guard inputEpoch.isCurrent(epoch), ifCurrent() else { return }
                 await desktopController.cancel(lifecycleEpoch: epoch)
-                guard inputEpoch.isCurrent(epoch) else { return }
+                guard inputEpoch.isCurrent(epoch), ifCurrent() else { return }
                 try await desktopController.begin(grant: inputGrant, lifecycleEpoch: epoch)
-                guard inputEpoch.isCurrent(epoch) else {
+                guard inputEpoch.isCurrent(epoch), ifCurrent() else {
+                    await desktopController.cancel(lifecycleEpoch: epoch)
+                    return
+                }
+                let readyState = await desktopController.state
+                guard inputEpoch.isCurrent(epoch), ifCurrent() else {
                     await desktopController.cancel(lifecycleEpoch: epoch)
                     return
                 }
                 currentInputGrant = inputGrant
-                desktopState = await desktopController.state
+                desktopState = readyState
                 desktopStatus = L10n.format("Control allowed for %@. Using your mouse or keyboard pauses actions.", L10n.appName(bundle))
                 installTakeoverMonitor(for: epoch)
             } catch {
-                guard inputEpoch.isCurrent(epoch) else { return }
+                guard inputEpoch.isCurrent(epoch), ifCurrent() else { return }
                 currentInputGrant = nil
                 lastVerifiedAction = nil
                 takeoverMonitor.stop()
@@ -210,6 +271,45 @@ final class FlowStateAppModel: ObservableObject {
                 desktopStatus = error.localizedDescription
             }
         }
+    }
+
+    private var activeCommandApplication: String? {
+        let foreground = frontmostApplication()
+        if let foreground, foreground != Bundle.main.bundleIdentifier, foreground != "com.flowstate.dev" { return foreground }
+        return lastExternalApplication
+    }
+
+    /// Called only for a new finalized user command, never by a late model response.
+    func prepareAutomaticTarget(for command: VoiceCommand, activeBundleIdentifier: String?, utteranceToken: UInt64? = nil) async throws -> DesktopObservation? {
+        switch command {
+        case .stop, .resume, .undo, .research: return nil
+        default: break
+        }
+        guard accessibilityGranted() else { throw DesktopExecutionError.accessibilityDenied }
+        guard !allowedInputActions.isEmpty else { throw DesktopExecutionError.nativeFailure("Desktop controls are turned off. Enable a control in Settings.") }
+        let entryEpoch = inputEpoch.current
+        let actualState = await desktopController.state
+        guard !Task.isCancelled, inputEpoch.isCurrent(entryEpoch), utteranceToken == nil || utteranceToken == utteranceGeneration else { throw DesktopExecutionError.staleGeneration }
+        desktopState = actualState
+        guard desktopState != .reconciliationRequired else { throw DesktopExecutionError.reconciliationRequired }
+        guard desktopState != .running else { throw DesktopExecutionError.nativeFailure("An action is still running. Wait for it to finish.") }
+        let target: String
+        if case .openApp(let bundle) = command { target = bundle }
+        else if let activeBundleIdentifier, !activeBundleIdentifier.isEmpty { target = activeBundleIdentifier }
+        else { throw DesktopExecutionError.nativeFailure("Open an app or name the app you want to control.") }
+        // A new utterance supersedes older inference, even in the same app.
+        inputBundleIdentifier = target
+        await beginInputTask(ifCurrent: { [weak self] in
+            guard let self else { return false }
+            return utteranceToken == nil || utteranceToken == self.utteranceGeneration
+        })?.value
+        guard let grant = currentInputGrant, grant.expiresAt > Date(), grant.allowedBundleIdentifiers.contains(target), desktopState == .ready else {
+            throw DesktopExecutionError.staleGeneration
+        }
+        if case .openApp = command { return nil }
+        let observation = try await desktopController.observeCurrent()
+        guard observation.bundleIdentifier == target else { throw DesktopExecutionError.targetChanged }
+        return observation
     }
 
     func cancelInputTask() {
@@ -283,7 +383,7 @@ final class FlowStateAppModel: ObservableObject {
     func resumeInputTask() {
         let epoch = inputEpoch.current
         guard let grant = currentInputGrant, grant.expiresAt > Date() else {
-            desktopStatus = "Renew the app input grant before resuming"
+            desktopStatus = "Repeat your command to start a new control session."
             voiceStatus = desktopStatus
             return
         }
@@ -368,13 +468,16 @@ final class FlowStateAppModel: ObservableObject {
 
     func prepareCloudCommand(_ command: String) {
         guard let cloudSession, cloudSession.signedIn else { cloudStatus = "Sign in before managed commands"; return }
-        guard let grant = currentInputGrant, grant.expiresAt > Date(), let target = grant.allowedBundleIdentifiers.first else { cloudStatus = "Grant input for an app first"; return }
         cloudStatus = "Preparing a plan for review"
         cloudPlanTarget = nil
-        let epoch = inputEpoch.current
+        let active = activeCommandApplication
         Task {
             do {
-                let observation = try await desktopController.observeCurrent()
+                let prepared = try await prepareAutomaticTarget(for: VoiceCommandRouter.resolve(command, mode: .auto), activeBundleIdentifier: active)
+                let observation: DesktopObservation
+                if let prepared { observation = prepared } else { observation = try await desktopController.observeCurrent() }
+                let target = inputBundleIdentifier
+                let epoch = inputEpoch.current
                 try await cloudSession.preparePlan(command:command,targetBundleIdentifier:target,locale:"en")
                 guard inputEpoch.isCurrent(epoch), let proposal = cloudSession.proposal else { return }
                 cloudPlanTarget = (proposal.id, observation, epoch)
@@ -385,7 +488,7 @@ final class FlowStateAppModel: ObservableObject {
     }
 
     func executeCloudPlan(_ plan: CloudProposal) {
-        guard !executingPlan, let session = cloudSession, let grant = currentInputGrant, grant.expiresAt > Date(), let target = grant.allowedBundleIdentifiers.first else { cloudStatus = "Renew the app input grant before continuing"; return }
+        guard !executingPlan, let session = cloudSession, let grant = currentInputGrant, grant.expiresAt > Date(), let target = grant.allowedBundleIdentifiers.first else { cloudStatus = "Repeat your command to start a new control session."; return }
         guard let prepared = cloudPlanTarget, prepared.id == plan.id, inputEpoch.isCurrent(prepared.epoch) else {
             cloudStatus = "The prepared target is no longer current. Please make a new request."
             return
@@ -443,7 +546,10 @@ final class FlowStateAppModel: ObservableObject {
             onFinish: { [weak self] in self?.finishVoiceSession() },
             onStop: { [weak self] in self?.stopVoiceSession() },
             onConfirm: pendingIntent == nil ? nil : { [weak self] in self?.confirmPendingIntent() },
-            onSettings: { [weak self] in self?.settingsSection = .tasks })
+            onSettings: { [weak self] in
+                guard let self else { return }
+                self.settingsSection = self.accessibilityGranted() ? .tasks : .permissions
+            })
     }
 
     func startVoiceSession() {
@@ -521,6 +627,7 @@ final class FlowStateAppModel: ObservableObject {
         isListening = false
         speechCapture.stop()
         cancelInputTask()
+        revokeTask()
         onCancelResearch?()
         let token = voiceGeneration
         Task {
@@ -590,7 +697,7 @@ final class FlowStateAppModel: ObservableObject {
         }
     }
 
-    private func consume(_ result: SpeechRecognitionResult, token: UInt64) {
+    func consume(_ result: SpeechRecognitionResult, token: UInt64) {
         guard token == voiceGeneration else { return }
         if !result.transcript.isEmpty || !result.sessionEnded { latestTranscript = result.transcript }
         if result.sessionEnded {
@@ -605,25 +712,49 @@ final class FlowStateAppModel: ObservableObject {
             confirmPendingIntent()
             return
         }
+        if result.isFinal { utteranceGeneration &+= 1 }
+        let utteranceToken = utteranceGeneration
+        let activeAtArrival = activeCommandApplication
+        if result.isFinal {
+            intentTask?.cancel(); cloudSession?.cancelIntent()
+            pendingIntent = nil; pendingIntentSummary = nil
+        }
         Task {
-            let arrivalObservation = result.isFinal ? try? await desktopController.observeCurrent() : nil
-            if speechSettings.activation == .wakePhrase,
-               await speechCoordinator.detectWakePhrase(result.transcript) {
-                speechCapture.stop()
-                voiceGeneration &+= 1
-                try? await startSpeechCapture(language: speechSettings.language)
-                voiceStatus = "Wake phrase heard — listening"
-                return
+            guard token == voiceGeneration, utteranceToken == utteranceGeneration else { return }
+            if speechSettings.activation == .wakePhrase {
+                let woke = await speechCoordinator.detectWakePhrase(result.transcript)
+                guard token == voiceGeneration, utteranceToken == utteranceGeneration else { return }
+                if woke {
+                    let wasCapturing = isListening && !result.sessionEnded
+                    speechCapture.stop()
+                    voiceGeneration &+= 1
+                    if wasCapturing { try? await startSpeechCapture(language: speechSettings.language) }
+                    voiceStatus = "Wake phrase heard — listening"
+                    return
+                }
+                if await speechCoordinator.phase == .idle { return }
+                guard token == voiceGeneration, utteranceToken == utteranceGeneration else { return }
+            }
+            var arrivalObservation: DesktopObservation?
+            if result.isFinal, !result.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                do {
+                    let rawCommand = VoiceCommandRouter.resolve(result.transcript, mode: speechSettings.mode)
+                    arrivalObservation = try await prepareAutomaticTarget(for: rawCommand, activeBundleIdentifier: activeAtArrival, utteranceToken: utteranceToken)
+                } catch {
+                    guard token == voiceGeneration, utteranceToken == utteranceGeneration else { return }
+                    voiceStatus = error.localizedDescription
+                    return
+                }
             }
             let personalized = await memoryStore.personalize(result.transcript, mode: speechSettings.mode)
-            guard token == voiceGeneration else { return }
+            guard token == voiceGeneration, utteranceToken == utteranceGeneration else { return }
             guard let command = await speechCoordinator.consume(
                 transcript: personalized,
                 isFinal: result.isFinal,
                 sessionEnded: result.sessionEnded,
                 utteranceID: result.utteranceID
             ) else { return }
-            guard token == voiceGeneration else { return }
+            guard token == voiceGeneration, utteranceToken == utteranceGeneration else { return }
             if result.isFinal, command != .unknown {
                 intentTask?.cancel(); cloudSession?.cancelIntent()
                 pendingIntent = nil; pendingIntentSummary = nil
@@ -634,29 +765,30 @@ final class FlowStateAppModel: ObservableObject {
                 isListening = false
                 speechCapture.stop()
                 cancelInputTask()
+                revokeTask()
                 onCancelResearch?()
                 voiceStatus = "Stopped locally"
             case let .dictate(text):
                 guard result.isFinal else { return }
                 executeDesktopAction(.insertText(text), expectedObservation: arrivalObservation)
             case let .scroll(lines):
-                executeDesktopAction(.scroll(lines: lines))
+                executeDesktopAction(.scroll(lines: lines), expectedObservation: arrivalObservation)
             case let .openApp(bundle):
-                guard bundle == inputBundleIdentifier else {
-                    desktopStatus = L10n.format("Allow control of %@ before opening it.", L10n.appName(bundle))
-                    voiceStatus = desktopStatus
-                    return
+                if inputBundleIdentifier != bundle {
+                    do { _ = try await prepareAutomaticTarget(for: command, activeBundleIdentifier: activeAtArrival, utteranceToken: utteranceToken) }
+                    catch { voiceStatus = error.localizedDescription; return }
                 }
+                guard token == voiceGeneration, utteranceToken == utteranceGeneration else { return }
                 executeDesktopAction(.openApplication(bundleIdentifier: bundle))
             case let .focus(role, label):
-                executeDesktopAction(.focus(role: role, label: label))
+                executeDesktopAction(.focus(role: role, label: label), expectedObservation: arrivalObservation)
             case let .select(label):
-                executeDesktopAction(.select(label: label))
+                executeDesktopAction(.select(label: label), expectedObservation: arrivalObservation)
             case let .press(key, modifiers):
                 if key == "Enter" || modifiers != nil {
-                    prepareLocalKeyConfirmation(key: key, modifiers: modifiers)
+                    prepareLocalKeyConfirmation(key: key, modifiers: modifiers, expectedObservation: arrivalObservation)
                 } else {
-                    executeDesktopAction(.press(key: key, modifiers: modifiers))
+                    executeDesktopAction(.press(key: key, modifiers: modifiers), expectedObservation: arrivalObservation)
                 }
             case let .research(query):
                 if let onResearch { onResearch(query); voiceStatus = cloudStatus }
@@ -667,7 +799,7 @@ final class FlowStateAppModel: ObservableObject {
                 undoLastDesktopAction()
             case .unknown:
                 guard result.isFinal else { return }
-                if shouldInterpret(command) { resolveManagedUtterance(personalized, utteranceID: result.utteranceID ?? UUID(), token: token) }
+                if shouldInterpret(command) { resolveManagedUtterance(personalized, utteranceID: result.utteranceID ?? UUID(), token: token, originalObservation: arrivalObservation) }
                 else { voiceStatus = "I could not match that request. Turn on cloud interpretation for natural-language controls." }
             }
         }
@@ -677,7 +809,7 @@ final class FlowStateAppModel: ObservableObject {
         useManagedCommands && command == .unknown && speechSettings.mode != .dictation
     }
 
-    private func resolveManagedUtterance(_ transcript: String, utteranceID: UUID, token: UInt64) {
+    private func resolveManagedUtterance(_ transcript: String, utteranceID: UUID, token: UInt64, originalObservation: DesktopObservation?) {
         guard let session = cloudSession, session.signedIn else {
             voiceStatus = "Sign in to use Auto interpretation, or choose Commands only for local controls."
             return
@@ -689,7 +821,7 @@ final class FlowStateAppModel: ObservableObject {
         intentTask = Task { [weak self] in
             guard let self, !Task.isCancelled, token == voiceGeneration, inputEpoch.isCurrent(epoch) else { return }
             do {
-                let observation = try await desktopController.observeCurrent()
+                guard let observation = originalObservation else { throw DesktopExecutionError.targetChanged }
                 await previous?.value
                 guard !Task.isCancelled, token == voiceGeneration, inputEpoch.isCurrent(epoch) else { return }
                 guard !observation.isSecure else {
@@ -699,7 +831,7 @@ final class FlowStateAppModel: ObservableObject {
                 contextRevision += 1
                 var revision = contextRevision
                 guard let inputGrant = currentInputGrant, inputGrant.expiresAt > Date(), desktopState == .ready else {
-                    voiceStatus = "Choose an app in Tasks & history and allow the controls you want to use."
+                    voiceStatus = "The active app changed. Repeat your command."
                     return
                 }
                 let apps = ApplicationCatalog.installed().sorted {
@@ -715,10 +847,16 @@ final class FlowStateAppModel: ObservableObject {
                     candidates.append(CloudIntentCandidate(id: element,
                         label: observation.focusedLabel ?? "Focused control", bundleIdentifier: observation.bundleIdentifier, kind: "control"))
                 }
+                let routingGrant = DesktopExecutionGrant(
+                    allowedBundleIdentifiers: Set(candidates.compactMap(\.bundleIdentifier)).union([observation.bundleIdentifier]),
+                    allowedActions: inputGrant.allowedActions, generation: inputGrant.generation, expiresAt: inputGrant.expiresAt)
+                try await desktopController.begin(grant: routingGrant, lifecycleEpoch: epoch)
+                guard !Task.isCancelled, inputEpoch.isCurrent(epoch) else { return }
+                currentInputGrant = routingGrant
                 let context = CloudIntentContext(focusedAppBundleIdentifier: observation.bundleIdentifier,
                     focusedRole: observation.focusedRole, editable: observation.isEditable, targetCandidates: candidates)
                 voiceStatus = "Understanding your request…"
-                let captureGrant = captureGrantForCloud(bundleIdentifier: observation.bundleIdentifier)
+                let captureGrant = await prepareAutomaticObservation(bundle: observation.bundleIdentifier)
                 var screenObservation: CaptureObservation?
                 var decision = try await session.routeIntent(utterance: transcript, sessionID: sessionID,
                     utteranceID: utteranceID.uuidString, contextRevision: revision,
@@ -728,7 +866,7 @@ final class FlowStateAppModel: ObservableObject {
                       sessionID == voiceSessionID, revision == contextRevision else { return }
                 if decision.requiresObservation {
                     guard let captureGrant, captureGrantForCloud(bundleIdentifier: observation.bundleIdentifier) == captureGrant else {
-                        voiceStatus = "Allow cloud screen context for this app before using visual commands."
+                        voiceStatus = "Enable screen context in Settings and allow Screen Recording to use visual commands."
                         return
                     }
                     voiceStatus = "Looking at the approved window…"
@@ -778,7 +916,7 @@ final class FlowStateAppModel: ObservableObject {
         }
     }
 
-    func prepareLocalKeyConfirmation(key: String, modifiers: String?) {
+    func prepareLocalKeyConfirmation(key: String, modifiers: String?, expectedObservation: DesktopObservation? = nil) {
         guard desktopState == .ready, let grant = currentInputGrant, grant.expiresAt > Date() else {
             voiceStatus = blockedControlMessage
             return
@@ -786,8 +924,10 @@ final class FlowStateAppModel: ObservableObject {
         let epoch = inputEpoch.current
         intentTask = Task {
             do {
-                let observation = try await desktopController.observeCurrent()
-                guard inputEpoch.isCurrent(epoch), let grant = currentInputGrant,
+                let observation: DesktopObservation
+                if let expectedObservation { observation = expectedObservation }
+                else { observation = try await desktopController.observeCurrent() }
+                guard !Task.isCancelled, inputEpoch.isCurrent(epoch), let grant = currentInputGrant,
                       grant.allowedBundleIdentifiers.contains(observation.bundleIdentifier), !observation.isSecure else { return }
                 let action = NativePlanAction(kind: .press, targetBundleIdentifier: observation.bundleIdentifier,
                     parameters: .press(key: key, modifiers: modifiers), capability: "app.input", requiresApproval: true)
@@ -795,7 +935,7 @@ final class FlowStateAppModel: ObservableObject {
                 pendingIntentSummary = "Press " + key + " in " + L10n.appName(observation.bundleIdentifier)
                 voiceStatus = "Confirm this keyboard shortcut. Say confirm or cancel."
             } catch {
-                guard inputEpoch.isCurrent(epoch) else { return }
+                guard !Task.isCancelled, inputEpoch.isCurrent(epoch) else { return }
                 voiceStatus = error.localizedDescription
             }
         }
@@ -848,7 +988,7 @@ final class FlowStateAppModel: ObservableObject {
         case .running:
             return "An action is still running. Wait for it to finish."
         default:
-            return "Choose an app and grant desktop control in Tasks & history before using commands"
+            return accessibilityGranted() ? "Repeat your command to use the active app automatically." : "Allow Accessibility in Settings, then repeat your command."
     }
     }
 
@@ -954,35 +1094,18 @@ struct FlowStateMenuView: View {
             }
 
             Divider()
-            ApplicationTargetPicker(title: "App to observe", selection: $model.bundleIdentifier)
-            HStack {
-                Button(L10n.text("Begin task")) { model.beginTask() }
-                    .disabled(model.isTaskActive)
-                Button(L10n.text("Revoke")) { model.revokeTask() }
-                    .disabled(!model.isTaskActive)
-            }
-            Toggle("Allow cloud screen context for this task", isOn: $model.allowCloudScreenContext)
-                .disabled(!model.isTaskActive)
-            Text("When needed, the approved window is sent to the cloud to help interpret your request.")
+            Text("Uses the active app or the app named in your command.")
                 .font(.caption).foregroundStyle(.secondary)
-            Button(L10n.text("Capture approved window")) { model.captureApprovedWindow() }
-                .disabled(!model.isTaskActive)
-            Text(L10n.text(model.taskStatus))
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-
-            Divider()
-            Text(L10n.text("Desktop control"))
-                .font(.system(size: 14, weight: .medium))
-            ApplicationTargetPicker(title: "App to control", selection: $model.inputBundleIdentifier)
+            Toggle("Use screen context when needed", isOn: $model.allowCloudScreenContext)
+            Text("With Screen Recording access, the relevant window can be sent to the cloud to understand a visual command.")
+                .font(.caption).foregroundStyle(.secondary)
             HStack {
-                Button(model.desktopState == .reconciliationRequired ? "I've checked the result" : L10n.text("Grant input")) { model.beginInputTask() }
-                Button(L10n.text("Cancel")) { model.cancelInputTask() }
-            }
-            HStack {
-                Button(L10n.text("Resume")) { model.resumeInputTask() }
+                if model.desktopState == .reconciliationRequired {
+                    Button("I've checked the result") { model.beginInputTask() }
+                }
+                Button("Resume") { model.resumeInputTask() }
                     .disabled(model.desktopState != .pausedForUser)
-                Button(L10n.text("Undo last edit")) { model.undoLastDesktopAction() }
+                Button("Undo last edit") { model.undoLastDesktopAction() }
             }
             Text(L10n.text(model.desktopStatus))
                 .font(.system(size: 12))
@@ -1009,7 +1132,7 @@ struct FlowStateMenuView: View {
 
 @main
 struct FlowStateApp: App {
-    @StateObject private var model = FlowStateAppModel()
+    @StateObject private var model = FlowStateAppModel(preferences: .standard)
 
     var body: some Scene {
         MenuBarExtra("Flow State", systemImage: "waveform") {

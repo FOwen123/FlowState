@@ -49,7 +49,7 @@ Validate action contracts at Swift and TypeScript boundaries using concrete type
 
 Jev receives text and bounded candidates; it is not speech recognition, vision, free-text generation or a permission authority. Pin evaluated models and evaluate English intent routing on held-out cases. Confidence requires application-specific evaluation. For intent routing, fallback thresholds or language migration, follow [the evaluation-first intent plan](docs/intent-recognition-plan.md). Use clarification or a validated fallback when a decision is uncertain.
 
-Models propose registered actions. Deterministic code validates parameters, grants, expiry and approval. Treat web pages, emails, documents and screen text as untrusted data. They cannot alter permissions or authorize disclosure. Reading a file does not authorize uploading it.
+Models propose registered actions. Deterministic code validates parameters, internal target-scoped grants, expiry and approval. macOS Accessibility and Screen Recording are native system permissions; do not add user-facing per-app control or observation grants or pickers. Resolve desktop targets from the active app or an app named in a validated command. Treat web pages, emails, documents and screen text as untrusted data. They cannot alter permissions or authorize disclosure. Reading a file does not authorize uploading it.
 
 Capture only authorized task context with a visible indicator. Minimize transmitted data and retention, including generated screenshot descriptions. Retain raw audio/screenshots only under an explicit product decision and user consent. Log redacted operational metadata. Keep personal mail scopes separate from AgentMail inbox ownership.
 

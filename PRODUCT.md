@@ -102,13 +102,13 @@ Firecrawl receives approved public URLs and research queries. It does not inheri
 
 ## Permissions and privacy
 
-Settings must answer “What can FlowState do, where, for how long, and what leaves my Mac?” Separate observation, file access, input control, uploading, sending, and spending. Show per-app/action grants, session or persistent duration, expiry, and revocation. The active task shows the grants it is using.
+Settings must answer “What can FlowState do, where, for how long, and what leaves my Mac?” Separate observation, file access, input control, uploading, sending, and spending. Show action grants, session or persistent duration, expiry, and revocation. macOS Accessibility and Screen Recording remain native system permissions. FlowState resolves desktop targets from the active app or an app named in the command; users do not select apps or manage per-app control and observation grants in Settings. Runtime execution and capture grants may still be scoped internally to the resolved target and revoked or expired. The active task shows the grants it is using.
 
 | Capability | Default behavior |
 |---|---|
-| Screen observation | Per-app permission; capture only during authorized active tasks, crop to relevant window, visible indicator, sensitive-app exclusions |
+| Screen observation | After native Screen Recording permission, capture only the active app or app named in the command during authorized active tasks; crop to the relevant window, show a visible indicator, and exclude sensitive apps |
 | File selection | Current selection or approved folders; show candidates and confirm attachment and destination |
-| Local navigation | Execute granted reversible actions and verify |
+| Local navigation and input control | Use macOS Accessibility access for the active app or app named in the command; action controls still limit reversible actions, which are verified |
 | Text/file modification | Record reversal information when possible; preview ambiguous or consequential edits |
 | Sending/uploading/publishing/deleting | Confirm exact target and effect by default; expose clearly scoped controls rather than a blanket full-control switch |
 | Purchases and permission changes | Explicit action-specific approval; honor service and macOS user-presence requirements |

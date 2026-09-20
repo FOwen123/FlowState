@@ -423,7 +423,7 @@ export const route = actionGeneric({
             decision: "clarify",
             reason: "observation_grant_missing",
             clarification:
-              "I need observation and upload permission to inspect that target.",
+              "Enable screen context in Settings and allow Screen Recording to use visual commands.",
           };
         } else if (request.observation?.imageDataUrl === undefined) {
           requiresObservation = true;
@@ -447,7 +447,7 @@ export const route = actionGeneric({
               decision: "clarify",
               reason: "observation_grant_missing",
               clarification:
-                "I need observation and upload permission to inspect that target.",
+                "Enable screen context in Settings and allow Screen Recording to use visual commands.",
             };
           }
         }

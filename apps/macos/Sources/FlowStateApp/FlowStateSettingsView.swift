@@ -1,4 +1,3 @@
-import AppKit
 import FlowStateCore
 import SwiftUI
 
@@ -259,21 +258,31 @@ private struct TasksSettingsView: View {
         settingsColumn {
             pageHeading(title: "Tasks & history", subtitle: "Review what Flow State is doing before it acts.")
             settingsPanel {
-                ApplicationTargetPicker(title: "App to control", selection: $model.inputBundleIdentifier)
-                    .padding(.vertical, 20)
+                SettingRow(
+                    title: "Desktop control",
+                    subtitle: "Uses the active app or the app named in your command.",
+                    trailing: { Image(systemName: "rectangle.on.rectangle") }
+                )
                 ForEach(DesktopActionKind.allCases, id: \.rawValue) { action in
                     ToggleRow(
                         title: L10n.actionName(action),
-                        subtitle: "Allow this action only for the selected target app.",
+                        subtitle: "Choose whether Flow State may use this desktop action.",
                         isOn: Binding(
                             get: { model.allowedInputActions.contains(action) },
                             set: { model.setInputAction(action, enabled: $0) }
                         )
                     )
                 }
+                ToggleRow(
+                    title: "Allow cloud screen context",
+                    subtitle: "When needed, a permitted window may be sent to the cloud for interpretation. This is separate from Screen Recording permission.",
+                    isOn: $model.allowCloudScreenContext
+                )
                 HStack(spacing: 12) {
-                    Button(model.desktopState == .reconciliationRequired ? "I've checked the result" : L10n.text("Grant desktop control")) { model.beginInputTask() }
-                        .buttonStyle(PaperBorderButtonStyle())
+                    if model.desktopState == .reconciliationRequired {
+                        Button("I've checked the result") { model.beginInputTask() }
+                            .buttonStyle(PaperBorderButtonStyle())
+                    }
                     Button(L10n.text("Cancel")) { model.cancelInputTask() }
                         .buttonStyle(PaperBorderButtonStyle())
                     Button(L10n.text("Resume")) { model.resumeInputTask() }
@@ -396,7 +405,7 @@ private struct PermissionsSettingsView: View {
                     )
                 }
             }
-            Text(L10n.text("Sensitive apps such as Passwords, Keychain and password managers remain excluded from screen capture. Full-window capture is disclosed before it is used."))
+            Text(L10n.text("Screen Recording lets Flow State observe permitted windows on this Mac. The separate cloud screen context setting controls whether a captured window may be uploaded for interpretation. Sensitive apps such as Passwords, Keychain and password managers remain excluded from screen capture."))
                 .font(.system(size: 13))
                 .foregroundStyle(PaperStyle.muted)
                 .padding(16)
@@ -407,8 +416,8 @@ private struct PermissionsSettingsView: View {
         switch permission {
         case .microphone: "Required only for an active speech session."
         case .speechRecognition: "Required only for an active speech session."
-        case .accessibility: "Allow Flow State to control the apps you approve."
-        case .screenRecording: "Allow screenshots of windows you approve during a task."
+        case .accessibility: "Allow Flow State to control the active app or an app named in your command."
+        case .screenRecording: "Allow Flow State to observe the active app or an app named in your command."
         }
     }
 }
@@ -584,34 +593,5 @@ private struct WaveMark: View {
             }
         }
         .accessibilityHidden(true)
-    }
-}
-
-
-struct ApplicationTargetPicker: View {
-    let title: String
-    @Binding var selection: String
-    @ObservedObject private var localization = UILocalization.shared
-    @State private var applications: [InstalledApplication] = []
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Picker(L10n.text(title), selection: $selection) {
-                Text(L10n.text("Choose an app")).tag("")
-                ForEach(applications) { app in
-                    Text(app.name).tag(app.bundleIdentifier)
-                }
-                if !selection.isEmpty && !applications.contains(where: { $0.bundleIdentifier == selection }) {
-                    Text(L10n.text("Previously selected app")).tag(selection)
-                }
-            }
-            Button { refresh() } label: { Image(systemName: "arrow.clockwise") }
-                .accessibilityLabel(L10n.text("Refresh app list"))
-                .help("Refresh installed applications")
-        }
-        .onAppear { refresh() }
-    }
-    private func refresh() {
-        applications = ApplicationCatalog.installed()
     }
 }
