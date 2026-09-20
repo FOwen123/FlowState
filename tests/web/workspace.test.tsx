@@ -90,20 +90,18 @@ describe("research workspace", () => {
     );
     expect(screen.queryByRole("dialog")).toBeNull();
   });
-  it("passes the chosen language to research", async () => {
+  it("uses English without a language picker", async () => {
     const research = vi.fn().mockResolvedValue(undefined);
     render(<Workspace configured onResearch={research} />);
-    fireEvent.change(screen.getByLabelText("Language / 語言"), {
-      target: { value: "zh-Hant" },
-    });
-    fireEvent.change(screen.getByLabelText("公開文章網址"), {
+    expect(screen.queryByRole("combobox")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Public article URL"), {
       target: { value: "https://example.com/article" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "研究文章" }));
+    fireEvent.click(screen.getByRole("button", { name: "Research article" }));
     await waitFor(() =>
       expect(research).toHaveBeenCalledWith(
         "https://example.com/article",
-        "zh-Hant",
+        "en",
       ),
     );
   });
@@ -123,13 +121,6 @@ describe("research workspace", () => {
         "en",
       ),
     );
-  });
-  it("supports Traditional Chinese labels", () => {
-    render(<Workspace configured={false} />);
-    fireEvent.change(screen.getByLabelText("Language / 語言"), {
-      target: { value: "zh-Hant" },
-    });
-    expect(screen.getByRole("button", { name: "研究文章" })).toBeTruthy();
   });
 });
 it("shows the configured sender in the exact email review", () => {

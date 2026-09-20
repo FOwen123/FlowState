@@ -97,3 +97,10 @@ describe("privacy panel", () => {
     expect(screen.queryByText(/Cloud data deletion complete/)).toBeNull();
   });
 });
+
+it("shows English privacy copy without a second language", () => {
+  const { container } = render(<PrivacyPanel />);
+  expect(container.textContent).not.toMatch(/\p{Script=Han}/u);
+  fireEvent.click(screen.getByRole("button", { name: /^Delete cloud data/ }));
+  expect(container.textContent).not.toMatch(/\p{Script=Han}/u);
+});

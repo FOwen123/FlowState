@@ -7,6 +7,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "evaluate:intent": "node scripts/evaluate-intent.ts",
+    "evaluate:intent:live": "node scripts/evaluate-intent.ts --mode live",
     "check:env": "node scripts/check-env.mjs",
     "test:native": "swift test --package-path apps/macos",
     "dev:web": "vite apps/web --host 127.0.0.1",

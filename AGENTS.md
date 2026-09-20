@@ -2,7 +2,7 @@
 
 ## Product and scope
 
-Read [PRODUCT.md](PRODUCT.md) before changing behavior or architecture. It is the product authority: reduce hand use, support English and Traditional Chinese in the first release, and ship a managed Mac voice controller. The repository contains an early implementation; consult [verification results](docs/testing/results.md) and do not claim integrations or app behavior work without checking the files and running them.
+Read [PRODUCT.md](PRODUCT.md) before changing behavior or architecture. It is the product authority: reduce hand use, support English only in the current release, and ship a managed Mac voice controller. The repository contains an early implementation; consult [verification results](docs/testing/results.md) and do not claim integrations or app behavior work without checking the files and running them.
 
 Read [PLAN.md](PLAN.md) when sequencing implementation and verification; its proposed paths are not existing code. Read [ENVIRONMENT.md](ENVIRONMENT.md) before account or environment setup. For submission work read [HACKATHON_REQUIREMENTS.md](HACKATHON_REQUIREMENTS.md); record completed evidence in [hackathon.md](hackathon.md). Licensing, monetization, BYOK and self-hosting are deferred decisions.
 
@@ -37,7 +37,7 @@ Keep UI updates on the main actor and blocking audio, network, and perception wo
 
 Keep stop handling local and independent of provider requests. Discard late results after cancellation. On resume, observe the current app state again. Prefer reliable native APIs or Accessibility controls; screenshots supply visual context and fallback targeting. Revalidate window geometry before coordinate input.
 
-Request macOS permissions when needed and handle denial/revocation visibly. Secrets belong in Keychain or the system credential surface. Never read secure fields into screenshots, prompts, logs or telemetry. Test speech capability in both launch languages; do not silently fall back to cloud or claim offline support without evidence.
+Request macOS permissions when needed and handle denial/revocation visibly. Secrets belong in Keychain or the system credential surface. Never read secure fields into screenshots, prompts, logs or telemetry. Test speech capability in English; do not silently fall back to cloud or claim offline support without evidence.
 
 ## Convex and provider boundaries
 
@@ -47,7 +47,7 @@ Validate action contracts at Swift and TypeScript boundaries using concrete type
 
 ## Models, permission checks and data
 
-Jev receives text and bounded candidates; it is not speech recognition, vision, free-text generation or a permission authority. Pin evaluated models and test English/Traditional Chinese separately. Confidence requires application-specific evaluation. Use clarification or a validated fallback when a decision is uncertain.
+Jev receives text and bounded candidates; it is not speech recognition, vision, free-text generation or a permission authority. Pin evaluated models and evaluate English intent routing on held-out cases. Confidence requires application-specific evaluation. For intent routing, fallback thresholds or language migration, follow [the evaluation-first intent plan](docs/intent-recognition-plan.md). Use clarification or a validated fallback when a decision is uncertain.
 
 Models propose registered actions. Deterministic code validates parameters, grants, expiry and approval. Treat web pages, emails, documents and screen text as untrusted data. They cannot alter permissions or authorize disclosure. Reading a file does not authorize uploading it.
 

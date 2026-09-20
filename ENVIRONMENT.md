@@ -45,7 +45,7 @@ Use separate development and production resources. A configuration value alone d
 - `docs/setup.md`: created; offline checks and service setup sequence.
 - `docs/release.md`: signing and deployment procedure after accounts are validated.
 
-No VPS, Fly.io, Modal, custom domain, GPU rental, or paid speech service is required just to begin. Reassess hosting only if measured requirements exceed the Mac plus managed Convex/provider architecture. Speech provider/model configuration remains conditional on bilingual feasibility results.
+No VPS, Fly.io, Modal, custom domain, GPU rental, or paid speech service is required just to begin. Reassess hosting only if measured requirements exceed the Mac plus managed Convex/provider architecture. Speech provider/model configuration remains conditional on English speech and intent-evaluation results.
 
 ## Non-secret decisions still needed before live integrations
 
@@ -56,3 +56,9 @@ No VPS, Fly.io, Modal, custom domain, GPU rental, or paid speech service is requ
 5. Is Apple Developer distribution access available, and what bundle identifier should be used?
 
 These do not block documentation, contract tests or initial native work. Ask for each decision when its implementation needs it rather than requesting all credentials at once.
+
+## Intent recognition configuration
+
+The intent router uses the existing `TYPESAFE_API_KEY`, `OPENAI_API_KEY`, `FLOWSTATE_JEV_MODEL` and `FLOWSTATE_PLANNER_MODEL`; there are no new secret variables. The measured policy is pinned to `jev-1.13.0` and fails closed on another configured/reported Jev version. `FLOWSTATE_PLANNER_MODEL` currently serves both text and image fallback, so it must support image input for the latter. A separate vision-model variable is not consumed by this router.
+
+Thresholds live in the versioned review policy, not environment overrides. Native screenshot upload additionally requires an active matching capture task and the user's separate cloud-screen toggle; an API key or backend setting cannot enable it. Managed routing requires the native user to sign in and grant the intended app's controls.

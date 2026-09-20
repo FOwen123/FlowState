@@ -94,7 +94,7 @@ export function LiveWorkspace() {
     <>
       {history && history.length > 0 && (
         <div className="auth">
-          <label htmlFor="recent">Recent workflows / 最近的工作流程</label>
+          <label htmlFor="recent">Recent workflows</label>
           <select
             id="recent"
             style={{ maxWidth: "100%" }}
@@ -124,9 +124,6 @@ export function LiveWorkspace() {
         <p className="auth" role="status">
           Provider acceptance is uncertain. Check AgentMail sent history before
           any new send; retry is disabled to avoid duplicates.
-          <br />
-          寄送結果尚未確認。請先檢查 AgentMail
-          寄件紀錄；重試已停用，避免重複寄送。
         </p>
       )}
       {data && (data.status === "queued" || data.status === "running") && (
@@ -149,7 +146,7 @@ export function LiveWorkspace() {
               }
             }}
           >
-            Cancel research / 取消研究
+            Cancel research
           </button>
           <p>
             Cancellation discards late results; a provider request already in
@@ -167,35 +164,30 @@ export function LiveWorkspace() {
               "message.complained",
             ].includes(r.eventType),
           )
-            ? "Delivery problem reported. Check the assistant inbox. / 郵件傳遞發生問題。"
+            ? "Delivery problem reported. Check the assistant inbox."
             : receipts?.some((r) => r.eventType === "message.delivered")
-              ? "Delivered to the recipient’s mail server. Inbox placement is not confirmed. / 已送達收件伺服器。"
-              : "Accepted for sending. Delivery has not been confirmed. / 已接受寄送，尚未確認送達。"}
+              ? "Delivered to the recipient’s mail server. Inbox placement is not confirmed."
+              : "Accepted for sending. Delivery has not been confirmed."}
         </p>
       )}
       <Workspace
         sender={data?.sender ?? undefined}
         configured
         note={note ?? undefined}
-        onResearch={async (url, language) => {
+        onResearch={async (url) => {
           await register({ deviceId, name: "Flow State web" });
           const created = await create({
             deviceId,
             query:
-              language === "zh-Hant"
-                ? "請以繁體中文摘要這篇公開文章，並附上來源。"
-                : "Summarize this public article in English with source attribution.",
+              "Summarize this public article in English with source attribution.",
             sourceUrl: url,
           });
           setRunId(created.runId);
           await research({ runId: created.runId });
         }}
-        onSearch={async (query, language) => {
+        onSearch={async (query) => {
           await register({ deviceId, name: "Flow State web" });
-          const suffix =
-            language === "zh-Hant"
-              ? "請以繁體中文回答並附上來源。"
-              : "Answer in English with sources.";
+          const suffix = "Answer in English with sources.";
           const created = await create({
             deviceId,
             query: query + "\n" + suffix,

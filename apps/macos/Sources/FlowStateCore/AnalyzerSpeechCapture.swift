@@ -11,19 +11,43 @@ struct StreamingTranscript {
         if isFinal { finalized.append(text); partial = "" } else { partial = text }
         return self.text
     }
+    mutating func reset() {
+        finalized.removeAll(keepingCapacity: true)
+        partial = ""
+    }
 }
 
-/// macOS 26 speech models run on-device, including zh-TW. No audio upload path.
+/// Finalized audio cannot become a new command even if its result arrives late,
+/// after the microphone has detected the next utterance.
+struct SpeechResultRangeGate {
+    private var finalizedEnd: TimeInterval = -.infinity
+    mutating func accepts(end: TimeInterval, isFinal: Bool) -> Bool {
+        guard end.isFinite, end > finalizedEnd else { return false }
+        if isFinal { finalizedEnd = end }
+        return true
+    }
+}
+
+/// English speech runs on-device. There is no audio upload path.
 @MainActor
 public final class AnalyzerSpeechCapture {
     private var engine: AVAudioEngine?
     private var analyzer: SpeechAnalyzer?
     private var input: AsyncStream<AnalyzerInput>.Continuation?
     private var resultsTask: Task<Void, Never>?
+    private var endpointPollTask: Task<Void, Never>?
+    private var streamingTranscript = StreamingTranscript()
+    private var resultRangeGate = SpeechResultRangeGate()
+    private var endpointDetector: UtteranceEndpointDetector
     private(set) var generation: UInt64 = 0
     var starting = false
     private var failure: (@MainActor () -> Void)?
-    public init() {}
+    private let endpointPollInterval: UInt64 = 100_000_000
+    private let speechActivityThreshold: Float = 0.01
+
+    public init(endpointSilenceDuration: TimeInterval = 0.75) {
+        endpointDetector = UtteranceEndpointDetector(silenceDuration: endpointSilenceDuration)
+    }
 
     public static func installLanguage(_ language: SpeechLanguage) async throws {
         guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: language.locale) else { throw SpeechCaptureError.unavailable }
@@ -40,7 +64,7 @@ public final class AnalyzerSpeechCapture {
         let token = generation
         starting = true
         defer { if token == generation { starting = false } }
-        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo:language.locale) else { throw SpeechCaptureError.unavailable }
+        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo:SpeechLanguage.english.locale) else { throw SpeechCaptureError.unavailable }
         let transcriber = SpeechTranscriber(locale:locale,preset:.progressiveTranscription)
         guard await AssetInventory.status(forModules:[transcriber]) == .installed else { throw SpeechCaptureError.modelNotInstalled }
         guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith:[transcriber]) else { throw SpeechCaptureError.unavailable }
@@ -53,25 +77,56 @@ public final class AnalyzerSpeechCapture {
               let converter = PCMInputConverter(from:natural,to:format) else { throw SpeechCaptureError.noInputDevice }
         let stream = AsyncStream<AnalyzerInput>.makeStream(bufferingPolicy:.bufferingOldest(128))
         self.failure = onFailure
+        streamingTranscript.reset()
+        endpointDetector.reset()
+        resultRangeGate = SpeechResultRangeGate()
         self.analyzer = session
         self.input = stream.continuation
         resultsTask = Task { [weak self] in
-            var transcript = StreamingTranscript()
             do {
                 for try await result in transcriber.results {
                     guard let self, self.generation == token else { return }
-                    let text = transcript.update(String(result.text.characters),isFinal:result.isFinal)
-                    onResult(SpeechRecognitionResult(transcript:text,language:language,isFinal:false))
+                    guard self.resultRangeGate.accepts(end: result.range.end.seconds, isFinal: result.isFinal) else { continue }
+                    let text = self.streamingTranscript.update(String(result.text.characters),isFinal:result.isFinal)
+                    guard self.endpointDetector.updateTranscript(text,isFinal:result.isFinal,at:Date()) else {
+                        // A late final/revision can belong to audio already
+                        // committed by the automatic endpoint. Do not surface
+                        // it as a duplicate command.
+                        self.streamingTranscript.reset()
+                        continue
+                    }
+                    onResult(SpeechRecognitionResult(transcript:text,language:.english,isFinal:false,sessionEnded:false))
                 }
                 guard let self, self.generation == token else { return }
+                let finalTime = Date()
+                if let endpoint = self.endpointDetector.finish(at:finalTime) {
+                    self.emit(endpoint,language:.english,onResult:onResult)
+                } else {
+                    // An automatic endpoint may already have emitted the last
+                    // transcript. Still notify consumers that the analyzer
+                    // session itself is over so they can return to idle.
+                    onResult(SpeechRecognitionResult(
+                        transcript:self.streamingTranscript.text,
+                        language:.english,
+                        isFinal:true,
+                        utteranceID:UUID(),
+                        sessionEnded:true
+                    ))
+                }
                 self.cleanup()
-                onResult(SpeechRecognitionResult(transcript:transcript.text,language:language,isFinal:true))
             } catch {
                 guard let self, self.generation == token else { return }
                 self.stop(); onFailure()
             }
         }
+        let activityThreshold = speechActivityThreshold
         audioEngine.inputNode.installTap(onBus:0,bufferSize:1024,format:natural) { @Sendable [weak self] buffer,_ in
+            let active = Self.isSpeechActive(buffer,threshold:activityThreshold)
+            Task { @MainActor [weak self] in
+                guard let self, self.generation == token else { return }
+                self.endpointDetector.updateSpeechActivity(active,at:Date())
+                self.pollEndpoint(at:Date(),language:.english,onResult:onResult)
+            }
             do {
                 let converted = try converter.convert(buffer)
                 guard converted.frameLength > 0 else { return }
@@ -88,6 +143,7 @@ public final class AnalyzerSpeechCapture {
             engine = audioEngine
             audioEngine.prepare()
             try audioEngine.start()
+            startEndpointPoller(token:token,language:.english,onResult:onResult)
         } catch {
             audioEngine.inputNode.removeTap(onBus:0)
             if generation == token { stop() }
@@ -117,6 +173,8 @@ public final class AnalyzerSpeechCapture {
         if let previous { Task { await previous.cancelAndFinishNow() } }
     }
     private func cleanup() {
+        endpointPollTask?.cancel()
+        endpointPollTask = nil
         engine?.stop()
         engine?.inputNode.removeTap(onBus:0)
         engine = nil
@@ -124,6 +182,61 @@ public final class AnalyzerSpeechCapture {
         analyzer = nil
         failure = nil
         resultsTask = nil
+    }
+
+    private func startEndpointPoller(
+        token: UInt64,
+        language: SpeechLanguage,
+        onResult: @escaping @MainActor (SpeechRecognitionResult) -> Void
+    ) {
+        endpointPollTask?.cancel()
+        endpointPollTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds:self?.endpointPollInterval ?? 100_000_000)
+                guard let self, self.generation == token else { return }
+                self.pollEndpoint(at:Date(),language:language,onResult:onResult)
+            }
+        }
+    }
+
+    private func pollEndpoint(
+        at now: Date,
+        language: SpeechLanguage,
+        onResult: @escaping @MainActor (SpeechRecognitionResult) -> Void
+    ) {
+        guard let endpoint = endpointDetector.poll(at:now) else { return }
+        emit(endpoint,language:language,onResult:onResult)
+    }
+
+    private func emit(
+        _ endpoint: UtteranceEndpoint,
+        language: SpeechLanguage,
+        onResult: @escaping @MainActor (SpeechRecognitionResult) -> Void
+    ) {
+        streamingTranscript.reset()
+        onResult(SpeechRecognitionResult(
+            transcript:endpoint.transcript,
+            language:language,
+            isFinal:true,
+            utteranceID:endpoint.utteranceID,
+            sessionEnded:endpoint.sessionEnded
+        ))
+    }
+
+    nonisolated private static func isSpeechActive(_ buffer: AVAudioPCMBuffer, threshold: Float) -> Bool {
+        guard let channels = buffer.floatChannelData, buffer.frameLength > 0 else { return false }
+        let frameCount = Int(buffer.frameLength)
+        let channelCount = Int(buffer.format.channelCount)
+        var sum: Float = 0
+        for channel in 0..<channelCount {
+            let samples = channels[channel]
+            for frame in 0..<frameCount {
+                let sample = samples[frame]
+                sum += sample * sample
+            }
+        }
+        let rms = sqrt(sum / Float(max(1,frameCount * channelCount)))
+        return rms >= threshold
     }
 }
 

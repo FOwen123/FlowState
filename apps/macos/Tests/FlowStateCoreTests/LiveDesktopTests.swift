@@ -24,7 +24,7 @@ import Testing
     try #require(AXIsProcessTrusted(), "The test runner needs Accessibility permission independently of the app")
     let driver = AXDesktopDriver()
     let controller = DesktopAutomationController(driver: driver)
-    try await controller.begin(grant: DesktopExecutionGrant(allowedBundleIdentifiers: ["com.apple.TextEdit"], allowedActions: [.openApplication, .insertText, .scroll], generation: 1, expiresAt: Date().addingTimeInterval(30)))
+    try await controller.begin(grant: DesktopExecutionGrant(allowedBundleIdentifiers: ["com.apple.TextEdit"], allowedActions: [.openApplication, .insertText, .scroll, .press], generation: 1, expiresAt: Date().addingTimeInterval(30)))
     _ = try await controller.execute(.openApplication(bundleIdentifier: "com.apple.TextEdit"), expectedBundleIdentifier: "com.apple.TextEdit")
     var ready = false
     var lastObservation: DesktopObservation?
@@ -44,6 +44,13 @@ import Testing
     #expect(result.valueAfter?.contains("Verified input / 輸入測試") == true)
     try await controller.undo(result)
     #expect(try await driver.observe().value == original)
+    print("Live fixture: testing select-all")
+    _ = try await controller.execute(.press(key: "A", modifiers: "Command"), expectedBundleIdentifier: "com.apple.TextEdit")
+    #expect(try await driver.observe().selectedTextRange == DesktopTextRange(location: 0, length: (original as NSString).length))
+    print("Live fixture: testing arrow key")
+    _ = try await controller.execute(.press(key: "ArrowRight", modifiers: nil), expectedBundleIdentifier: "com.apple.TextEdit")
+    #expect(try await driver.observe().selectedTextRange?.length == 0)
+    print("Live fixture: testing scroll")
     let appElement = AXUIElementCreateApplication(openedApp.processIdentifier)
     let window = try #require(liveAttribute(appElement, kAXFocusedWindowAttribute) as! AXUIElement?)
     let scrollbar = try #require(liveVerticalScrollbar(window), "Disposable document must expose a vertical scrollbar")
@@ -55,8 +62,22 @@ import Testing
         try await Task.sleep(for: .milliseconds(50))
     }
     #expect(scrollChanged, "Scroll must change the approved document's visible position")
+    if ProcessInfo.processInfo.environment["FLOWSTATE_CAPTURE_SMOKE"] == "1" {
+        // Only the exact synthetic fixture above may be captured. No upload or file output.
+        try #require(try await driver.observe().value == original)
+        let capture = ScreenCaptureController()
+        let captureGrant = await capture.beginTask(allowedBundleIdentifiers: ["com.apple.TextEdit"])
+        let frame = try await capture.capture(bundleIdentifier: "com.apple.TextEdit", grant: captureGrant)
+        try await capture.revalidate(frame.observation, grant: captureGrant, forUpload: true)
+        #expect(frame.observation.bundleIdentifier == "com.apple.TextEdit")
+        #expect(frame.observation.windowID != 0)
+        #expect(frame.observation.uploadSafe)
+        #expect(try frame.pngDataURL(uploadApproved: true).utf8.count <= CaptureImageBounds.defaultMaximumBytes)
+        await capture.revoke()
+        print("Synthetic TextEdit window capture, geometry revalidation and bounded in-memory encoding passed; no upload.")
+    }
     // Leave the test document open for inspection; never close an unrelated document.
-    print("Live TextEdit activation, bilingual insertion, exact undo and verified scrolling passed.")
+    print("Live TextEdit activation, Unicode insertion, exact undo, select-all, arrow key and scrolling passed.")
 }
 
 private func liveAttribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {

@@ -113,7 +113,6 @@ private struct CloudConnectedView: View {
     @ObservedObject private var localization = UILocalization.shared
     @State private var command = ""
     @State private var query = ""
-    @State private var language = "en"
     @State private var recipient = ""
     @State private var reviewed: CloudNote?
     @State private var reviewedRecipient = ""
@@ -308,12 +307,6 @@ private struct CloudConnectedView: View {
                 detail: text("account.research.placeholder")
             )
 
-            Picker(text("account.language.label"), selection: $language) {
-                Text(text("account.language.english")).tag("en")
-                Text(text("account.language.traditional_chinese")).tag("zh-Hant")
-            }
-            .pickerStyle(.menu)
-
             TextField(text("account.research.placeholder"), text: $query)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityLabel(text("account.research.placeholder"))
@@ -322,9 +315,7 @@ private struct CloudConnectedView: View {
                 Button(text("account.research.action")) {
                     perform {
                         try await cloud.research(
-                            query: query + (language == "zh-Hant"
-                                ? "\n請以繁體中文回答並附上來源。"
-                                : "\nAnswer in English with sources.")
+                            query: query + "\nAnswer in English with sources."
                         )
                     }
                 }

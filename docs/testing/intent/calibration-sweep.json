@@ -1,0 +1,11 @@
+{
+  "samples": 80,
+  "bestZeroErrorGate": {
+    "confidence": 0.5,
+    "selectedProbability": 0.5,
+    "margin": 0.8,
+    "accepted": 15,
+    "families": 5
+  },
+  "gridCount": 640
+}

@@ -11,8 +11,8 @@ type Props = {
   configured: boolean;
   sender?: string;
   note?: Note;
-  onResearch?: (url: string, language: "en" | "zh-Hant") => Promise<void>;
-  onSearch?: (query: string, language: "en" | "zh-Hant") => Promise<void>;
+  onResearch?: (url: string, language: "en") => Promise<void>;
+  onSearch?: (query: string, language: "en") => Promise<void>;
   onSend?: (id: string, recipient: string) => Promise<void>;
 };
 const labels = {
@@ -46,31 +46,6 @@ const labels = {
     boundary:
       "This workspace does not control your Mac. Reading an article does not authorize sending an email.",
   },
-  "zh-Hant": {
-    title: "減少操作，專注當下。",
-    subtitle: "研究公開文章、檢視摘要，準備好後再寄出筆記。",
-    article: "閱讀文章",
-    topic: "主題研究",
-    question: "主題或問題",
-    search: "搜尋公開來源",
-    url: "公開文章網址",
-    research: "研究文章",
-    recipient: "收件人",
-    review: "檢視郵件",
-    confirm: "確認寄出",
-    cancel: "取消",
-    note: "閱讀筆記",
-    empty: "從一個想法開始。",
-    emptyBody: "加入公開文章，建立附有來源的筆記。寄出前由你確認。",
-    missing: "尚未設定雲端服務。請先設定 Convex 並登入。",
-    busy: "處理中…",
-    dialog: "確認郵件",
-    accepted: "請求已完成。請查看工作流程狀態；服務接受請求不代表已送達。",
-    source: "閱讀來源",
-    status: "工作流程狀態",
-    control: "由你掌控",
-    boundary: "此工作區不會控制你的 Mac。閱讀文章不代表授權寄出郵件。",
-  },
 };
 
 export function Workspace({
@@ -81,7 +56,7 @@ export function Workspace({
   onSearch,
   onSend,
 }: Props) {
-  const [language, setLanguage] = useState<"en" | "zh-Hant">("en");
+  const language = "en";
   const [url, setUrl] = useState("");
   const [mode, setMode] = useState<"article" | "topic">("article");
   const [topic, setTopic] = useState("");
@@ -122,17 +97,6 @@ export function Workspace({
         <a className="wordmark" href="/">
           ◌ &nbsp; Flow State
         </a>
-        <label className="language">
-          Language / 語言
-          <select
-            aria-label="Language / 語言"
-            value={language}
-            onChange={(e) => setLanguage(e.target.value as "en" | "zh-Hant")}
-          >
-            <option value="en">English</option>
-            <option value="zh-Hant">繁體中文</option>
-          </select>
-        </label>
       </header>
       <section className="intro">
         <p className="eyebrow">YOUR READING WORKSPACE</p>
@@ -203,7 +167,7 @@ export function Workspace({
           <aside>
             <h2>{l.control}</h2>
             <p>{l.boundary}</p>
-            <p>English · 繁體中文</p>
+            <p>English</p>
           </aside>
         </section>
         <section className="note" aria-label={l.note}>
@@ -260,9 +224,7 @@ export function Workspace({
       {approval && approvalCurrent && (
         <section className="approval" role="dialog" aria-label={l.dialog}>
           <h2>{l.dialog}</h2>
-          <p>
-            From / 寄件人: {approval.sender ?? "Configured assistant inbox"}
-          </p>
+          <p>From: {approval.sender ?? "Configured assistant inbox"}</p>
           <p>
             {l.recipient}: <strong>{approval.recipient}</strong>
           </p>

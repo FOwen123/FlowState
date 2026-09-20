@@ -68,3 +68,45 @@ Microphone testing found Option–Space conflicts with Codex’s mascot shortcut
 Gmail in Brave is the selected personal-mail target; ChatGPT in Brave is the creative target. A reviewed Gmail draft handoff is implemented but not live-verified; it opens a compose URL in Brave and does not send. Gmail chooses the signed-in account; the user must verify its sender. Full browser adapters remain pending. Creative file attachment/retrieval/sharing, visual target grounding, synchronized native/web memory, fully voice-accessible review/recovery, scheduled retention and broad multi-app workflows remain incomplete. File grants and planner action schemas alone do not implement those workflows.
 
 Request quotas are counts, not monetary budgets. Whole-window capture has no field-level redaction. Uncertain sends require manual provider-history reconciliation; blind retry is disabled. Signed/notarized distribution, clean-machine testing and hackathon submission remain outside verified completion.
+
+## September 21, 2026 — English intent integration (in progress)
+
+Branch: `codex/flowstate-foundation`. The English-only intent plan is being implemented; this entry is not release acceptance. User-owned README/design/assets changes are excluded from implementation ownership.
+
+- English interface and speech settings migrate without deleting Unicode user content. The language selector and Traditional Chinese resource catalogs were removed. Legacy stored language values remain readable for migration.
+- App-level fake-driver tests exercise open, both scroll directions, focus, selection, key input and literal insertion through the same granted executor, plus cancellation and changed-focus rejection. These establish dispatch/guard behavior, not compatibility with every Mac app.
+- The opt-in real TextEdit fixture passed activation, Unicode insertion, exact text Undo and scrolling. An extended run passed Command-A (observed full selection) and ArrowRight (observed collapsed selection). Two preceding extended attempts stopped with `targetChanged`; no retry was hidden inside execution. Transient target/focus changes still require broader acceptance testing.
+- Automatic endpoint tests now require a final recognizer result plus stable silence. A regression demonstrates why an unfinished `Open Brave` hypothesis must not run before its longer correction arrives. Fake-clock tests cannot establish real microphone endpoint quality.
+- The corpus contains 320 distinct synthetic inputs in 80 scenario families. Variants within a family are correlated; 320 rows are not 320 independent safety observations. An initial duplicated corpus was rejected before calibration.
+- Initial live TypeSafe calls used `jev-1.13.0` and synthetic inputs only. Those API smoke/pilot calls used an earlier corpus and are not calibration or holdout evidence. No desktop, mail, file-upload, purchase or publication effect was executed by the model evaluation.
+
+Still pending: calibrated release gates, complete text/vision comparisons, authorized screenshot integration, independent integrated review, authenticated native intent acceptance, real continuous microphone sessions, and a second clean Mac/account. Named arbitrary clicks, coordinate input and unimplemented service workflows must not be described as supported merely because a model recognizes their intent.
+
+### Integrated intent checks and review corrections
+
+The frozen Jev v2 corpus run completed: 160 development, 80 calibration and 80 untouched holdout inputs. The selected gate accepted 15/80 action/dictation proposals on holdout across seven families without observed joint-choice errors. That small sample enables review proposals only; it does not establish unattended safety. Raw holdout intent accuracy was 73/80, including one dictation-to-action error. See `intent-evaluation.md` for latency, usage, pricing and statistical limits.
+
+A real disposable TextEdit run passed activation, Unicode insertion, exact Undo, select-all, ArrowRight and scrolling. It also passed ScreenCaptureKit capture of that synthetic document, secure-field scan, window/display geometry revalidation and bounded in-memory PNG encoding. No image was uploaded or saved. Arbitrary control discovery and coordinate clicks are not implemented.
+
+Independent review found target drift in local dictation/legacy planning, retryable uncertain keyboard effects, unbound observation revisions, inconsistent modifier approvals, missing approval tests and a prediction scorer accepting action names as intents. Fixes are being validated before the implementation commit. The raw Jev report counts above were calculated using exact intent equality, not the affected optional prediction-file scorer.
+
+Browser checks passed all three Chromium tests (English review flow, startup without keys/provider calls, desktop/mobile layout). The last integrated Swift run before review corrections passed 96 Core, 8 Cloud and 10 App tests; opt-in OS tests are reported separately. Final post-review totals will supersede these counts.
+
+### Final review and user-reported command feedback
+
+September 21 on `codex/flowstate-foundation`, the primary Mac above:
+
+- Integrated Swift checks passed 102 Core, 9 Cloud and 15 App tests. Backend checks passed 124 tests across 20 files; TypeScript checking passed. Web checks remain 25 passing tests and three Chromium acceptance tests from the preceding unchanged web revision.
+- Independent review exposed two further seams: a verified app launch retained the previous application's observation, and legacy keyboard-plan approval requested `app.control` instead of the validated `app.input` capability. Regression tests reproduced both failures against the old behavior; the corrected implementation passes. Planned steps now observe the verified destination before the next step.
+- The user supplied a real `Scroll up.` transcript with a setup-blocked HUD. Unified logs show microphone capture starting at 01:32:18 and stopping at 01:32:42; they do not include per-intent decisions. The displayed message proves routing reached the local desktop gate, not that scrolling executed. The gate had conflated missing/expired grants and paused states.
+- The HUD's fixed 156-point height and two-line status truncation hid recovery instructions. A failing fitting-size regression now passes with a full-width status and content-sized panel. Paused commands explain Resume; successful Resume also updates voice feedback. A live Accessibility check opened the control Settings page from the HUD button and found `Allow desktop control`. Start/Stop also passed. No input grant was enabled by this UI check.
+- A previous running-app RSS sample after short Start/Stop was 165,824 KiB (about 162 MiB). This excludes external speech services and is neither peak nor full-model memory.
+- See [fallback evaluation](intent-fallback-evaluation.md) for the 24-call ledger, failed pilot and two successful v2 parses. Full text/vision comparison, authenticated native intent execution, robust continuous-voice acceptance, clean-Mac testing and unsupported arbitrary clicks remain open gates.
+
+The screenshot supplied for troubleshooting exposed environment secrets. The user was advised to rotate those keys; no key values are included in this evidence.
+
+Final independent review reported no remaining actionable P1/P2 findings in the integrated delta. Paused scroll, dictation and Enter/modifier confirmation share recovery guidance; the earlier missing-field message no longer hides a paused state. Runtime token metrics combine Jev and fallback only when both report the field; incomplete cost estimates are omitted.
+
+The development Convex functions synchronized successfully at 01:52:52 on September 21. The CLI's dedicated typecheck initially found no `convex/tsconfig.json`; the repository `pnpm typecheck` includes `convex` and passed, then the one-shot sync used `--typecheck disable`. No production deployment or persistent development server was started. Deployed model identifiers were verified as `jev-1.13.0` and `gpt-5.6-luna`. Interactive native authentication and a live signed-in intent request remain unverified.
+
+The final debug package passed strict signature verification and was relaunched. Reproduce the control-page HUD acceptance with `FLOWSTATE_UI_SMOKE=1 swift scripts/macos-menu-smoke.swift hud`; it briefly starts the microphone, opens Tasks & history from the HUD, confirms the Allow desktop control button, and stops capture. It does not grant app control or print transcripts.

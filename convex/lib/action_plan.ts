@@ -141,12 +141,12 @@ function normalizeAction(value: unknown): PlannedAction {
       exactKeys(parameters, ["key", "modifiers"]);
       {
         const key = stringParam(parameters, "key", 32);
-        const safeKeys = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", "Tab", "Escape", "Enter"]);
+        const safeKeys = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", "Tab", "Escape", "Enter", "A", "C", "V"]);
         if (!safeKeys.has(key)) throw new Error("press key is not on the safe navigation allowlist");
         normalized = { key };
         if (parameters.modifiers !== undefined) {
           const modifiers = stringParam(parameters, "modifiers", 100);
-          if (modifiers !== "Shift") throw new Error("press modifiers are restricted to Shift");
+          if (modifiers !== "Shift" && modifiers !== "Command") throw new Error("press modifiers are restricted to Shift or Command");
           normalized.modifiers = modifiers;
           requiresApproval = true;
         }

@@ -27,12 +27,18 @@ public enum NativePlanDecodingError: Error, Equatable, LocalizedError, Sendable 
 public enum NativePlanActionKind: String, Codable, Equatable, Sendable {
     case openApplication
     case scroll
+    case focus
+    case select
+    case press
     case insertText
 }
 
 public enum NativePlanParameters: Equatable, Sendable {
     case openApplication
     case scroll(lines: Int32)
+    case focus(role: String, label: String?)
+    case select(label: String)
+    case press(key: String, modifiers: String?)
     case insertText(text: String, replaceSelection: Bool)
 }
 
@@ -84,6 +90,7 @@ public indirect enum NativePlanJSONValue: Codable, Equatable, Sendable {
 
 public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConvertible {
     public let kind: NativePlanActionKind
+    public let targetID: String?
     public let targetBundleIdentifier: String
     public let parameters: NativePlanParameters
     public let capability: String
@@ -93,6 +100,7 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
 
     public init(
         kind: NativePlanActionKind,
+        targetID: String? = nil,
         targetBundleIdentifier: String,
         parameters: NativePlanParameters,
         capability: String,
@@ -101,6 +109,7 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         visualTarget: NativePlanJSONValue? = nil
     ) {
         self.kind = kind
+        self.targetID = targetID
         self.targetBundleIdentifier = targetBundleIdentifier
         self.parameters = parameters
         self.capability = capability
@@ -115,6 +124,12 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
             .openApplication(bundleIdentifier: targetBundleIdentifier)
         case let .scroll(lines):
             .scroll(lines: lines)
+        case let .focus(role, label):
+            .focus(role: role, label: label)
+        case let .select(label):
+            .select(label: label)
+        case let .press(key, modifiers):
+            .press(key: key, modifiers: modifiers)
         case let .insertText(text, _):
             .insertText(text)
         }
@@ -127,6 +142,14 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         case let .scroll(lines):
             let direction = lines < 0 ? "down" : "up"
             return "Scroll \(direction) in \(targetBundleIdentifier) (amount: \(abs(lines)))"
+        case let .focus(role, label):
+            return label.map { "Focus \($0) (\(role)) in \(targetBundleIdentifier)" }
+                ?? "Focus \(role) in \(targetBundleIdentifier)"
+        case let .select(label):
+            return "Select \(label) in \(targetBundleIdentifier)"
+        case let .press(key, modifiers):
+            return modifiers.map { "Press \($0)-\(key) in \(targetBundleIdentifier)" }
+                ?? "Press \(key) in \(targetBundleIdentifier)"
         case let .insertText(text, _):
             return "Insert text into \(targetBundleIdentifier): \(text)"
         }
@@ -136,6 +159,7 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
 
     private enum CodingKeys: String, CodingKey, CaseIterable {
         case kind
+        case targetId
         case targetBundleIdentifier
         case parameters
         case capability
@@ -168,6 +192,20 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         case replaceSelection
     }
 
+    private enum FocusCodingKeys: String, CodingKey, CaseIterable {
+        case role
+        case label
+    }
+
+    private enum SelectCodingKeys: String, CodingKey, CaseIterable {
+        case label
+    }
+
+    private enum PressCodingKeys: String, CodingKey, CaseIterable {
+        case key
+        case modifiers
+    }
+
     public init(from decoder: Decoder) throws {
         let allFields = try decoder.container(keyedBy: NativePlanCodingKey.self)
         try rejectUnknownKeys(
@@ -180,18 +218,25 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         guard let kind = NativePlanActionKind(rawValue: kindValue) else {
             throw NativePlanDecodingError.unsupportedAction(kindValue)
         }
+        let targetID = try container.decodeIfPresent(String.self, forKey: .targetId)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let targetID, targetID.isEmpty {
+            throw NativePlanDecodingError.invalidTarget
+        }
         let target = try container.decode(String.self, forKey: .targetBundleIdentifier)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !target.isEmpty else { throw NativePlanDecodingError.invalidTarget }
 
         let capability = try container.decode(String.self, forKey: .capability)
-        let expectedCapability: String = switch kind {
-        case .openApplication, .scroll:
-            "app.control"
-        case .insertText:
-            "app.input"
+        let allowedCapabilities: Set<String> = switch kind {
+        case .openApplication:
+            ["app.control", "app.open"]
+        case .scroll, .focus, .select:
+            ["app.control"]
+        case .press, .insertText:
+            ["app.input"]
         }
-        guard capability == expectedCapability else {
+        guard allowedCapabilities.contains(capability) else {
             throw NativePlanDecodingError.unsupportedCapability(capability)
         }
 
@@ -200,13 +245,6 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
             throw NativePlanDecodingError.unsupportedExecutor(executor)
         }
 
-        let requiresApproval = try container.decode(Bool.self, forKey: .requiresApproval)
-        let expectedApproval = kind == .insertText
-        guard requiresApproval == expectedApproval else {
-            throw NativePlanDecodingError.invalidParameters(
-                "requiresApproval must be \(expectedApproval) for \(kind.rawValue)."
-            )
-        }
         if container.contains(.visualTarget), try !container.decodeNil(forKey: .visualTarget) {
             throw NativePlanDecodingError.unsupportedVisualTarget
         }
@@ -232,6 +270,54 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
                 throw NativePlanDecodingError.invalidParameters("lines must be between -100 and 100.")
             }
             parameters = .scroll(lines: lines)
+        case .focus:
+            let allParameters = try parametersDecoder.container(keyedBy: NativePlanCodingKey.self)
+            try rejectUnknownKeys(
+                allParameters.allKeys,
+                allowed: FocusCodingKeys.allCases.map(\.stringValue)
+            )
+            let parametersContainer = try parametersDecoder.container(keyedBy: FocusCodingKeys.self)
+            let role = try parametersContainer.decode(String.self, forKey: .role)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !role.isEmpty, role.count <= 100 else {
+                throw NativePlanDecodingError.invalidParameters("focus role must be between 1 and 100 characters.")
+            }
+            let label = try parametersContainer.decodeIfPresent(String.self, forKey: .label)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard label == nil || !(label?.isEmpty ?? true) && (label?.count ?? 0) <= 300 else {
+                throw NativePlanDecodingError.invalidParameters("focus label is invalid.")
+            }
+            parameters = .focus(role: role, label: label)
+        case .select:
+            let allParameters = try parametersDecoder.container(keyedBy: NativePlanCodingKey.self)
+            try rejectUnknownKeys(
+                allParameters.allKeys,
+                allowed: SelectCodingKeys.allCases.map(\.stringValue)
+            )
+            let parametersContainer = try parametersDecoder.container(keyedBy: SelectCodingKeys.self)
+            let label = try parametersContainer.decode(String.self, forKey: .label)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !label.isEmpty, label.count <= 300 else {
+                throw NativePlanDecodingError.invalidParameters("select label must be between 1 and 300 characters.")
+            }
+            parameters = .select(label: label)
+        case .press:
+            let allParameters = try parametersDecoder.container(keyedBy: NativePlanCodingKey.self)
+            try rejectUnknownKeys(
+                allParameters.allKeys,
+                allowed: PressCodingKeys.allCases.map(\.stringValue)
+            )
+            let parametersContainer = try parametersDecoder.container(keyedBy: PressCodingKeys.self)
+            let key = try parametersContainer.decode(String.self, forKey: .key)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard NativePlanAction.allowedPressKeys.contains(key) else {
+                throw NativePlanDecodingError.invalidParameters("press key is not on the native allowlist.")
+            }
+            let modifiers = try parametersContainer.decodeIfPresent(String.self, forKey: .modifiers)
+            if let modifiers, !NativePlanAction.allowedPressModifiers.contains(modifiers) {
+                throw NativePlanDecodingError.invalidParameters("press modifiers are not on the native allowlist.")
+            }
+            parameters = .press(key: key, modifiers: modifiers)
         case .insertText:
             let allParameters = try parametersDecoder.container(keyedBy: NativePlanCodingKey.self)
             try rejectUnknownKeys(
@@ -250,8 +336,21 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
             parameters = .insertText(text: text, replaceSelection: replaceSelection)
         }
 
+        let requiresApproval = try container.decode(Bool.self, forKey: .requiresApproval)
+        let expectedApproval: Bool = switch parameters {
+        case .insertText: true
+        case let .press(key, modifiers): key == "Enter" || modifiers != nil
+        default: false
+        }
+        guard !expectedApproval || requiresApproval else {
+            throw NativePlanDecodingError.invalidParameters(
+                "Approval is required for \(kind.rawValue)."
+            )
+        }
+
         self.init(
             kind: kind,
+            targetID: targetID,
             targetBundleIdentifier: target,
             parameters: parameters,
             capability: capability,
@@ -264,6 +363,7 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(kind.rawValue, forKey: .kind)
+        try container.encodeIfPresent(targetID, forKey: .targetId)
         try container.encode(targetBundleIdentifier, forKey: .targetBundleIdentifier)
         try container.encode(capability, forKey: .capability)
         try container.encode(executor, forKey: .executor)
@@ -276,12 +376,31 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         case let .scroll(lines):
             var parametersContainer = container.nestedContainer(keyedBy: ScrollCodingKeys.self, forKey: .parameters)
             try parametersContainer.encode(lines, forKey: .lines)
+        case let .focus(role, label):
+            var parametersContainer = container.nestedContainer(keyedBy: FocusCodingKeys.self, forKey: .parameters)
+            try parametersContainer.encode(role, forKey: .role)
+            try parametersContainer.encodeIfPresent(label, forKey: .label)
+        case let .select(label):
+            var parametersContainer = container.nestedContainer(keyedBy: SelectCodingKeys.self, forKey: .parameters)
+            try parametersContainer.encode(label, forKey: .label)
+        case let .press(key, modifiers):
+            var parametersContainer = container.nestedContainer(keyedBy: PressCodingKeys.self, forKey: .parameters)
+            try parametersContainer.encode(key, forKey: .key)
+            try parametersContainer.encodeIfPresent(modifiers, forKey: .modifiers)
         case let .insertText(text, replaceSelection):
             var parametersContainer = container.nestedContainer(keyedBy: InsertTextCodingKeys.self, forKey: .parameters)
             try parametersContainer.encode(text, forKey: .text)
             try parametersContainer.encode(replaceSelection, forKey: .replaceSelection)
         }
     }
+
+    public static let allowedPressKeys: Set<String> = [
+        "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+        "PageUp", "PageDown", "Home", "End", "Tab", "Escape", "Enter",
+        "A", "C", "V"
+    ]
+
+    public static let allowedPressModifiers: Set<String> = ["Shift", "Command"]
 }
 
 public struct NativePlanResponse: Codable, Equatable, Sendable {

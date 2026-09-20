@@ -55,11 +55,7 @@ export function MemoryPanel({
       <div className="settings-heading">
         <div>
           <h1>Memory</h1>
-          <p>
-            Your words. Your preferences. Always editable.
-            <br />
-            你的用語、你的偏好，隨時可以修改。
-          </p>
+          <p>Your words. Your preferences. Always editable.</p>
         </div>
         <button
           disabled={busy}
@@ -76,7 +72,7 @@ export function MemoryPanel({
             });
           }}
         >
-          Add preference / 新增偏好
+          Add preference
         </button>
       </div>
       <p className="notice">
@@ -91,7 +87,7 @@ export function MemoryPanel({
           <span role="columnheader">Source</span>
           <span role="columnheader">Manage</span>
         </div>
-        {rows.length === 0 && <p>No saved preferences yet. 尚未儲存偏好。</p>}
+        {rows.length === 0 && <p>No saved preferences yet.</p>}
         {rows.map((item) => (
           <div className="memory-row" role="row" key={item.key}>
             <span role="cell">{item.value.phrase}</span>
@@ -132,7 +128,7 @@ export function MemoryPanel({
             );
           }}
         >
-          <label htmlFor="memory-kind">Preference type / 偏好類型</label>
+          <label htmlFor="memory-kind">Preference type</label>
           <select
             id="memory-kind"
             disabled={busy}
@@ -144,12 +140,12 @@ export function MemoryPanel({
               })
             }
           >
-            <option value="vocabulary">Vocabulary / 用語</option>
-            <option value="appAlias">App alias / 應用程式別名</option>
-            <option value="style">Writing style / 寫作風格</option>
-            <option value="folder">Folder preference / 資料夾偏好</option>
+            <option value="vocabulary">Vocabulary</option>
+            <option value="appAlias">App alias</option>
+            <option value="style">Writing style</option>
+            <option value="folder">Folder preference</option>
           </select>
-          <label htmlFor="memory-phrase">When I say / 當我說</label>
+          <label htmlFor="memory-phrase">When I say</label>
           <input
             id="memory-phrase"
             required
@@ -163,7 +159,7 @@ export function MemoryPanel({
               })
             }
           />
-          <label htmlFor="memory-value">Use / 使用</label>
+          <label htmlFor="memory-value">Use</label>
           <input
             id="memory-value"
             required
@@ -185,14 +181,14 @@ export function MemoryPanel({
                 !editing.value.replacement.trim()
               }
             >
-              Save to my account / 儲存至帳戶
+              Save to my account
             </button>
             <button
               type="button"
               disabled={busy}
               onClick={() => setEditing(undefined)}
             >
-              Cancel / 取消
+              Cancel
             </button>
           </div>
         </form>
@@ -203,18 +199,15 @@ export function MemoryPanel({
           role="group"
           aria-label="Confirm preference deletion"
         >
-          <p>
-            Delete this preference from your cloud account?
-            從雲端帳戶刪除此偏好？
-          </p>
+          <p>Delete this preference from your cloud account?</p>
           <button
             disabled={busy}
             onClick={() => void perform(() => onRemove(deleting))}
           >
-            Confirm delete / 確認刪除
+            Confirm delete
           </button>
           <button disabled={busy} onClick={() => setDeleting(undefined)}>
-            Cancel / 取消
+            Cancel
           </button>
         </div>
       )}

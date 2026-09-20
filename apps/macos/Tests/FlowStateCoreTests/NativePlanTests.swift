@@ -89,6 +89,81 @@ func openAndScrollPlansDecode() throws {
     #expect(response.actions[1].executor == "desktop")
 }
 
+@Test("focus, select, and bounded key plans map to native actions")
+func focusSelectAndPressPlansDecode() throws {
+    let response = try NativePlanResponse.decode(data("""
+    {
+      "planId": "plan-controls",
+      "status": "ready",
+      "fingerprint": "fp-controls",
+      "actions": [
+        {
+          "kind": "focus",
+          "targetBundleIdentifier": "com.apple.TextEdit",
+          "parameters": {"role": "AXTextField", "label": "Title"},
+          "capability": "app.control",
+          "executor": "desktop",
+          "requiresApproval": false,
+          "targetId": "focused-title"
+        },
+        {
+          "kind": "select",
+          "targetBundleIdentifier": "com.apple.TextEdit",
+          "parameters": {"label": "Title"},
+          "capability": "app.control",
+          "executor": "desktop",
+          "requiresApproval": false
+        },
+        {
+          "kind": "press",
+          "targetBundleIdentifier": "com.apple.TextEdit",
+          "parameters": {"key": "Tab", "modifiers": "Shift"},
+          "capability": "app.input",
+          "executor": "desktop",
+          "requiresApproval": true
+        }
+      ],
+      "capabilities": ["app.control", "app.input"]
+    }
+    """))
+
+    #expect(response.actions[0].desktopAction == .focus(role: "AXTextField", label: "Title"))
+    #expect(response.actions[1].desktopAction == .select(label: "Title"))
+    #expect(response.actions[2].desktopAction == .press(key: "Tab", modifiers: "Shift"))
+}
+
+@Test("native plan accepts an app.open capability only for open application")
+func appOpenCapabilityIsScoped() throws {
+    let response = try NativePlanResponse.decode(data("""
+    {
+      "planId": "plan-app-open",
+      "status": "ready",
+      "fingerprint": "fp-app-open",
+      "actions": [{
+        "kind": "openApplication",
+        "targetBundleIdentifier": "com.brave.Browser",
+        "parameters": {},
+        "capability": "app.open",
+        "executor": "desktop",
+        "requiresApproval": false
+      }],
+      "capabilities": ["app.open"]
+    }
+    """))
+
+    #expect(response.actions[0].capability == "app.open")
+}
+
+@Test("native plan rejects an unknown target field even when targetId is known")
+func unknownTargetFieldIsRejected() {
+    #expect(throws: NativePlanDecodingError.self) {
+        _ = try NativePlanResponse.decode(data(validInsertJSON.replacingOccurrences(
+            of: "\"requiresApproval\": true",
+            with: "\"requiresApproval\": true, \"targetId\": \"target-1\", \"targetLabel\": \"unexpected\""
+        )))
+    }
+}
+
 @Test("execution metadata is accepted separately from the normalized response")
 func executionMetadataWrapper() throws {
     let response = try NativePlanResponse.decode(data(validInsertJSON))
@@ -275,4 +350,14 @@ private let validScrollJSON = """
 
 private func data(_ value: String) -> Data {
     Data(value.utf8)
+}
+
+@Test("a stricter cloud review policy may require approval for navigation")
+func stricterNavigationReviewPolicyDecodes() throws {
+    let action = try JSONDecoder().decode(NativePlanAction.self, from: Data("""
+    {"kind":"scroll","targetBundleIdentifier":"com.apple.TextEdit","parameters":{"lines":-3},
+     "capability":"app.control","executor":"desktop","requiresApproval":true}
+    """.utf8))
+    #expect(action.requiresApproval)
+    #expect(action.desktopAction == .scroll(lines: -3))
 }

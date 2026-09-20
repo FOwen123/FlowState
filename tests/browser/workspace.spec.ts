@@ -3,7 +3,7 @@ import { build } from "esbuild";
 import { readFile } from "node:fs/promises";
 
 // Browser-only component harness: no dev server, backend, or real email.
-test("review, cancel, confirm, Chinese labels and mobile layout", async ({
+test("review, cancel, confirm, English-only UI and mobile layout", async ({
   page,
 }) => {
   const bundle = await build({
@@ -35,11 +35,9 @@ test("review, cancel, confirm, Chinese labels and mobile layout", async ({
   await page.getByRole("button", { name: "Confirm send" }).click();
   await expect(page.getByRole("status")).toContainText("Request completed");
   expect(await page.evaluate("window.__sent")).toBe(1);
-  await page
-    .getByLabel("Language / 語言", { exact: true })
-    .selectOption("zh-Hant");
+  await expect(page.getByRole("combobox")).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "減少操作，專注當下。",
+    "Less effort. More flow.",
   );
   await page.setViewportSize({ width: 390, height: 844 });
   expect(

@@ -53,7 +53,7 @@ export function Landing({ onOpen }: { onOpen: () => void }) {
               in your words.
             </h1>
             <p className="hero-description">
-              Move between apps, dictate in English or 繁體中文,
+              Move between apps, dictate in English,
               <br className="wide-only" /> and carry a task through with less
               reaching
               <br className="wide-only" /> for the mouse and keyboard.
@@ -67,7 +67,7 @@ export function Landing({ onOpen }: { onOpen: () => void }) {
               </button>
             </div>
             <p id="download-status" className="small-muted">
-              For macOS · English + 繁體中文
+              For macOS · English
               <br />
               In development. Download available at release.
             </p>
@@ -82,7 +82,7 @@ export function Landing({ onOpen }: { onOpen: () => void }) {
             </div>
             <div className="preview-content">
               <p className="small-muted">One request. A few careful steps.</p>
-              <h2 lang="zh-Hant">“研究這篇文章，幫我草擬一封 email。”</h2>
+              <h2>“Research this article and draft an email for me.”</h2>
               <p className="muted">
                 Read this article, research the context, and draft an email.
               </p>
@@ -127,7 +127,7 @@ export function Landing({ onOpen }: { onOpen: () => void }) {
           <article>
             <h3>Say it your way</h3>
             <p>
-              English, 繁體中文, or a mix of both.
+              English dictation and commands.
               <br />
               Commands and dictation stay distinct.
             </p>

@@ -14,7 +14,6 @@
 "Allow screenshots of windows you approve during a task." = "Allow screenshots of windows you approve during a task.";
 "Allow this action only for the selected target app." = "Allow this action only in the selected app.";
 "App alias" = "App alias";
-"App language" = "App language";
 "App to control" = "App to control";
 "Approved app bundle ID" = "Approved app ID";
 "Approved application bundle identifier" = "Approved app ID";
@@ -171,12 +170,10 @@
 "This shortcut is in use or unavailable. Choose another in Voice & activation." = "This shortcut is in use or unavailable. Choose another in Voice & activation.";
 "This workflow operation is not known on this Mac." = "This workflow action isn’t available on this Mac.";
 "Toggle" = "Toggle";
-"Traditional Chinese" = "Traditional Chinese";
 "Transcript ready" = "Transcript ready";
 "Undo last edit" = "Undo last edit";
 "Uploading requires an explicit file approval." = "You must explicitly approve a file before uploading.";
 "Use" = "Use";
-"Use system language" = "Use system language";
 "Use the Mac's selected audio input." = "Use the audio input selected on your Mac.";
 "Verified text edit undone" = "Verified text edit was undone";
 "Visual targets are not available to the native executor." = "Visual targets aren’t available for this action.";
@@ -203,7 +200,6 @@
 "⌃⌥ Space (may conflict)" = "⌃⌥ Space (may conflict)";
 "⌥ Space" = "⌥ Space";
 "⌥ Space (legacy)" = "⌥ Space (legacy)";
-"繁體中文" = "繁體中文";
 "Screen Recording permission granted" = "Screen Recording access is allowed";
 "Screen Recording permission required" = "Screen Recording access is required";
 "Listening" = "Listening";

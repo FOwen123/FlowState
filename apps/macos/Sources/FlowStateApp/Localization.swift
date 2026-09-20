@@ -3,35 +3,18 @@ import Foundation
 import FlowStateCore
 import SwiftUI
 
-enum InterfaceLanguage: String, CaseIterable, Sendable {
-    case system
+enum InterfaceLanguage: String, Sendable {
     case english = "en"
-    case traditionalChinese = "zh-Hant"
-
     static let defaultsKey = "FlowState.interfaceLanguage"
-    static func resolve(_ selection: Self, preferredLanguages: [String] = Locale.preferredLanguages) -> Self {
-        guard selection == .system else { return selection }
-        return preferredLanguages.first?.lowercased().hasPrefix("zh") == true ? .traditionalChinese : .english
-    }
-    var displayName: String {
-        switch self {
-        case .system: L10n.text("Use system language")
-        case .english: "English"
-        case .traditionalChinese: "繁體中文"
-        }
-    }
+    static func resolve(_ selection: Self) -> Self { .english }
 }
 
 @MainActor
 final class UILocalization: ObservableObject {
     static let shared = UILocalization()
-    private let defaults: UserDefaults
-    @Published var language: InterfaceLanguage {
-        didSet { defaults.set(language.rawValue, forKey: InterfaceLanguage.defaultsKey) }
-    }
+    let language = InterfaceLanguage.english
     init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-        language = InterfaceLanguage(rawValue: defaults.string(forKey: InterfaceLanguage.defaultsKey) ?? "system") ?? .system
+        defaults.set("en", forKey: InterfaceLanguage.defaultsKey)
     }
 }
 
@@ -53,6 +36,12 @@ enum L10n {
             return String(format: text(key, language: selection), locale: locale, Int64(lines).magnitude, appName)
         case let .insertText(value, _):
             return String(format: text("Insert text into %@: %@", language: selection), locale: locale, appName, value)
+        case let .focus(role, label):
+            return "Focus \(label ?? role) in \(appName)"
+        case let .select(label):
+            return "Select \(label) in \(appName)"
+        case let .press(key, modifiers):
+            return "Press \(modifiers.map { $0 + "–" } ?? "")\(key) in \(appName)"
         }
     }
 
@@ -67,9 +56,7 @@ enum L10n {
         }
     }
 
-    static var language: InterfaceLanguage {
-        InterfaceLanguage.resolve(InterfaceLanguage(rawValue: UserDefaults.standard.string(forKey: InterfaceLanguage.defaultsKey) ?? "system") ?? .system)
-    }
+    static let language = InterfaceLanguage.english
     static func text(_ key: String, table: String = "Localizable", language selection: InterfaceLanguage? = nil) -> String {
         let language = InterfaceLanguage.resolve(selection ?? language)
         guard let url = Bundle.module.url(forResource: language.rawValue, withExtension: "lproj"),

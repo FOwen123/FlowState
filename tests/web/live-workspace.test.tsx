@@ -55,7 +55,7 @@ afterEach(() => {
 });
 function openRun() {
   render(<LiveWorkspace />);
-  fireEvent.change(screen.getByLabelText("Recent workflows / 最近的工作流程"), {
+  fireEvent.change(screen.getByLabelText("Recent workflows"), {
     target: { value: "run1" },
   });
 }
@@ -98,9 +98,7 @@ it("can cancel running research without offering email retraction", async () => 
   mocks.status = "running";
   mocks.cancel.mockResolvedValue({ status: "cancelled" });
   openRun();
-  fireEvent.click(
-    screen.getByRole("button", { name: "Cancel research / 取消研究" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Cancel research" }));
   await waitFor(() =>
     expect(mocks.cancel).toHaveBeenCalledWith({ runId: "run1" }),
   );

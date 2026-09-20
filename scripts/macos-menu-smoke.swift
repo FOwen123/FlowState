@@ -1,5 +1,5 @@
 // Opt-in acceptance check against the already-running development app.
-// `settings` opens its Settings window; `voice` starts microphone capture briefly.
+// `settings` opens Settings; `voice` checks capture; `hud` also checks control-settings navigation.
 // Disable desktop/cloud grants before voice checks. No transcript text is logged.
 import AppKit
 import ApplicationServices
@@ -7,7 +7,7 @@ guard ProcessInfo.processInfo.environment["FLOWSTATE_UI_SMOKE"] == "1" else {
  print("Set FLOWSTATE_UI_SMOKE=1 to interact with the running Flow State app."); exit(2)
 }
 let mode = CommandLine.arguments.dropFirst().first ?? "settings"
-guard ["settings", "voice"].contains(mode) else { print("Use settings or voice"); exit(2) }
+guard ["settings", "voice", "hud"].contains(mode) else { print("Use settings, voice, or hud"); exit(2) }
 guard let process = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == "com.flowstate.dev" }) else { fatalError("Flow State is not running") }
 let app = AXUIElementCreateApplication(process.processIdentifier)
 func attr(_ e: AXUIElement,_ name: String)->CFTypeRef? { var result:CFTypeRef?; AXUIElementCopyAttributeValue(e,name as CFString,&result); return result }
@@ -50,6 +50,15 @@ if mode == "settings" {
  let statuses = voiceStatuses()
  let listening = statuses.contains { $0.contains("Listening") }
  print("Visible listening indicator:", listening)
+ var controlsOpened = mode != "hud"
+ if mode == "hud", let settings=windows().compactMap({find($0,{attr($0,"AXDescription") as? String == "Open control settings"})}).first {
+  print("HUD settings press", AXUIElementPerformAction(settings,kAXPressAction as CFString).rawValue)
+  Thread.sleep(forTimeInterval:0.6)
+  controlsOpened = windows().contains { w in
+   attr(w,"AXTitle") as? String == "Flow State Settings" && find(w,{attr($0,"AXDescription") as? String == "Allow desktop control"}) != nil
+  }
+  print("Control settings opened:",controlsOpened)
+ }
  if let stop=windows().compactMap({find($0,{["Stop listening", "Stop voice session"].contains(attr($0,"AXDescription") as? String ?? "")})}).first { print("Stop press", AXUIElementPerformAction(stop,kAXPressAction as CFString).rawValue) }
- if !listening { exit(1) }
+ if !listening || !controlsOpened { exit(1) }
 }

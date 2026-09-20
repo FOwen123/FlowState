@@ -2,6 +2,8 @@
 
 Updated September 20, 2026. Current implementation scope: sections 1–11. Product authority: [PRODUCT.md](PRODUCT.md). Contributor rules: [AGENTS.md](AGENTS.md). Account/configuration checklist: [ENVIRONMENT.md](ENVIRONMENT.md).
 
+**Next priority:** [English-only intent recognition](docs/intent-recognition-plan.md). This evaluation-first plan supersedes the earlier bilingual/manual-mode direction and defines the file-level work for automatic utterance completion, Jev routing, measured fallback thresholds and contextual execution. English migration and the core routing path are implemented; the measured policy requires review of cloud proposals. Live acceptance and release gates remain open.
+
 Implementation has started. See [verification results](docs/testing/results.md) for completed evidence and [setup instructions](docs/setup.md) for configuration. Unchecked items remain open acceptance gates; some contain partial implementation. Paths below are planning targets and may be consolidated in the actual code. Keep modules together until their responsibilities justify splitting them. Complete each slice with failing behavioral tests, implementation, relevant checks, and observed user-facing behavior. Do not start servers, production builds, or deployments merely to check this document.
 
 ## Test computer and environments
@@ -10,13 +12,13 @@ Verified on the current local host, September 20, 2026:
 
 | Target | Configuration | Use |
 |---|---|---|
-| Primary Mac | MacBook Pro; Apple M5 Pro, 15 CPU cores; 24 GB unified memory; macOS 26.6.2 | Native UI, microphone, bilingual speech, Accessibility, capture, physical takeover, performance and end-to-end workflows |
+| Primary Mac | MacBook Pro; Apple M5 Pro, 15 CPU cores; 24 GB unified memory; macOS 26.6.2 | Native UI, microphone, English speech, Accessibility, capture, physical takeover, performance and end-to-end workflows |
 | Installed tools | Xcode 27.0; Swift 6.4; Node 24.15.0; pnpm 11.10.0 | Baseline inventory; validate dependency compatibility and pin supported versions during setup |
 | Development services | Convex development deployment configured; real provider checks and one approved AgentMail delivery verified | Authentication, database isolation, model calls, research and approved email tests |
 | Browser on primary Mac | Brave for intended daily use; Safari for native baseline | Public web companion, cross-app workflows and focus checks; record installed versions at test time |
 | Release validation | Separate macOS test account, then a second clean supported Mac when available | Fresh onboarding, signing, permissions, update and uninstall; second computer not yet supplied |
 
-Native unit tests now run with synthetic capture data; the native app has not been exercised interactively. Do not infer Intel, older macOS, lower-memory, or other Mac compatibility from this machine. Hostinger VPS is not required for the selected managed architecture and cannot validate native macOS behavior. Microphone, permissions and input-control checks require a real Mac.
+Native tests use synthetic capture data; selected live microphone and desktop checks have been recorded. Consult the verification record for their exact coverage; full automatic intent recognition is not yet implemented. Do not infer Intel, older macOS, lower-memory, or other Mac compatibility from this machine. Hostinger VPS is not required for the selected managed architecture and cannot validate native macOS behavior. Microphone, permissions and input-control checks require a real Mac.
 
 For every measured run, record commit, OS/app/model versions, test language, target app, peak memory, latency, result, corrections and physical interventions in `docs/testing/results.md`. Keep raw private audio/screenshots out of test evidence.
 
@@ -44,25 +46,25 @@ Files: `apps/macos/FlowState/App/FlowStateApp.swift`, `App/AppState.swift`, `UI/
 - [ ] Add menu-bar lifecycle, HUD states, settings and visible local/cloud indicators.
 - [ ] Explain/request microphone, speech, Accessibility and screen capture only when needed.
 - [ ] Handle denied/revoked permissions without repeated prompts or silent degradation.
-- [ ] Add English and Traditional Chinese UI strings and accessible labels.
+- [x] Offer English-only UI and accessible labels; migrate stored language preferences and remove Chinese resources/selectors as specified in the intent plan.
 - [ ] Show a safe first-run action and voice-accessible help/cancel controls.
 
-Verify: primary Mac, fresh test account; permit/deny/revoke each permission and exercise onboarding in both languages.
+Verify: primary Mac, fresh test account; permit/deny/revoke each permission and exercise onboarding in English.
 
-## 3. Bilingual audio and activation feasibility
+## 3. English audio and automatic intent recognition
 
-Files: `apps/macos/FlowState/Audio/AudioCapture.swift`, `Audio/SpeechRecognizer.swift`, `Audio/ActivationController.swift`, `Audio/StopListener.swift`, `Audio/TranscriptProcessor.swift`, `apps/macos/FlowStateTests/AudioStateTests.swift`, `tests/fixtures/commands.en.json`, `tests/fixtures/commands.zh-Hant.json`, `tests/fixtures/commands.mixed.json`, `docs/testing/speech-evaluation.md`.
+Files: `apps/macos/FlowState/Audio/AudioCapture.swift`, `Audio/SpeechRecognizer.swift`, `Audio/ActivationController.swift`, `Audio/StopListener.swift`, `Audio/TranscriptProcessor.swift`, `apps/macos/FlowStateTests/AudioStateTests.swift`, `tests/fixtures/commands.en.json`, `docs/testing/speech-evaluation.md`.
 
 - [ ] Compare Apple Speech and a suitable local multilingual runtime on this Mac; document model size, peak memory, latency and quality.
-- [ ] Select the speech path using both launch languages, not an English-only benchmark.
+- [ ] Validate the selected local speech path against English utterances, accents and realistic recognition errors.
 - [ ] Implement push-to-talk, session toggle and configurable locally detected wake phrase.
 - [ ] Keep local stop detection independent of cloud requests and workflow execution.
 - [ ] Handle silence, microphone changes, session restart, background audio and false wakeups.
-- [ ] Separate command/dictation modes; prevent dictated command words from executing.
-- [ ] Preserve meaning, names, punctuation and mixed-language app names; make Traditional Chinese output explicit.
+- [ ] Add Auto routing and automatic utterance completion, with explicit mode overrides; prevent dictated command words from executing. Follow the intent plan’s evaluation gates.
+- [ ] Preserve dictated meaning, names and punctuation. Remove Chinese recognition/command branches while preserving Unicode user data.
 - [ ] Test offline behavior and disclose any required managed transcription; never silently fall back to cloud.
 
-Verify: primary Mac microphone plus synthetic/consented samples; English, Traditional Chinese and mixed speech; measure memory and stop latency with active workflows and network disconnected.
+Verify: primary Mac microphone plus synthetic/consented samples; English speech, ambiguity and correction cases; measure memory and stop latency with active workflows and network disconnected.
 
 ## 4. Native control and interruption
 
@@ -99,7 +101,7 @@ Files: `convex/ai/jev.ts`, `convex/ai/vision.ts`, `convex/ai/planner.ts`, `conve
 - [ ] Route exact local commands locally; use Jev for bounded textual intent/candidate selection.
 - [ ] Build minimal permitted screen context; interpret screenshots with a vision model, not Jev.
 - [ ] Validate planned actions against the registry; model output cannot grant permissions.
-- [ ] Evaluate Jev on English/Traditional Chinese separately; add clarification or validated fallback.
+- [ ] Calibrate English intent/action/target thresholds on separate development/calibration/holdout sets; compare text and screenshot LLM fallbacks using the intent plan. Remove the uncalibrated 0.55 policy.
 - [ ] Ground visual targets in current geometry; handle moved windows and multiple displays.
 - [ ] Bound request sizes, retries, execution time and provider usage; report outages clearly.
 
@@ -143,7 +145,7 @@ Files: `apps/macos/FlowState/Storage/PreferenceStore.swift`, `UI/MemoryView.swif
 - [ ] Make learned preferences opt-in; preserve explicit preference precedence.
 - [ ] Handle deletion and synchronization consistently across Mac and web.
 
-Verify: primary Mac and development Convex; bilingual corrections survive restart and deletion removes the synchronized record.
+Verify: primary Mac and development Convex; English corrections survive restart and deletion removes the synchronized record.
 
 ## 10. Public-web research and both email paths
 
@@ -159,13 +161,13 @@ Files: `convex/research.ts`, `convex/mail.ts`, `convex/http.ts`, `convex/deliver
 
 Verify: development accounts and primary Mac; use an explicitly authorized test recipient for real sending. Test provider failures with fixtures before live calls.
 
-## 11. Complete workflows and bilingual acceptance
+## 11. Complete workflows and English acceptance
 
-Files: `tests/e2e/creative-workflow.md`, `tests/e2e/research-mail-workflow.md`, `tests/e2e/navigation-bilingual.md`, `docs/testing/results.md`.
+Files: `tests/e2e/creative-workflow.md`, `tests/e2e/research-mail-workflow.md`, `tests/e2e/navigation-english.md`, `docs/testing/results.md`.
 
 - [ ] Run creative file selection → attachment → request → wait → retrieve → sharing draft.
 - [ ] Run public research → sourced note → approved email using real configured services.
-- [ ] Run navigation/dictation/correction in both languages and mixed speech.
+- [ ] Run English Auto navigation/dictation/correction, language-setting upgrade, ambiguity and fallback acceptance tests.
 - [ ] Exercise stop, physical takeover, resume, undo, denied permissions, app restart and network failure.
 - [ ] Repeat each reference flow from a clean starting state; record failures and physical interventions, not only successful videos.
 - [ ] Add trip planning and return-request flows after the reusable steps are verified; keep purchases out of routine tests.
@@ -188,4 +190,4 @@ Verify: primary Mac plus clean supported Mac when available; logged-out web/repo
 
 ## Start order and dependencies
 
-Start with repository/contracts and native permission/audio feasibility; no paid provider credentials are needed for most of that work. Validate bilingual speech and local stop before committing to a speech runtime. Configure Convex/auth early, then add grants, native execution and model integrations in testable slices. Complete recovery before relying on long workflows. Keep the full roadmap even if the hackathon milestone demonstrates only a verified subset.
+Follow [the intent-recognition sequence](docs/intent-recognition-plan.md): evaluation fixtures and provider contract tests → Jev/fallback calibration → English-only migration → automatic utterance completion → context-aware routing and permitted execution → live acceptance and independent review. Reuse the existing repository, Convex/auth and native foundations. Complete recovery before relying on long workflows. Keep the broader roadmap even if the hackathon milestone demonstrates only a verified subset.

@@ -16,17 +16,37 @@ public enum DesktopAction: Equatable, Codable, Sendable {
     case openApplication(bundleIdentifier: String)
     case scroll(lines: Int32)
     case focus(role: String?)
+    case focusTarget(role: String?, label: String?)
     case select
+    case selectTarget(label: String)
     case press
+    case keyPress(key: String, modifiers: String?)
     case insertText(String)
+
+    public static func focus(role: String?, label: String?) -> Self {
+        .focusTarget(role: role, label: label)
+    }
+
+    public static func select(label: String) -> Self {
+        .selectTarget(label: label)
+    }
+
+    public static func press(key: String, modifiers: String?) -> Self {
+        .keyPress(key: key, modifiers: modifiers)
+    }
+
+    var movesKeyboardFocus: Bool {
+        if case .keyPress("Tab", _) = self { return true }
+        return false
+    }
 
     public var kind: DesktopActionKind {
         switch self {
         case .openApplication: .openApplication
         case .scroll: .scroll
-        case .focus: .focus
-        case .select: .select
-        case .press: .press
+        case .focus, .focusTarget: .focus
+        case .select, .selectTarget: .select
+        case .press, .keyPress: .press
         case .insertText: .insertText
         }
     }
@@ -66,32 +86,135 @@ public struct DesktopExecutionGrant: Codable, Equatable, Sendable {
     }
 }
 
+public struct DesktopTextRange: Codable, Equatable, Sendable {
+    public let location: Int
+    public let length: Int
+
+    public init(location: Int, length: Int) {
+        self.location = location
+        self.length = length
+    }
+}
+
 public struct DesktopObservation: Codable, Equatable, Sendable {
     public let bundleIdentifier: String
     public let focusedElementID: String?
     public let value: String?
+    public let focusedRole: String?
+    public let focusedLabel: String?
+    public let isEditable: Bool
+    public let isSecure: Bool
+    public let selectedTextRange: DesktopTextRange?
     public let observedAt: Date
 
     public init(
         bundleIdentifier: String,
         focusedElementID: String? = nil,
         value: String? = nil,
+        focusedRole: String? = nil,
+        focusedLabel: String? = nil,
+        isEditable: Bool = false,
+        isSecure: Bool = false,
+        selectedTextRange: DesktopTextRange? = nil,
         observedAt: Date = Date()
     ) {
         self.bundleIdentifier = bundleIdentifier
         self.focusedElementID = focusedElementID
         self.value = value
+        self.focusedRole = focusedRole
+        self.focusedLabel = focusedLabel
+        self.isEditable = isEditable
+        self.isSecure = isSecure
+        self.selectedTextRange = selectedTextRange
+        self.observedAt = observedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case bundleIdentifier
+        case focusedElementID
+        case value
+        case focusedRole
+        case focusedLabel
+        case isEditable
+        case isSecure
+        case selectedTextRange
+        case observedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            bundleIdentifier: try values.decode(String.self, forKey: .bundleIdentifier),
+            focusedElementID: try values.decodeIfPresent(String.self, forKey: .focusedElementID),
+            value: try values.decodeIfPresent(String.self, forKey: .value),
+            focusedRole: try values.decodeIfPresent(String.self, forKey: .focusedRole),
+            focusedLabel: try values.decodeIfPresent(String.self, forKey: .focusedLabel),
+            isEditable: try values.decodeIfPresent(Bool.self, forKey: .isEditable) ?? false,
+            isSecure: try values.decodeIfPresent(Bool.self, forKey: .isSecure) ?? false,
+            selectedTextRange: try values.decodeIfPresent(DesktopTextRange.self, forKey: .selectedTextRange),
+            observedAt: try values.decode(Date.self, forKey: .observedAt)
+        )
+    }
+
+    /// Safe context for routing. It intentionally excludes the focused value,
+    /// which may contain private document text and is only needed for local undo.
+    public var safeContext: DesktopSafeContext {
+        DesktopSafeContext(
+            bundleIdentifier: bundleIdentifier,
+            focusedElementID: focusedElementID,
+            focusedRole: focusedRole,
+            focusedLabel: focusedLabel,
+            isEditable: isEditable,
+            isSecure: isSecure,
+            observedAt: observedAt
+        )
+    }
+}
+
+public struct DesktopSafeContext: Codable, Equatable, Sendable {
+    public let bundleIdentifier: String
+    public let focusedElementID: String?
+    public let focusedRole: String?
+    public let focusedLabel: String?
+    public let isEditable: Bool
+    public let isSecure: Bool
+    public let observedAt: Date
+
+    public init(
+        bundleIdentifier: String,
+        focusedElementID: String?,
+        focusedRole: String?,
+        focusedLabel: String?,
+        isEditable: Bool,
+        isSecure: Bool,
+        observedAt: Date
+    ) {
+        self.bundleIdentifier = bundleIdentifier
+        self.focusedElementID = focusedElementID
+        self.focusedRole = focusedRole
+        self.focusedLabel = focusedLabel
+        self.isEditable = isEditable
+        self.isSecure = isSecure
         self.observedAt = observedAt
     }
 }
 
 public struct DesktopActionResult: Equatable, Sendable {
     public let verified: Bool
+    /// True once the native effect was attempted. A false result with this flag
+    /// means the final result is unknown and must never be replayed automatically.
+    public let effectAttempted: Bool
     public let valueBefore: String?
     public let valueAfter: String?
 
-    public init(verified: Bool, valueBefore: String? = nil, valueAfter: String? = nil) {
+    public init(
+        verified: Bool,
+        effectAttempted: Bool = false,
+        valueBefore: String? = nil,
+        valueAfter: String? = nil
+    ) {
         self.verified = verified
+        self.effectAttempted = effectAttempted
         self.valueBefore = valueBefore
         self.valueAfter = valueAfter
     }
@@ -133,6 +256,7 @@ public enum DesktopAutomationState: String, Codable, Equatable, Sendable {
     case ready
     case running
     case pausedForUser
+    case reconciliationRequired
     case cancelled
 }
 
@@ -143,6 +267,8 @@ public enum DesktopExecutionError: Error, Equatable, LocalizedError, Sendable {
     case actionNotGranted
     case targetChanged
     case verificationFailed
+    case dispatchUncertain
+    case reconciliationRequired
     case pausedForTakeover
     case interveningEdit
     case undoUnsupported
@@ -157,7 +283,9 @@ public enum DesktopExecutionError: Error, Equatable, LocalizedError, Sendable {
         case .grantExpired: "The desktop-control grant has expired."
         case .actionNotGranted: "This action is not granted for the current task."
         case .targetChanged: "The focused application changed before the action ran."
-        case .verificationFailed: "The action ran but its expected effect was not verified."
+        case .verificationFailed: "The action was not verified before its effect boundary."
+        case .dispatchUncertain: "The action may have run; check its effect before continuing."
+        case .reconciliationRequired: "Check the last action before continuing or granting desktop control again."
         case .pausedForTakeover: "Desktop control is paused while you use the Mac."
         case .interveningEdit: "The focused value changed, so undo was not performed."
         case .undoUnsupported: "This action has no safe verified undo."
@@ -170,6 +298,9 @@ public enum DesktopExecutionError: Error, Equatable, LocalizedError, Sendable {
 
 public protocol DesktopDriver: Sendable {
     func observe() async throws -> DesktopObservation
+    /// Drivers must return `effectAttempted: true` for an unverified result
+    /// after crossing the native effect boundary, and throw
+    /// `DesktopExecutionError.dispatchUncertain` if they fail after dispatch.
     func perform(
         _ action: DesktopAction,
         expectedObservation: DesktopObservation,
@@ -218,6 +349,29 @@ public actor DesktopAutomationController {
         stateValue = .ready
     }
 
+    /// Captures the current app and focused control for a bounded routing
+    /// request. The caller must pass this same snapshot to `execute` after any
+    /// cloud inference so a changed focus cannot receive the result.
+    public func observeCurrent() async throws -> DesktopObservation {
+        guard stateValue == .ready else {
+            if stateValue == .pausedForUser { throw DesktopExecutionError.pausedForTakeover }
+            if stateValue == .reconciliationRequired { throw DesktopExecutionError.reconciliationRequired }
+            if stateValue == .cancelled { throw DesktopExecutionError.staleGeneration }
+            throw DesktopExecutionError.notStarted
+        }
+        guard let grant, grant.generation == generation else {
+            throw DesktopExecutionError.staleGeneration
+        }
+        guard grant.expiresAt > Date() else { throw DesktopExecutionError.grantExpired }
+        let observation = try await driver.observe()
+        guard stateValue == .ready,
+              self.grant?.generation == generation,
+              grant.expiresAt > Date() else {
+            throw DesktopExecutionError.staleGeneration
+        }
+        return observation
+    }
+
     public func cancel(lifecycleEpoch: UInt64? = nil) {
         guard acceptLifecycleEpoch(lifecycleEpoch) else { return }
         generation &+= 1
@@ -237,6 +391,7 @@ public actor DesktopAutomationController {
     @discardableResult
     public func resume() async throws -> DesktopObservation {
         guard stateValue == .pausedForUser else {
+            if stateValue == .reconciliationRequired { throw DesktopExecutionError.reconciliationRequired }
             throw DesktopExecutionError.notStarted
         }
         guard activeOperation == nil else { throw DesktopExecutionError.staleGeneration }
@@ -278,10 +433,12 @@ public actor DesktopAutomationController {
 
     public func execute(
         _ action: DesktopAction,
-        expectedBundleIdentifier: String
+        expectedBundleIdentifier: String,
+        expectedObservation: DesktopObservation? = nil
     ) async throws -> VerifiedDesktopAction {
         guard stateValue == .ready else {
             if stateValue == .pausedForUser { throw DesktopExecutionError.pausedForTakeover }
+            if stateValue == .reconciliationRequired { throw DesktopExecutionError.reconciliationRequired }
             if stateValue == .cancelled { throw DesktopExecutionError.staleGeneration }
             throw DesktopExecutionError.notStarted
         }
@@ -296,10 +453,16 @@ public actor DesktopAutomationController {
         let token = OperationToken(id: UUID(), generation: generation)
         activeOperation = token
         stateValue = .running
+        var effectAttempted = false
         do {
             let before = try await driver.observe()
             guard isCurrent(token, state: .running), grant.expiresAt > Date() else {
                 throw DesktopExecutionError.staleGeneration
+            }
+            if let expectedObservation {
+                guard sameObservationContext(before, expectedObservation) else {
+                    throw DesktopExecutionError.targetChanged
+                }
             }
             guard action.kind == .openApplication || before.bundleIdentifier == expectedBundleIdentifier else {
                 throw DesktopExecutionError.targetChanged
@@ -313,6 +476,16 @@ public actor DesktopAutomationController {
                 expectedObservation: before,
                 authorize: authorization
             )
+            effectAttempted = result.effectAttempted || result.verified
+            guard result.verified else {
+                if result.effectAttempted {
+                    throw DesktopExecutionError.dispatchUncertain
+                }
+                guard isCurrent(token, state: .running) else {
+                    throw DesktopExecutionError.staleGeneration
+                }
+                throw DesktopExecutionError.verificationFailed
+            }
             guard isCurrent(token, state: .running) else {
                 throw DesktopExecutionError.staleGeneration
             }
@@ -320,11 +493,8 @@ public actor DesktopAutomationController {
             guard isCurrent(token, state: .running) else {
                 throw DesktopExecutionError.staleGeneration
             }
-            guard result.verified else {
-                throw DesktopExecutionError.verificationFailed
-            }
             guard after.bundleIdentifier == expectedBundleIdentifier,
-                  action.kind == .openApplication || action.kind == .scroll ||
+                  action.kind == .openApplication || action.kind == .scroll || action.movesKeyboardFocus ||
                     sameElementIdentity(after.focusedElementID, before.focusedElementID) else {
                 throw DesktopExecutionError.targetChanged
             }
@@ -345,7 +515,8 @@ public actor DesktopAutomationController {
         } catch {
             if activeOperation == token {
                 activeOperation = nil
-                stateValue = .ready
+                stateValue = effectAttempted || (error as? DesktopExecutionError) == .dispatchUncertain
+                    ? .reconciliationRequired : .ready
             }
             throw error
         }
@@ -360,7 +531,10 @@ public actor DesktopAutomationController {
               record.valueBefore != nil,
               record.valueAfter != nil
         else { throw DesktopExecutionError.undoUnsupported }
-        guard stateValue == .ready else { throw DesktopExecutionError.notStarted }
+        guard stateValue == .ready else {
+            if stateValue == .reconciliationRequired { throw DesktopExecutionError.reconciliationRequired }
+            throw DesktopExecutionError.notStarted
+        }
         guard activeOperation == nil else { throw DesktopExecutionError.staleGeneration }
         guard let grant, grant.generation == generation, grant.expiresAt > Date() else {
             throw DesktopExecutionError.staleGeneration
@@ -439,7 +613,7 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
     public init() {}
 
     static func isSecureTextField(role: String?, subrole: String?) -> Bool {
-        role == "AXTextField" && subrole == "AXSecureTextField"
+        role == "AXSecureTextField" || subrole == "AXSecureTextField"
     }
 
     static func canReadValue(role: String?, subrole: String?) -> Bool {
@@ -459,8 +633,12 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
         let focusedElement = focused.map { $0 as! AXUIElement }
         let role = focusedElement.flatMap { copyAttribute($0, kAXRoleAttribute as CFString) as? String }
         let subrole = focusedElement.flatMap { copyAttribute($0, kAXSubroleAttribute as CFString) as? String }
+        let label = focusedElement.flatMap { self.accessibleLabel($0) }
+        let isEditable = focusedElement.map(Self.isEditable) ?? false
+        let isSecure = Self.isSecureTextField(role: role, subrole: subrole)
+        let selection = focusedElement.flatMap { selectedTextRange(for: $0) }
         let value: String?
-        if Self.canReadValue(role: role, subrole: subrole) {
+        if Self.canReadValue(role: role, subrole: subrole), !isSecure {
             value = focusedElement.flatMap { copyAttribute($0, kAXValueAttribute as CFString) as? String }
         } else {
             value = nil
@@ -469,7 +647,12 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
         return DesktopObservation(
             bundleIdentifier: bundleIdentifier,
             focusedElementID: elementID,
-            value: value
+            value: value,
+            focusedRole: role,
+            focusedLabel: label,
+            isEditable: isEditable,
+            isSecure: isSecure,
+            selectedTextRange: selection.map { DesktopTextRange(location: $0.location, length: $0.length) }
         )
     }
 
@@ -481,7 +664,8 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
         if action.kind != .openApplication {
             let current = try await observe()
             guard current.bundleIdentifier == expectedObservation.bundleIdentifier,
-                  sameElementIdentity(current.focusedElementID, expectedObservation.focusedElementID)
+                  sameElementIdentity(current.focusedElementID, expectedObservation.focusedElementID),
+                  current.selectedTextRange == expectedObservation.selectedTextRange
             else { throw DesktopExecutionError.targetChanged }
         }
         switch action {
@@ -511,7 +695,7 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
                 }
                 try await Task.sleep(for: .milliseconds(50))
             }
-            return DesktopActionResult(verified: false)
+            return DesktopActionResult(verified: false, effectAttempted: true)
         case let .scroll(lines):
             guard (-100...100).contains(lines) else { throw DesktopExecutionError.actionNotGranted }
             guard await authorize() else { throw DesktopExecutionError.staleGeneration }
@@ -555,8 +739,8 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
                 }
                 try await Task.sleep(for:.milliseconds(50))
             }
-            return DesktopActionResult(verified:false)
-        case .focus, .select, .press, .insertText:
+            return DesktopActionResult(verified:false, effectAttempted: true)
+        case .focus, .focusTarget, .select, .selectTarget, .press, .keyPress, .insertText:
             guard AXIsProcessTrusted() else { throw DesktopExecutionError.accessibilityDenied }
             let focused = try focusedElement(matching: expectedObservation)
             switch action {
@@ -565,11 +749,70 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
                     return DesktopActionResult(verified: false)
                 }
                 guard await authorize() else { throw DesktopExecutionError.staleGeneration }
+                let effectFocused = try focusedElement(matching: expectedObservation)
+                let effectRole = copyAttribute(effectFocused, kAXRoleAttribute as CFString) as? String
+                let effectSubrole = copyAttribute(effectFocused, kAXSubroleAttribute as CFString) as? String
+                guard !Self.isSecureTextField(role: effectRole, subrole: effectSubrole),
+                      role == nil || role == effectRole else {
+                    return DesktopActionResult(verified: false)
+                }
+            case let .focusTarget(role, label):
+                let actualRole = copyAttribute(focused, kAXRoleAttribute as CFString) as? String
+                let actualLabel = accessibleLabel(focused)
+                let actualSubrole = copyAttribute(focused, kAXSubroleAttribute as CFString) as? String
+                guard (role == nil || role == actualRole),
+                      label == nil || label == actualLabel,
+                      !Self.isSecureTextField(role: actualRole, subrole: actualSubrole) else {
+                    return DesktopActionResult(verified: false)
+                }
+                guard await authorize() else { throw DesktopExecutionError.staleGeneration }
+                let effectFocused = try focusedElement(matching: expectedObservation)
+                let effectRole = copyAttribute(effectFocused, kAXRoleAttribute as CFString) as? String
+                let effectSubrole = copyAttribute(effectFocused, kAXSubroleAttribute as CFString) as? String
+                let effectLabel = accessibleLabel(effectFocused)
+                guard (role == nil || role == effectRole),
+                      label == nil || label == effectLabel,
+                      !Self.isSecureTextField(role: effectRole, subrole: effectSubrole) else {
+                    return DesktopActionResult(verified: false)
+                }
+                guard AXUIElementSetAttributeValue(effectFocused, kAXFocusedAttribute as CFString, kCFBooleanTrue) == .success else {
+                    return DesktopActionResult(verified: false)
+                }
+                guard let focusedAfter = try? focusedElement(matching: expectedObservation),
+                      sameElementIdentity(retainedElementIdentifier(focusedAfter), expectedObservation.focusedElementID) else {
+                    return DesktopActionResult(verified: false, effectAttempted: true)
+                }
             case .select:
                 guard await authorize() else { throw DesktopExecutionError.staleGeneration }
                 let effectFocused = try focusedElement(matching: expectedObservation)
+                let effectRole = copyAttribute(effectFocused, kAXRoleAttribute as CFString) as? String
+                let effectSubrole = copyAttribute(effectFocused, kAXSubroleAttribute as CFString) as? String
+                guard !Self.isSecureTextField(role: effectRole, subrole: effectSubrole) else {
+                    return DesktopActionResult(verified: false)
+                }
                 guard AXUIElementSetAttributeValue(effectFocused, kAXSelectedAttribute as CFString, kCFBooleanTrue) == .success else {
                     return DesktopActionResult(verified: false)
+                }
+                guard (copyAttribute(effectFocused, kAXSelectedAttribute as CFString) as? NSNumber)?.boolValue == true else {
+                    return DesktopActionResult(verified: false, effectAttempted: true)
+                }
+            case let .selectTarget(label):
+                guard accessibleLabel(focused) == label else {
+                    return DesktopActionResult(verified: false)
+                }
+                guard await authorize() else { throw DesktopExecutionError.staleGeneration }
+                let effectFocused = try focusedElement(matching: expectedObservation)
+                let effectRole = copyAttribute(effectFocused, kAXRoleAttribute as CFString) as? String
+                let effectSubrole = copyAttribute(effectFocused, kAXSubroleAttribute as CFString) as? String
+                guard accessibleLabel(effectFocused) == label,
+                      !Self.isSecureTextField(role: effectRole, subrole: effectSubrole) else {
+                    return DesktopActionResult(verified: false)
+                }
+                guard AXUIElementSetAttributeValue(effectFocused, kAXSelectedAttribute as CFString, kCFBooleanTrue) == .success else {
+                    return DesktopActionResult(verified: false)
+                }
+                guard (copyAttribute(effectFocused, kAXSelectedAttribute as CFString) as? NSNumber)?.boolValue == true else {
+                    return DesktopActionResult(verified: false, effectAttempted: true)
                 }
             case .press:
                 guard await authorize() else { throw DesktopExecutionError.staleGeneration }
@@ -577,6 +820,60 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
                 guard AXUIElementPerformAction(effectFocused, kAXPressAction as CFString) == .success else {
                     return DesktopActionResult(verified: false)
                 }
+            case let .keyPress(key, modifiers):
+                guard Self.allowedPressKeys.contains(key),
+                      modifiers == nil || Self.allowedPressModifiers.contains(modifiers ?? "") else {
+                    throw DesktopExecutionError.actionNotGranted
+                }
+                guard await authorize(), let keyCode = Self.keyCode(for: key) else {
+                    throw DesktopExecutionError.staleGeneration
+                }
+                let current = try await observe()
+                guard sameObservationContext(current, expectedObservation) else {
+                    throw DesktopExecutionError.targetChanged
+                }
+                guard await authorize() else { throw DesktopExecutionError.staleGeneration }
+                let source = CGEventSource(stateID: .combinedSessionState)
+                guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
+                      let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) else {
+                    throw DesktopExecutionError.nativeFailure("Could not create a keyboard event.")
+                }
+                Self.tagAutomationEvent(keyDown)
+                Self.tagAutomationEvent(keyUp)
+                keyDown.flags = []
+                keyUp.flags = []
+                if modifiers == "Shift" { keyDown.flags.insert(.maskShift); keyUp.flags.insert(.maskShift) }
+                if modifiers == "Command" { keyDown.flags.insert(.maskCommand); keyUp.flags.insert(.maskCommand) }
+                let clipboardBefore = await MainActor.run { NSPasteboard.general.changeCount }
+                guard await authorize(),
+                      let target = NSWorkspace.shared.frontmostApplication,
+                      target.bundleIdentifier == expectedObservation.bundleIdentifier,
+                      let postingFocused = try? focusedElement(matching: expectedObservation),
+                      !Self.isSecureTextField(
+                        role: copyAttribute(postingFocused, kAXRoleAttribute as CFString) as? String,
+                        subrole: copyAttribute(postingFocused, kAXSubroleAttribute as CFString) as? String
+                      )
+                else { throw DesktopExecutionError.targetChanged }
+                keyDown.postToPid(target.processIdentifier)
+                keyUp.postToPid(target.processIdentifier)
+                do {
+                    for _ in 0..<10 {
+                        try await Task.sleep(for: .milliseconds(30))
+                        guard await authorize() else { throw DesktopExecutionError.dispatchUncertain }
+                        let after = try await observe()
+                        guard after.bundleIdentifier == current.bundleIdentifier else {
+                            throw DesktopExecutionError.dispatchUncertain
+                        }
+                        let clipboardAfter = await MainActor.run { NSPasteboard.general.changeCount }
+                        if keyboardEffectObserved(key: key, modifiers: modifiers, before: current, after: after,
+                                                  clipboardChanged: clipboardAfter != clipboardBefore) {
+                            return DesktopActionResult(verified: true, effectAttempted: true)
+                        }
+                    }
+                } catch {
+                    throw DesktopExecutionError.dispatchUncertain
+                }
+                return DesktopActionResult(verified: false, effectAttempted: true)
             case let .insertText(text):
                 let role = copyAttribute(focused, kAXRoleAttribute as CFString) as? String
                 let subrole = copyAttribute(focused, kAXSubroleAttribute as CFString) as? String
@@ -611,6 +908,7 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
                 let after = copyAttribute(effectFocused, kAXValueAttribute as CFString) as? String
                 return DesktopActionResult(
                     verified: after == effectExpectedAfter,
+                    effectAttempted: true,
                     valueBefore: effectPrevious,
                     valueAfter: after
                 )
@@ -657,6 +955,45 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
         guard let value = copyAttribute(system, kAXFocusedUIElementAttribute as CFString)
         else { throw DesktopExecutionError.nativeFailure("No focused Accessibility element is available.") }
         return value as! AXUIElement
+    }
+
+    private static let allowedPressKeys = NativePlanAction.allowedPressKeys
+    private static let allowedPressModifiers = NativePlanAction.allowedPressModifiers
+
+    private func accessibleLabel(_ element: AXUIElement) -> String? {
+        for attribute in [kAXTitleAttribute, kAXDescriptionAttribute, kAXHelpAttribute] {
+            if let value = copyAttribute(element, attribute as CFString) as? String,
+               !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return value
+            }
+        }
+        return nil
+    }
+
+    private static func isEditable(_ element: AXUIElement) -> Bool {
+        var settable = DarwinBoolean(false)
+        return AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &settable) == .success
+            && settable.boolValue
+    }
+
+    private static func keyCode(for key: String) -> CGKeyCode? {
+        switch key {
+        case "ArrowUp": 126
+        case "ArrowDown": 125
+        case "ArrowLeft": 123
+        case "ArrowRight": 124
+        case "PageUp": 116
+        case "PageDown": 121
+        case "Home": 115
+        case "End": 119
+        case "Tab": 48
+        case "Escape": 53
+        case "Enter": 36
+        case "A": 0
+        case "C": 8
+        case "V": 9
+        default: nil
+        }
     }
 
     private func focusedElement(matching expectedObservation: DesktopObservation) throws -> AXUIElement {
@@ -715,6 +1052,7 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
         guard let value = copyAttribute(element, kAXSelectedTextRangeAttribute as CFString) else {
             return nil
         }
+        guard CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
         let axValue = value as! AXValue
         guard AXValueGetType(axValue) == .cfRange
         else { return nil }
@@ -741,8 +1079,40 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
         guard AXUIElementCopyAttributeValue(element, attribute, &value) == .success else { return nil }
         return value
     }
+
+    static func tagAutomationEvent(_ event: CGEvent) {
+        event.setIntegerValueField(
+            .eventSourceUserData,
+            value: Int64(bitPattern: InputTakeoverMonitor.automationEventTag)
+        )
+    }
 }
 
 private func sameElementIdentity(_ lhs: String?, _ rhs: String?) -> Bool {
     lhs == rhs
+}
+
+private func sameObservationContext(_ lhs: DesktopObservation, _ rhs: DesktopObservation) -> Bool {
+    lhs.bundleIdentifier == rhs.bundleIdentifier &&
+        sameElementIdentity(lhs.focusedElementID, rhs.focusedElementID) &&
+        lhs.focusedRole == rhs.focusedRole &&
+        lhs.focusedLabel == rhs.focusedLabel &&
+        lhs.isEditable == rhs.isEditable &&
+        lhs.isSecure == rhs.isSecure &&
+        lhs.selectedTextRange == rhs.selectedTextRange
+}
+
+
+/// Verify an observable result, not merely successful construction of an input event.
+func keyboardEffectObserved(key: String, modifiers: String?, before: DesktopObservation,
+                            after: DesktopObservation, clipboardChanged: Bool) -> Bool {
+    guard before.bundleIdentifier == after.bundleIdentifier else { return false }
+    if key == "C", modifiers == "Command" { return clipboardChanged }
+    if key == "A", modifiers == "Command", let value = before.value {
+        return after.focusedElementID == before.focusedElementID &&
+            after.selectedTextRange == DesktopTextRange(location: 0, length: (value as NSString).length)
+    }
+    if key == "Tab", after.focusedElementID != before.focusedElementID { return true }
+    guard after.focusedElementID == before.focusedElementID else { return false }
+    return after.value != before.value || after.selectedTextRange != before.selectedTextRange
 }

@@ -12,7 +12,6 @@ import { GenericId, v } from "convex/values";
 import { requireIdentity } from "./lib/identity";
 import { createOpenAIClient } from "./lib/openai";
 import { normalizeModelPlan, parsePlannerText, PlannedAction } from "./lib/action_plan";
-import { createTypeSafeClient } from "./lib/typesafe";
 import { usageLimit } from "./usage";
 import { isRecord } from "./lib/http";
 
@@ -112,11 +111,6 @@ function requireCommand(command: string): string {
   return value;
 }
 
-function requireLocale(locale: string): "en" | "zh-Hant" {
-  if (locale !== "en" && locale !== "zh-Hant") throw new Error("locale must be en or zh-Hant");
-  return locale;
-}
-
 function parseActions(actionsJson: string): PlannedAction[] {
   try {
     const value = JSON.parse(actionsJson) as unknown;
@@ -138,20 +132,11 @@ function parseCapabilities(value: string | undefined): string[] {
   }
 }
 
-function screenshotDataUrl(value: string | undefined): string | undefined {
-  if (value === undefined) return undefined;
-  if (value.length > 2_000_000) throw new Error("screenshot exceeds the 2MB limit");
-  if (!/^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(value)) {
-    throw new Error("screenshot must be a PNG or JPEG data URL");
-  }
-  return value;
-}
-
 export const createActionPlan = mutationGeneric({
   args: {
     deviceId: v.string(),
     command: v.string(),
-    locale: v.union(v.literal("en"), v.literal("zh-Hant")),
+    locale: v.literal("en"),
     expiresAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
@@ -237,6 +222,7 @@ export const resolveActionPlan = actionGeneric({
   args: { planId: v.id("actionPlans"), screenshot: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
+    if (args.screenshot !== undefined) throw new Error("Use the authorized intent observation path for screenshots.");
     const claim = await ctx.runMutation(internalClaimPlan, {
       planId: args.planId,
       ownerKey: identity.tokenIdentifier,
@@ -249,22 +235,8 @@ export const resolveActionPlan = actionGeneric({
       throw new Error(`action plan is ${plan.status}`);
     }
     try {
-      const screenshot = screenshotDataUrl(args.screenshot);
-      if (process.env.TYPESAFE_API_KEY !== undefined) {
-        const route = await createTypeSafeClient({
-          apiKey: process.env.TYPESAFE_API_KEY,
-          model: process.env.FLOWSTATE_JEV_MODEL,
-        }).chooseCandidate({
-          state: { command: plan.command, locale: plan.locale },
-          candidates: {
-            desktop: "A registered desktop action plan is appropriate",
-            clarify: "The request needs user clarification before planning",
-          },
-        });
-        if (route.choice === "clarify" || (route.confidence !== undefined && route.confidence < 0.55)) {
-          throw new Error("action request needs clarification");
-        }
-      }
+      // Voice classification belongs to the evaluated intent endpoint. This
+      // explicit planning surface always returns a proposal for human review.
       const openai = createOpenAIClient({
         apiKey: process.env.OPENAI_API_KEY,
         model: process.env.FLOWSTATE_PLANNER_MODEL,
@@ -272,16 +244,13 @@ export const resolveActionPlan = actionGeneric({
       const inputParts: Array<Record<string, unknown>> = [
         {
           type: "input_text",
-          text: `Locale: ${plan.locale}\nCommand: ${plan.command}\nReturn only JSON with actions, explanation, and clarificationNeeded. Use only registered action kinds: openApplication, scroll, focus, select, press, insertText, openURL, attachFile, sendEmail. Never invent permissions or file paths.`,
+          text: `Locale: en\nCommand: ${plan.command}\nReturn only JSON with actions, explanation, and clarificationNeeded. Use only registered action kinds: openApplication, scroll, focus, select, press, insertText, openURL, attachFile, sendEmail. Never invent permissions or file paths.`,
         },
       ];
-      if (screenshot !== undefined) {
-        inputParts.push({ type: "input_image", image_url: screenshot });
-      }
       const response = await openai.createResponse({
         input: [{ role: "user", content: inputParts }],
         instructions:
-          "You are a constrained planner. Model output is a proposal only. Return strict JSON: {actions:[{kind,targetBundleIdentifier,parameters}],explanation,clarificationNeeded}. Every desktop action requires its own targetBundleIdentifier, including scroll and insertText; repeat the selected app identifier on each step. Parameters: openApplication {}; scroll {lines: integer from -100 to 100, negative means down}; insertText {text: string, replaceSelection: true}; focus {role: string, label?: string}; select {label: string}; press {key: ArrowUp|ArrowDown|ArrowLeft|ArrowRight|PageUp|PageDown|Home|End|Tab|Escape|Enter, modifiers?: Shift}; openURL {url: http(s) URL}; attachFile {fileId: existing approved ID}; sendEmail {recipient,subject,body}. Use 1 to 12 actions. Do not include executor, capability or requiresApproval; the server supplies them. Omit visualTarget unless supplied with verified current geometry. Never infer unknown file IDs or permissions. Do not include markdown.",
+          "You are a constrained planner. Model output is a proposal only. Return strict JSON: {actions:[{kind,targetBundleIdentifier,parameters}],explanation,clarificationNeeded}. Every desktop action requires its own targetBundleIdentifier, including scroll and insertText; repeat the selected app identifier on each step. Parameters: openApplication {}; scroll {lines: integer from -100 to 100, negative means down}; insertText {text: string, replaceSelection: true}; focus {role: string, label?: string}; select {label: string}; press {key: ArrowUp|ArrowDown|ArrowLeft|ArrowRight|PageUp|PageDown|Home|End|Tab|Escape|Enter|A|C|V, modifiers?: Shift|Command}; openURL {url: http(s) URL}; attachFile {fileId: existing approved ID}; sendEmail {recipient,subject,body}. Use 1 to 12 actions. Do not include executor, capability or requiresApproval; the server supplies them. Omit visualTarget unless supplied with verified current geometry. Never infer unknown file IDs or permissions. Do not include markdown.",
       });
       const normalized = parsePlannerText(response.outputText);
       await ctx.runMutation(internalSavePlan, {

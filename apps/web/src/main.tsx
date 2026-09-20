@@ -23,7 +23,7 @@ function App() {
     <>
       <nav className="workspace-nav" aria-label="Workspace navigation">
         <button onClick={() => setOpen(false)}>← Flow State</button>
-        <span>Cloud workspace · English / 繁體中文</span>
+        <span>Cloud workspace</span>
       </nav>
       {!client || !key ? (
         <Workspace configured={false} />

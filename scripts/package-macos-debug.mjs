@@ -5,6 +5,7 @@ import {
   mkdir,
   readFile,
   readdir,
+  rm,
   writeFile,
 } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
@@ -16,10 +17,15 @@ await mkdir(`${bundle}/Contents/MacOS`, { recursive: true });
 await mkdir(`${bundle}/Contents/Resources`, { recursive: true });
 await cp(`${directory}/FlowStateApp`, `${bundle}/Contents/MacOS/FlowStateApp`);
 for (const name of await readdir(directory)) {
-  if (name.endsWith(".bundle"))
+  if (name.endsWith(".bundle")) {
+    await rm(`${bundle}/Contents/Resources/${name}`, {
+      recursive: true,
+      force: true,
+    });
     await cp(`${directory}/${name}`, `${bundle}/Contents/Resources/${name}`, {
       recursive: true,
     });
+  }
 }
 const info = JSON.parse(
   execFileSync(

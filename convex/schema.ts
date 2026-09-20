@@ -178,6 +178,27 @@ export default defineSchema({
     .index("by_owner", ["ownerKey", "updatedAt"])
     .index("by_owner_device", ["ownerKey", "deviceId", "updatedAt"]),
 
+  intentRequests: defineTable({
+    ownerKey: v.string(),
+    deviceId: v.string(),
+    sessionId: v.string(),
+    utteranceId: v.string(),
+    contextRevision: v.number(),
+    fingerprint: v.optional(v.string()),
+    status: v.union(
+      v.literal("processing"),
+      v.literal("requires_observation"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
+    decision: v.optional(v.string()),
+    reason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner_session_utterance", ["ownerKey", "deviceId", "sessionId", "utteranceId"])
+    .index("by_owner_device", ["ownerKey", "deviceId", "updatedAt"]),
+
   usageCounters: defineTable({
     ownerKey: v.string(),
     period: v.string(),

@@ -95,11 +95,7 @@ function Permissions() {
       <div className="settings-heading">
         <div>
           <h1>Permissions</h1>
-          <p>
-            Your devices. Your boundaries.
-            <br />
-            你的裝置、你的控制範圍。
-          </p>
+          <p>Your devices. Your boundaries.</p>
         </div>
       </div>
       <p className="notice">
@@ -107,7 +103,7 @@ function Permissions() {
         and input permissions are managed separately in the Mac app and System
         Settings.
       </p>
-      <h2>Connected devices / 已連結裝置</h2>
+      <h2>Connected devices</h2>
       {!devices && <p role="status">Loading devices…</p>}
       {devices?.length === 0 && <p>No registered devices yet.</p>}
       {devices?.map((device) => (
@@ -115,19 +111,19 @@ function Permissions() {
           <div>
             <strong>{device.name ?? "Unnamed device"}</strong>
             <p className="small-muted">
-              {device.active ? "Active / 使用中" : "Revoked / 已撤銷"}
+              {device.active ? "Active" : "Revoked"}
             </p>
           </div>
           <div className="row-actions">
             <button onClick={() => setSelected(device.deviceId)}>
-              View grants / 查看授權
+              View grants
             </button>
             <button
               disabled={!device.active || busy}
               aria-label={"Revoke " + (device.name ?? "Unnamed device")}
               onClick={() => setPending(device)}
             >
-              Revoke / 撤銷
+              Revoke
             </button>
           </div>
         </div>
@@ -144,16 +140,16 @@ function Permissions() {
               void perform(() => revoke({ deviceId: pending.deviceId }))
             }
           >
-            Confirm revoke / 確認撤銷
+            Confirm revoke
           </button>
           <button disabled={busy} onClick={() => setPending(undefined)}>
-            Cancel / 取消
+            Cancel
           </button>
         </div>
       )}
       {selected && (
         <section aria-label="Device grants">
-          <h2>Grants / 授權</h2>
+          <h2>Grants</h2>
           {!grants && <p role="status">Loading grants…</p>}
           {grants?.length === 0 && <p>No cloud grants for this device.</p>}
           {grants?.map((grant) => (
@@ -171,7 +167,7 @@ function Permissions() {
                   void perform(() => revokePermission({ grantId: grant.id }))
                 }
               >
-                Revoke grant / 撤銷授權
+                Revoke grant
               </button>
             </div>
           ))}
@@ -192,25 +188,25 @@ export function AccountWorkspace() {
           aria-current={page === "research" ? "page" : undefined}
           onClick={() => setPage("research")}
         >
-          Tasks & history / 工作紀錄
+          Tasks & history
         </button>
         <button
           aria-current={page === "memory" ? "page" : undefined}
           onClick={() => setPage("memory")}
         >
-          Memory / 記憶
+          Memory
         </button>
         <button
           aria-current={page === "permissions" ? "page" : undefined}
           onClick={() => setPage("permissions")}
         >
-          Permissions / 權限
+          Permissions
         </button>
         <button
           aria-current={page === "privacy" ? "page" : undefined}
           onClick={() => setPage("privacy")}
         >
-          Privacy & usage / 隱私與用量
+          Privacy & usage
         </button>
       </nav>
       <div>

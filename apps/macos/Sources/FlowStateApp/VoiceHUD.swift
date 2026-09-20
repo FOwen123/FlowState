@@ -11,16 +11,25 @@ final class VoiceHUDController {
         transcript: String,
         isListening: Bool,
         onFinish: @escaping () -> Void,
-        onStop: @escaping () -> Void
+        onStop: @escaping () -> Void,
+        onConfirm: (() -> Void)? = nil,
+        onSettings: @escaping () -> Void = {}
     ) {
         model.status = status
         model.transcript = transcript
         model.isListening = isListening
         model.onFinish = onFinish
         model.onStop = onStop
+        model.onSettings = onSettings
+        model.onConfirm = onConfirm
+        model.canConfirm = onConfirm != nil
 
         let panel = makePanelIfNeeded()
-        if !panel.isVisible { position(panel) }
+        if let host = panel.contentView as? NSHostingView<VoiceHUDView> {
+            host.rootView = VoiceHUDView(model: model)
+            panel.setContentSize(host.fittingSize)
+        }
+        position(panel)
         panel.orderFrontRegardless()
     }
 
@@ -70,12 +79,15 @@ final class VoiceHUDController {
 }
 
 @MainActor
-private final class VoiceHUDModel: ObservableObject {
+final class VoiceHUDModel: ObservableObject {
     @Published var status = "Ready"
     @Published var transcript = ""
     @Published var isListening = false
     var onFinish: () -> Void = {}
     var onStop: () -> Void = {}
+    var onSettings: () -> Void = {}
+    var onConfirm: (() -> Void)?
+    @Published var canConfirm = false
 }
 
 private final class VoiceHUDPanel: NSPanel {
@@ -83,7 +95,8 @@ private final class VoiceHUDPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-private struct VoiceHUDView: View {
+struct VoiceHUDView: View {
+    @Environment(\.openSettings) private var openSettings
     @ObservedObject private var localization = UILocalization.shared
     @ObservedObject var model: VoiceHUDModel
 
@@ -98,25 +111,40 @@ private struct VoiceHUDView: View {
                     Text(L10n.text("Flow State"))
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(VoiceHUDPalette.text)
-                    Text(L10n.text(model.status))
-                        .font(.system(size: 12))
-                        .foregroundStyle(VoiceHUDPalette.muted)
-                        .lineLimit(2)
                 }
 
                 Spacer(minLength: 12)
 
                 HStack(spacing: 8) {
-                    Button(L10n.text("Finish"), action: model.onFinish)
+                    Button {
+                        model.onSettings()
+                        NSApplication.shared.activate()
+                        openSettings()
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityLabel("Open control settings")
+                    .buttonStyle(VoiceHUDButtonStyle(tint: VoiceHUDPalette.divider))
+                    Button(model.canConfirm ? "Confirm" : L10n.text("Finish")) {
+                        if model.canConfirm { model.onConfirm?() } else { model.onFinish() }
+                    }
                         .buttonStyle(VoiceHUDButtonStyle(tint: VoiceHUDPalette.accent))
-                        .accessibilityLabel(L10n.text("Finish voice session"))
-                        .disabled(!model.isListening)
-                        .opacity(model.isListening ? 1 : 0.45)
+                        .accessibilityLabel(model.canConfirm ? "Confirm proposed action" : L10n.text("Finish voice session"))
+                        .disabled(!model.isListening && !model.canConfirm)
+                        .opacity(model.isListening || model.canConfirm ? 1 : 0.45)
                     Button(L10n.text("Stop"), action: model.onStop)
                         .buttonStyle(VoiceHUDButtonStyle(tint: VoiceHUDPalette.stop))
                         .accessibilityLabel(L10n.text("Stop voice session"))
                 }
             }
+
+            Text(L10n.text(model.status))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(VoiceHUDPalette.text)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 12)
+                .accessibilityLabel("Voice status")
 
             Divider()
                 .overlay(VoiceHUDPalette.divider)
@@ -130,7 +158,7 @@ private struct VoiceHUDView: View {
                 .accessibilityLabel(L10n.text("Latest transcript"))
         }
         .padding(16)
-        .frame(width: 460, height: 156)
+        .frame(width: 520)
         .background {
             RoundedRectangle(cornerRadius: 16)
                 .fill(VoiceHUDPalette.panel)

@@ -4,7 +4,7 @@ Flow State is a Mac voice controller that reduces sustained typing, clicking, an
 
 ## Status and document authority
 
-Updated September 20, 2026 after the product interview. Flow State is the display name; `FlowState` is the code identifier. Implementation has started; [verification results](docs/testing/results.md) distinguish tested behavior from pending integrations and release requirements.
+Updated September 20, 2026 for English-only automatic intent recognition. Flow State is the display name; `FlowState` is the code identifier. Implementation has started; [verification results](docs/testing/results.md) distinguish tested behavior from pending integrations and release requirements.
 
 This document is the current product source of truth. [PLAN.md](PLAN.md) translates this direction into a file-level implementation checklist and verified test-machine baseline. [ENVIRONMENT.md](ENVIRONMENT.md) lists account, credential and configuration inputs. [HACKATHON_REQUIREMENTS.md](HACKATHON_REQUIREMENTS.md) records event requirements; [hackathon.md](hackathon.md) records completed work and evidence, never planned work as completed. [AGENTS.md](AGENTS.md) defines implementation rules.
 
@@ -15,7 +15,7 @@ Ship the product and a truthful hackathon submission first. The hackathon is a d
 The founder experiences discomfort from mouse scrolling and typing. FlowState serves people who want to reduce those interactions across everyday Mac applications.
 
 1. Hands-free navigation: open and switch apps, scroll, switch tabs or conversations, select controls, attach files, and stop or correct actions.
-2. English and Traditional Chinese from the first release: dictation, commands, corrections, and confirmations, including mixed-language speech and English app names. Indonesian is a later language target.
+2. English only for the current release: interface, dictation, commands, corrections and confirmations. Remove Traditional Chinese support from the active product; additional languages are deferred. Preserve Unicode user content and existing data.
 3. Longer workflows across applications: creative work, public-web research, file organization, and email.
 
 Examples include Brave and Substack reading, Spotify, messaging, and creative AI applications. Codex, Cursor, and Ghostty are useful personal workflows, but developer tooling does not define the product or showcase.
@@ -25,8 +25,8 @@ Examples include Brave and Substack reading, Spotify, messaging, and creative AI
 Use a native menu-bar app with a compact, transient heads-up display (HUD) and a separate settings window. Show what was heard, interpreted intent, current step, local/cloud processing, and accessible controls to stop, confirm, retry, or undo.
 
 - Offer configurable push-to-talk and a locally detected wake phrase. A hands-free session must not require holding a key. Validate microphone, battery, false activation, and interruption behavior before shipping wake activation.
-- Make dictation and command modes explicit. Dictating a sentence containing “delete” must not execute a delete command.
-- Support voice correction and clarification in both launch languages. Preserve meaning during dictation cleanup; do not invent or silently remove substantive content.
+- Default to Auto intent recognition, with optional Dictation only and Commands only overrides. Finalize complete utterances automatically within an active session; Finish remains an override. Dictating a sentence containing “delete” must not execute a delete command.
+- Support voice correction and clarification in English. Preserve meaning during dictation cleanup; do not invent or silently remove substantive content.
 - States: idle, listening, resolving, acting, awaiting confirmation, paused, completed, failed, cancelled. Screen capture is off while idle.
 - A local stop path remains available while cloud calls or actions are running. Cancellation invalidates queued actions and late replies. Report already completed external effects accurately.
 - Physical mouse or keyboard input pauses desktop execution immediately at the next safe interruption point. Distinguish real user input from injected events. Independent cloud work may continue under its existing grants.
@@ -49,7 +49,7 @@ Long workflows run step by step with visible progress. A result from one app is 
 | Layer | Direction | Responsibility |
 |---|---|---|
 | Mac application | Swift, SwiftUI, Swift Package Manager | Menu bar, HUD, onboarding, settings, local execution |
-| Speech | Evaluate Apple Speech and a local multilingual speech runtime; use managed speech if required with explicit disclosure | English/Traditional Chinese quality, mixed-language transcription, local activation and stop |
+| Speech | Current local Apple speech path; evaluate alternatives only where measured English failures justify them | English transcription, utterance completion, local activation and stop |
 | Mac context | NSWorkspace, macOS Accessibility, ScreenCaptureKit, Vision OCR where useful | Relevant app state, permitted screenshots, text and control candidates |
 | Semantic decisions | Jev through TypeSafe's documented API/SDK | Bounded intent and candidate selection using textual state and explicit preferences |
 | Vision and planning | Managed OpenAI models initially, invoked server-side | Interpret screenshots, generate language, construct typed multi-step plans |
@@ -67,9 +67,9 @@ Authentication provider, exact speech/vision models, minimum macOS version, and 
 ### Decision and action pipeline
 
 ```text
-Local activation → transcription → explicit command/dictation routing
+Local activation → transcription → utterance completion → Auto intent routing
                                     ↓
-Permitted app context + relevant screenshot + explicit preferences
+Minimal permitted text context + explicit preferences; screenshot only when needed
                                     ↓
 Exact local match / Jev bounded choice / vision + language-model plan
                                     ↓
@@ -86,9 +86,11 @@ Screenshots are central visual context, not a requirement to click coordinates f
 
 ### Jev has a concrete role
 
+Implement the evaluation-first sequence in [English-only intent recognition](docs/intent-recognition-plan.md). The current code still needs migration; this direction is not a completion claim.
+
 Use Jev to choose between known intents, resolve references such as “that file,” and rank a bounded set of app/control/file candidates. Exact local commands and saved aliases can bypass it. Jev does not transcribe speech, interpret screenshots, generate rewritten sentences, or grant permission.
 
-The documented models accept text. Convert visual context into bounded textual candidates using vision/OCR before calling Jev. Customize requests with explicit preferences and rules rather than assuming per-user training. Use documented response shapes, pin evaluated model versions, and calibrate decisions on FlowState's own examples. English and Traditional Chinese must be evaluated separately; weaker Chinese performance must lead to clarification or a validated multilingual fallback, not silently reduced language support. See the [TypeSafe model documentation](https://docs.typesafe.ai/models.md).
+The documented models accept text. Convert visual context into bounded textual candidates using vision/OCR before calling Jev. Customize requests with explicit preferences and rules rather than assuming per-user training. Use documented response shapes, pin evaluated model versions, and calibrate decisions on FlowState's own examples. Evaluate English utterances, including ambiguity, quoted commands, corrections and speech-recognition errors. Choose intent/action/target thresholds from calibration data and verify on untouched holdout data. Escalate to a text or vision-capable LLM when the missing context can resolve uncertainty; otherwise clarify. Never treat confidence as a permission grant. See the [TypeSafe model documentation](https://docs.typesafe.ai/models.md).
 
 ### Convex and external services
 
@@ -122,7 +124,7 @@ Raw audio and screenshots are not retained by default. Generated screen descript
 
 Remember explicit preferences by default: vocabulary, app aliases, writing style, approved folders, and reusable workflows. Automatically learned preferences are opt-in and cannot override explicit choices silently. Provide a Memory page to inspect, edit, delete, and control synchronization. Offer voice equivalents for these controls where practical.
 
-Traditional Chinese output is an explicit setting. Character conversion alone does not establish accurate recognition or regional phrasing. Evaluate names, punctuation, app names, and code-switching with realistic user utterances. Indonesian remains a later addition.
+English is the only offered interface, recognition and assistant-output language. Migrate previous language settings to English without deleting drafts, history or preferences. Preserve literal user text, Unicode names and filenames; out-of-scope language requests should clarify rather than execute an uncertain action.
 
 ## Recovery and undo
 
@@ -138,28 +140,28 @@ Every registered action declares parameter validation, preconditions, required g
 
 ## Delivery and acceptance
 
-Implement coherent end-to-end slices without treating the deadline as permission to remove launch languages or permission controls. The complete product roadmap remains broader than what can be demonstrated at submission.
+Implement coherent end-to-end slices under the English-only scope while preserving permission controls. The complete product roadmap remains broader than what can be demonstrated at submission.
 
-1. **Bilingual control foundation:** validate English/Traditional Chinese speech and local stop; deliver navigation, dictation, corrections, onboarding, and HUD in representative native and browser apps.
+1. **English automatic control foundation:** evaluate Jev routing and fallback thresholds, validate English speech, automatic utterance completion and local stop; deliver navigation, dictation, corrections, onboarding, and HUD in representative native and browser apps.
 2. **Context and personalization:** add approved screenshots, verified visual targets, explicit memory, Jev routing, per-action grants, and takeover/resume.
 3. **Durable workflows:** add managed planning, Convex progress, file attachment, bounded recovery and undo, public research, and both email paths.
 4. **Release readiness:** exercise clean installation, authentication, revoked permissions, provider failures, deletion, signed distribution, and reproducible setup.
 
-For each slice, record task completion, required physical interventions, corrections, unintended actions, end-to-end latency, and stop latency. Test both languages and mixed speech separately. Measure recognition-to-stop independently from spoken-word-to-stop; never claim instant acoustic recognition. Establish performance targets from measured baselines rather than undocumented model guarantees.
+For each slice, record task completion, required physical interventions, corrections, unintended actions, end-to-end latency, and stop latency. Test English intent categories, speech errors, literal dictation and ambiguity separately. Measure recognition-to-stop independently from spoken-word-to-stop; never claim instant acoustic recognition. Establish performance targets from measured baselines rather than undocumented model guarantees.
 
 Release acceptance includes:
 
-- A non-developer can install, understand permissions, and perform the core navigation/dictation flow in both launch languages.
+- A non-developer can install, understand permissions, and perform the core navigation/dictation flow in English.
 - Voice stop and physical takeover prevent further desktop steps; stale cloud responses and reconnects cannot restart them.
 - A creative file-attachment workflow and a research/email workflow complete with visible verification and recovery.
 - Undo works for supported actions and accurately explains unsupported reversal.
 - Account/device isolation, expired approvals, focus changes, duplicate requests, untrusted page instructions, and permission revocation are tested.
-- Offline and provider-outage behavior is explicit. Aim to preserve local stop and deterministic commands; do not claim offline transcription until the chosen runtime is tested offline in both languages.
+- Offline and provider-outage behavior is explicit. Aim to preserve local stop and deterministic commands; do not claim offline transcription until the chosen runtime is tested offline in English.
 - Diagnostic and evaluation fixtures contain synthetic or consented data, never private screenshots or credentials.
 
 ## Hackathon milestone
 
-Show an everyday productivity workflow that reduces physical interaction, with English and Traditional Chinese evidence. The creative workflow demonstrates the broader Mac controller; public research and reviewed email demonstrate useful Firecrawl, OpenAI, AgentMail, and Convex integration. A constrained usable web experience lets judges try cloud functionality without access to the developer's Mac.
+Show an everyday productivity workflow that reduces physical interaction, with English acceptance evidence. The creative workflow demonstrates the broader Mac controller; public research and reviewed email demonstrate useful Firecrawl, OpenAI, AgentMail, and Convex integration. A constrained usable web experience lets judges try cloud functionality without access to the developer's Mac.
 
 Keep guest data isolated, sending restricted, provider usage bounded, and real execution distinguishable from previews. Recheck event rules and submission gates in HACKATHON_REQUIREMENTS.md. Record only working capabilities and actual deployment evidence in hackathon.md. An incomplete submission must be described as a prototype, not as a production-ready product.
 

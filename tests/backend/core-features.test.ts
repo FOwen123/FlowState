@@ -21,6 +21,7 @@ afterEach(() => {
   delete process.env.OPENAI_API_KEY;
   delete process.env.FLOWSTATE_PLANNER_MODEL;
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe("preferences, devices, and grants", () => {
@@ -401,6 +402,8 @@ describe("quota and retention safeguards", () => {
 
 describe("typed action-plan contracts", () => {
   it("resolves a bounded plan through OpenAI and leaves execution behind approval", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", "test-key");
+    vi.stubEnv("FLOWSTATE_JEV_MODEL", "jev-1.13.0");
     process.env.OPENAI_API_KEY = "sk-test";
     process.env.FLOWSTATE_PLANNER_MODEL = "gpt-5-mini";
     const fetch = vi.fn(async () =>
@@ -488,4 +491,11 @@ describe("typed action-plan contracts", () => {
     });
     expect(plan.actions[0]).toMatchObject({ executor: "service", requiresApproval: true, capability: "mail.send" });
   });
+});
+
+it("legacy planning cannot bypass the authorized screenshot intent path", async () => {
+  const t = convexTest(schema, modules); const user = t.withIdentity(ownerA);
+  await user.mutation(api.workflows.registerDevice, { deviceId: "legacy-screen" });
+  const { planId } = await user.mutation(api.plans.createActionPlan, { deviceId: "legacy-screen", command: "scroll down", locale: "en" });
+  await expect(user.action(api.plans.resolveActionPlan, { planId, screenshot: "data:image/png;base64,AAAA" })).rejects.toThrow("authorized intent");
 });

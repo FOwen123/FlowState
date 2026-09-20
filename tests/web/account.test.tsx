@@ -59,14 +59,12 @@ afterEach(() => {
 it("wires explicit memory editing to the authenticated account", async () => {
   mocks.save.mockResolvedValue({});
   render(<AccountWorkspace />);
-  fireEvent.click(screen.getByRole("button", { name: "Memory / 記憶" }));
+  fireEvent.click(screen.getByRole("button", { name: "Memory" }));
   fireEvent.click(screen.getByRole("button", { name: "Edit My music" }));
-  fireEvent.change(screen.getByLabelText("Use / 使用"), {
+  fireEvent.change(screen.getByLabelText("Use"), {
     target: { value: "Apple Music" },
   });
-  fireEvent.click(
-    screen.getByRole("button", { name: "Save to my account / 儲存至帳戶" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Save to my account" }));
   await waitFor(() =>
     expect(mocks.save).toHaveBeenCalledWith({
       key: "memory:a",
@@ -82,12 +80,10 @@ it("wires explicit memory editing to the authenticated account", async () => {
 it("requires confirmation before revoking a device", async () => {
   mocks.revoke.mockResolvedValue({});
   render(<AccountWorkspace />);
-  fireEvent.click(screen.getByRole("button", { name: "Permissions / 權限" }));
+  fireEvent.click(screen.getByRole("button", { name: "Permissions" }));
   fireEvent.click(screen.getByRole("button", { name: "Revoke My Mac" }));
   expect(mocks.revoke).not.toHaveBeenCalled();
-  fireEvent.click(
-    screen.getByRole("button", { name: "Confirm revoke / 確認撤銷" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Confirm revoke" }));
   await waitFor(() =>
     expect(mocks.revoke).toHaveBeenCalledWith({ deviceId: "device123" }),
   );

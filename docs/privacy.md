@@ -1,6 +1,6 @@
 # Development privacy boundaries
 
-The Mac captures audio only after activation and uses Apple's on-device SpeechAnalyzer models. English and Traditional Chinese model assets must be installed. Raw microphone audio has no managed upload path. The wake-phrase option keeps local recognition active while enabled; microphone and real wake behavior still require manual acceptance.
+The Mac captures audio only after activation and uses Apple's on-device SpeechAnalyzer models. The English model asset must be installed. Raw microphone audio has no managed upload path. In Auto mode, completed utterances and minimal permitted app metadata are sent to managed inference when cloud interpretation is enabled. Window images require a separate task-level cloud-context opt-in as well as screen observation permission. The wake-phrase option keeps local recognition active while enabled; microphone and real wake behavior still require manual acceptance.
 
 ScreenCaptureKit captures an explicitly approved window into memory. Capture grants expire and can be revoked. Frames currently are not transmitted by the Mac UI. Whole-window capture is not field-level redaction: do not approve private windows for capture. A conservative password-manager/system-app exclusion list does not establish complete sensitive-content detection.
 

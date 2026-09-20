@@ -27,7 +27,6 @@
 "account.plan.action" = "Plan action %d: %@";
 "account.language.label" = "Answer language";
 "account.language.english" = "English";
-"account.language.traditional_chinese" = "Traditional Chinese";
 "account.research.title" = "Public research";
 "account.research.placeholder" = "Research a public topic";
 "account.research.action" = "Research";

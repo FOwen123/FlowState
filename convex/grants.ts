@@ -4,9 +4,11 @@ import { mutationGeneric, queryGeneric } from "convex/server";
 import { requireIdentity } from "./lib/identity";
 
 const capabilities = new Set([
+  "app.open",
   "app.observe",
   "app.control",
   "app.input",
+  "app.upload",
   "file.read",
   "file.upload",
   "mail.read",

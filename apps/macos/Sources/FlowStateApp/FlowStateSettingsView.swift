@@ -48,7 +48,6 @@ enum PaperStyle {
 struct FlowStateSettingsView: View {
     @ObservedObject var model: FlowStateAppModel
     @ObservedObject private var localization = UILocalization.shared
-    @State private var section: FlowStateSettingsSection = .voice
 
     var body: some View {
         HStack(spacing: 0) {
@@ -77,7 +76,7 @@ struct FlowStateSettingsView: View {
 
             ForEach(FlowStateSettingsSection.allCases) { item in
                 Button {
-                    section = item
+                    model.settingsSection = item
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: item.icon)
@@ -89,26 +88,17 @@ struct FlowStateSettingsView: View {
                     }
                     .padding(.horizontal, 12)
                     .frame(height: 44)
-                    .background(section == item ? PaperStyle.raised : .clear)
+                    .background(model.settingsSection == item ? PaperStyle.raised : .clear)
                     .clipShape(RoundedRectangle(cornerRadius: 9))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(L10n.text(item.title))
-                .accessibilityAddTraits(section == item ? .isSelected : [])
+                .accessibilityAddTraits(model.settingsSection == item ? .isSelected : [])
             }
 
             Spacer()
             VStack(alignment: .leading, spacing: 8) {
-                Text(L10n.text("App language"))
-                Picker(L10n.text("App language"), selection: $localization.language) {
-                    ForEach(InterfaceLanguage.allCases, id: \.self) { language in
-                        Text(language.displayName).tag(language)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(maxWidth: .infinity)
                 Text("Flow State 0.1")
             }
             .font(.system(size: 13))
@@ -124,7 +114,7 @@ struct FlowStateSettingsView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch section {
+        switch model.settingsSection {
         case .personalMail:
             PersonalMailView()
         case .cloud:
@@ -170,15 +160,6 @@ private struct VoiceSettingsView: View {
                         set: { updateMode($0) }
                     ),
                     options: VoiceMode.allCases
-                )
-                PickerRow(
-                    title: "Language",
-                    subtitle: "Choose the language you speak.",
-                    selection: Binding(
-                        get: { model.speechSettings.language },
-                        set: { updateLanguage($0) }
-                    ),
-                    options: SpeechLanguage.allCases
                 )
                 if model.speechSettings.activation == .wakePhrase {
                     TextFieldRow(
@@ -257,12 +238,6 @@ private struct VoiceSettingsView: View {
         model.updateSpeechSettings(settings)
     }
 
-    private func updateLanguage(_ value: SpeechLanguage) {
-        var settings = model.speechSettings
-        settings.language = value
-        model.updateSpeechSettings(settings)
-    }
-
     private func updateWakePhrase(_ value: String) {
         var settings = model.speechSettings
         settings.wakePhrase = value
@@ -297,11 +272,12 @@ private struct TasksSettingsView: View {
                     )
                 }
                 HStack(spacing: 12) {
-                    Button(L10n.text("Grant desktop control")) { model.beginInputTask() }
+                    Button(model.desktopState == .reconciliationRequired ? "I've checked the result" : L10n.text("Grant desktop control")) { model.beginInputTask() }
                         .buttonStyle(PaperBorderButtonStyle())
                     Button(L10n.text("Cancel")) { model.cancelInputTask() }
                         .buttonStyle(PaperBorderButtonStyle())
                     Button(L10n.text("Resume")) { model.resumeInputTask() }
+                        .disabled(model.desktopState != .pausedForUser)
                         .buttonStyle(PaperBorderButtonStyle())
                     Button(L10n.text("Undo last edit")) { model.undoLastDesktopAction() }
                         .buttonStyle(PaperBorderButtonStyle())
@@ -616,14 +592,14 @@ struct ApplicationTargetPicker: View {
     let title: String
     @Binding var selection: String
     @ObservedObject private var localization = UILocalization.shared
-    @State private var applications: [NSRunningApplication] = []
+    @State private var applications: [InstalledApplication] = []
 
     var body: some View {
         HStack(spacing: 12) {
             Picker(L10n.text(title), selection: $selection) {
                 Text(L10n.text("Choose an app")).tag("")
-                ForEach(applications, id: \.processIdentifier) { app in
-                    Text(app.localizedName ?? L10n.text("Application")).tag(app.bundleIdentifier ?? "")
+                ForEach(applications) { app in
+                    Text(app.name).tag(app.bundleIdentifier)
                 }
                 if !selection.isEmpty && !applications.contains(where: { $0.bundleIdentifier == selection }) {
                     Text(L10n.text("Previously selected app")).tag(selection)
@@ -631,16 +607,11 @@ struct ApplicationTargetPicker: View {
             }
             Button { refresh() } label: { Image(systemName: "arrow.clockwise") }
                 .accessibilityLabel(L10n.text("Refresh app list"))
-                .help(L10n.text("Open an app, then refresh this list."))
+                .help("Refresh installed applications")
         }
         .onAppear { refresh() }
     }
     private func refresh() {
-        var seen = Set<String>()
-        applications = NSWorkspace.shared.runningApplications.filter {
-            guard $0.activationPolicy == .regular, let identifier = $0.bundleIdentifier,
-                  identifier != Bundle.main.bundleIdentifier else { return false }
-            return seen.insert(identifier).inserted
-        }.sorted { ($0.localizedName ?? "").localizedCaseInsensitiveCompare($1.localizedName ?? "") == .orderedAscending }
+        applications = ApplicationCatalog.installed()
     }
 }

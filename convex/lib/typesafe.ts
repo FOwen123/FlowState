@@ -5,6 +5,20 @@ import {
   requestJson,
   requireApiKey,
 } from "./http";
+import { parseStrictTypeSafeResponse } from "./strict_typesafe";
+import type {
+  StrictTypeSafeQuestion,
+  StrictTypeSafeResponse,
+} from "./strict_typesafe";
+
+export {
+  parseStrictTypeSafeResponse,
+} from "./strict_typesafe";
+export type {
+  StrictTypeSafeAnswer,
+  StrictTypeSafeQuestion,
+  StrictTypeSafeResponse,
+} from "./strict_typesafe";
 
 export type TypeSafeQuestion =
   | {
@@ -115,6 +129,14 @@ export function createTypeSafeClient(options: TypeSafeClientOptions) {
         },
       );
       return parseResponse(response);
+    },
+
+    async systemOneStrict(
+      request: TypeSafeSystemOneRequest,
+      questions: Record<string, StrictTypeSafeQuestion>,
+    ): Promise<StrictTypeSafeResponse> {
+      const response = await this.systemOne(request);
+      return parseStrictTypeSafeResponse(response, questions);
     },
 
     async chooseCandidate(input: {

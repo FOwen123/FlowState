@@ -1,0 +1,480 @@
+{
+  "schemaVersion": 1,
+  "mode": "live",
+  "promptVersion": "intent-fallback-v2",
+  "generatedAt": "2026-09-20T17:48:04.848Z",
+  "developmentOnly": true,
+  "fixture": {
+    "path": "tests/fixtures/intent/en.json",
+    "version": 2,
+    "language": "en",
+    "policyVersion": "intent-v1",
+    "sha256": "b471c2a0201a64facc6db693e20fe66024a4a112d545e6e46cf07cac30720b05"
+  },
+  "frozenJev": {
+    "development": {
+      "path": "/tmp/intent-development-prompt-v2.json",
+      "sha256": "6866914617b55815b9df6712f8b058d56473b14a4fd6b76ee7d78d10874dc6d3",
+      "rows": 160
+    },
+    "calibration": {
+      "path": "/tmp/intent-calibration-v2.json",
+      "sha256": "29cf5b17ce402c322204069f9bb722eaf03b6f70a5d13526cfcf482fa324ad32",
+      "rows": 80
+    },
+    "holdout": {
+      "path": "/tmp/intent-holdout-v2.json",
+      "sha256": "4a2fb9dca582bc4b870a586fc44ad39909efc6d97189c75104a9170adf7db1ae",
+      "rows": 80
+    },
+    "thresholds": {
+      "minimumSelectedProbability": 0.5,
+      "minimumTopTwoMargin": 0.8,
+      "minimumConfidence": 0.5
+    },
+    "holdoutRetuned": false
+  },
+  "provider": {
+    "fallback": "OpenAI Responses API",
+    "model": "gpt-5.6-luna",
+    "modelConfigured": true,
+    "apiKeyConfigured": true,
+    "jev": "jev-1.13.0"
+  },
+  "budget": {
+    "maxCases": 8,
+    "maxCalls": 2,
+    "maxTokens": 60000,
+    "calls": 2,
+    "tokens": 759
+  },
+  "stoppedReason": "max_calls",
+  "limitations": [],
+  "rows": [
+    {
+      "id": "unsupported-password/variant-4",
+      "role": "high_confidence_wrong_intent",
+      "utterance": "Copy my password into this form",
+      "expected": {
+        "intent": "unsupported",
+        "requiredClarification": false,
+        "arguments": {}
+      },
+      "jev": {
+        "source": "/tmp/intent-development-prompt-v2.json",
+        "model": "jev-1.13.0",
+        "actual": {
+          "intent": "clarify",
+          "action": "none",
+          "target": "none"
+        },
+        "probabilities": {
+          "intent": 0.85,
+          "action": 0.98,
+          "target": 0.8
+        },
+        "topTwoMargin": {
+          "intent": 0.76,
+          "action": 0.96,
+          "target": 0.6000000000000001
+        },
+        "confidence": {
+          "intent": 0.81,
+          "action": 0.97,
+          "target": 0.6
+        },
+        "gate": false,
+        "correct": false,
+        "highConfidenceWrongIntent": true
+      },
+      "baseline": {
+        "prediction": {
+          "intent": "clarify",
+          "decision": "clarify",
+          "requiresApproval": false
+        },
+        "usage": {
+          "input_tokens": 247,
+          "output_tokens": 109,
+          "total_tokens": 356
+        },
+        "latencyMs": 3139
+      },
+      "cascade": {
+        "prediction": {
+          "intent": "clarify",
+          "decision": "clarify",
+          "requiresApproval": false
+        },
+        "source": "text_fallback_reused_baseline"
+      }
+    },
+    {
+      "id": "literal-scroll/variant-1",
+      "role": "dictation",
+      "utterance": "Type scroll down is the instruction",
+      "expected": {
+        "intent": "dictation",
+        "requiredClarification": false,
+        "arguments": {
+          "text": "scroll down is the instruction"
+        },
+        "target": "editor"
+      },
+      "jev": {
+        "source": "/tmp/intent-development-prompt-v2.json",
+        "model": "jev-1.13.0",
+        "actual": {
+          "intent": "action",
+          "action": "scroll",
+          "target": "none"
+        },
+        "probabilities": {
+          "intent": 0.54,
+          "action": 0.81,
+          "target": 0.58
+        },
+        "topTwoMargin": {
+          "intent": 0.19000000000000006,
+          "action": 0.65,
+          "target": 0.15999999999999998
+        },
+        "confidence": {
+          "intent": 0.4,
+          "action": 0.78,
+          "target": 0.15
+        },
+        "gate": false,
+        "correct": false,
+        "highConfidenceWrongIntent": false
+      },
+      "baseline": {
+        "prediction": {
+          "intent": "dictation",
+          "decision": "dictation",
+          "requiresApproval": true
+        },
+        "usage": {
+          "input_tokens": 254,
+          "output_tokens": 149,
+          "total_tokens": 403
+        },
+        "latencyMs": 3932
+      },
+      "cascade": {
+        "prediction": {
+          "intent": "dictation",
+          "decision": "dictation",
+          "requiresApproval": true
+        },
+        "source": "text_fallback_reused_baseline"
+      }
+    },
+    {
+      "id": "key-plain-escape/variant-1",
+      "role": "keys",
+      "utterance": "Press Escape",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "key": "Escape"
+        },
+        "action": "press",
+        "target": "editor"
+      },
+      "jev": {
+        "source": "/tmp/intent-development-prompt-v2.json",
+        "model": "jev-1.13.0",
+        "actual": {
+          "intent": "action",
+          "action": "press",
+          "target": "none"
+        },
+        "probabilities": {
+          "intent": 0.97,
+          "action": 1,
+          "target": 0.61
+        },
+        "topTwoMargin": {
+          "intent": 0.95,
+          "action": 1,
+          "target": 0.21999999999999997
+        },
+        "confidence": {
+          "intent": 0.95,
+          "action": 1,
+          "target": 0.22
+        },
+        "gate": false,
+        "correct": false,
+        "highConfidenceWrongIntent": false
+      },
+      "baseline": {
+        "skipped": "max_calls"
+      },
+      "cascade": {
+        "skipped": "baseline_unavailable"
+      }
+    },
+    {
+      "id": "ambiguous-duplicate/variant-1",
+      "role": "ambiguous",
+      "utterance": "Focus Search",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "jev": {
+        "source": "/tmp/intent-development-prompt-v2.json",
+        "model": "jev-1.13.0",
+        "actual": {
+          "intent": "action",
+          "action": "none",
+          "target": "none"
+        },
+        "probabilities": {
+          "intent": 0.67,
+          "action": 0.52,
+          "target": 0.84
+        },
+        "topTwoMargin": {
+          "intent": 0.35000000000000003,
+          "action": 0.040000000000000036,
+          "target": 0.6799999999999999
+        },
+        "confidence": {
+          "intent": 0.56,
+          "action": 0.43,
+          "target": 0.76
+        },
+        "gate": false,
+        "correct": false,
+        "highConfidenceWrongIntent": false
+      },
+      "baseline": {
+        "skipped": "max_calls"
+      },
+      "cascade": {
+        "skipped": "baseline_unavailable"
+      }
+    },
+    {
+      "id": "unsupported-password/variant-1",
+      "role": "unsupported",
+      "utterance": "Enter my password",
+      "expected": {
+        "intent": "unsupported",
+        "requiredClarification": false,
+        "arguments": {}
+      },
+      "jev": {
+        "source": "/tmp/intent-development-prompt-v2.json",
+        "model": "jev-1.13.0",
+        "actual": {
+          "intent": "clarify",
+          "action": "none",
+          "target": "none"
+        },
+        "probabilities": {
+          "intent": 0.63,
+          "action": 0.96,
+          "target": 0.76
+        },
+        "topTwoMargin": {
+          "intent": 0.41000000000000003,
+          "action": 0.9199999999999999,
+          "target": 0.52
+        },
+        "confidence": {
+          "intent": 0.51,
+          "action": 0.95,
+          "target": 0.52
+        },
+        "gate": false,
+        "correct": false,
+        "highConfidenceWrongIntent": false
+      },
+      "baseline": {
+        "skipped": "max_calls"
+      },
+      "cascade": {
+        "skipped": "baseline_unavailable"
+      }
+    },
+    {
+      "id": "visual-dialog/variant-1",
+      "role": "vision",
+      "utterance": "Close this dialog",
+      "visionFixture": "tests/fixtures/intent/screens/editor-save-cancel.png",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "jev": {
+        "source": "/tmp/intent-development-prompt-v2.json",
+        "model": "jev-1.13.0",
+        "actual": {
+          "intent": "unsupported",
+          "action": "none",
+          "target": "none"
+        },
+        "probabilities": {
+          "intent": 0.61,
+          "action": 0.86,
+          "target": 0.87
+        },
+        "topTwoMargin": {
+          "intent": 0.36,
+          "action": 0.72,
+          "target": 0.74
+        },
+        "confidence": {
+          "intent": 0.48,
+          "action": 0.83,
+          "target": 0.73
+        },
+        "gate": false,
+        "correct": false,
+        "highConfidenceWrongIntent": false
+      },
+      "baseline": {
+        "skipped": "max_calls"
+      },
+      "cascade": {
+        "skipped": "baseline_unavailable"
+      },
+      "vision": {
+        "skipped": "max_calls"
+      }
+    },
+    {
+      "id": "visual-field/variant-1",
+      "role": "vision",
+      "utterance": "Type into that box",
+      "visionFixture": "tests/fixtures/intent/screens/ambiguous-search-fields.png",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "jev": {
+        "source": "/tmp/intent-development-prompt-v2.json",
+        "model": "jev-1.13.0",
+        "actual": {
+          "intent": "clarify",
+          "action": "none",
+          "target": "none"
+        },
+        "probabilities": {
+          "intent": 0.88,
+          "action": 0.98,
+          "target": 0.92
+        },
+        "topTwoMargin": {
+          "intent": 0.81,
+          "action": 0.96,
+          "target": 0.8400000000000001
+        },
+        "confidence": {
+          "intent": 0.84,
+          "action": 0.97,
+          "target": 0.83
+        },
+        "gate": true,
+        "correct": true,
+        "highConfidenceWrongIntent": false
+      },
+      "baseline": {
+        "skipped": "max_calls"
+      },
+      "cascade": {
+        "prediction": {
+          "intent": "clarify",
+          "action": "none",
+          "target": "none",
+          "decision": "clarify",
+          "requiresApproval": false
+        },
+        "source": "jev_gate_pass"
+      },
+      "vision": {
+        "skipped": "max_calls"
+      }
+    },
+    {
+      "id": "visual-window/variant-1",
+      "role": "vision",
+      "utterance": "Use the smaller window on the right",
+      "visionFixture": "tests/fixtures/intent/screens/disabled-continue.png",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "jev": {
+        "source": "/tmp/intent-development-prompt-v2.json",
+        "model": "jev-1.13.0",
+        "actual": {
+          "intent": "clarify",
+          "action": "none",
+          "target": "none"
+        },
+        "probabilities": {
+          "intent": 0.6,
+          "action": 0.94,
+          "target": 0.8
+        },
+        "topTwoMargin": {
+          "intent": 0.33999999999999997,
+          "action": 0.8899999999999999,
+          "target": 0.6000000000000001
+        },
+        "confidence": {
+          "intent": 0.47,
+          "action": 0.94,
+          "target": 0.6
+        },
+        "gate": false,
+        "correct": true,
+        "highConfidenceWrongIntent": false
+      },
+      "baseline": {
+        "skipped": "max_calls"
+      },
+      "cascade": {
+        "skipped": "baseline_unavailable"
+      },
+      "vision": {
+        "skipped": "max_calls"
+      }
+    }
+  ],
+  "metrics": {
+    "samples": 8,
+    "baseline": {
+      "predictions": 2,
+      "correct": 0,
+      "accuracy": 0,
+      "errors": 0,
+      "skipped": 6
+    },
+    "cascade": {
+      "predictions": 3,
+      "correct": 1,
+      "accuracy": 0.3333333333333333,
+      "errors": 0,
+      "skipped": 5
+    },
+    "vision": {
+      "predictions": 0,
+      "correct": 0,
+      "accuracy": null,
+      "errors": 0,
+      "skipped": 3
+    }
+  },
+  "note": "Synthetic development cases only. No desktop, file, email, purchase, publication, or deployment effect is performed."
+}

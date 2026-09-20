@@ -22,7 +22,7 @@ func activationModesAreExplicit() async {
 func localStopAndDictationMode() async {
     let coordinator = SpeechSessionCoordinator(settings: SpeechSettings(mode: .command))
     await coordinator.pushToTalkDown()
-    let stop = await coordinator.consume(transcript: "停止", isFinal: true)
+    let stop = await coordinator.consume(transcript: "Stop", isFinal: true)
     #expect(stop == .stop)
     #expect(await coordinator.phase == .idle)
 
@@ -31,6 +31,39 @@ func localStopAndDictationMode() async {
     let result = await dictation.consume(transcript: "scroll down", isFinal: true)
     #expect(result == .dictate("scroll down"))
     #expect(await dictation.phase == .idle)
+}
+
+@Test("an empty terminal endpoint ends the session without dispatching a command")
+func emptyTerminalEndpointEndsSession() async {
+    let coordinator = SpeechSessionCoordinator(settings: SpeechSettings(mode: .command))
+    await coordinator.pushToTalkDown()
+    let result = await coordinator.consume(
+        transcript: "",
+        isFinal: true,
+        sessionEnded: true,
+        utteranceID: UUID()
+    )
+    #expect(result == nil)
+    #expect(await coordinator.phase == .idle)
+}
+
+@Test("partial utterance IDs do not consume the later final result")
+func partialUtteranceIDDoesNotDeduplicateFinal() async {
+    let coordinator = SpeechSessionCoordinator(settings: SpeechSettings(mode: .command))
+    await coordinator.pushToTalkDown()
+    let id = UUID()
+    #expect(await coordinator.consume(
+        transcript: "scroll down",
+        isFinal: false,
+        sessionEnded: false,
+        utteranceID: id
+    ) == nil)
+    #expect(await coordinator.consume(
+        transcript: "scroll down",
+        isFinal: true,
+        sessionEnded: true,
+        utteranceID: id
+    ) == .scroll(-3))
 }
 
 @Test("wake phrase opens a listening session without executing its text")
@@ -47,7 +80,7 @@ func wakePhraseActivation() async {
 func speechSettingsRoundTrip() {
     let defaults = UserDefaults(suiteName: "flowstate-speech-\(UUID().uuidString)")!
     let settings = SpeechSettings(
-        language: .traditionalChinese,
+        language: .english,
         mode: .dictation,
         activation: .wakePhrase,
         wakePhrase: "嘿 Flow State",
@@ -55,6 +88,26 @@ func speechSettingsRoundTrip() {
     )
     SpeechSettingsStore.save(settings, defaults: defaults)
     #expect(SpeechSettingsStore.load(defaults: defaults) == settings)
+}
+
+@Test("legacy Traditional Chinese speech settings migrate to English without changing Unicode data")
+func legacySpeechSettingsMigrateToEnglish() throws {
+    let data = Data("""
+    {
+      "language": "zh-TW",
+      "mode": "command",
+      "activation": "toggle",
+      "wakePhrase": "嘿 Flow State",
+      "pushToTalkKey": "⌥ Space",
+      "draft": "繁體中文內容 — keep unchanged"
+    }
+    """.utf8)
+    let settings = try JSONDecoder().decode(SpeechSettings.self, from: data)
+    #expect(settings.language == .english)
+    #expect(settings.mode == .command)
+    #expect(settings.activation == .toggle)
+    #expect(settings.wakePhrase == "嘿 Flow State")
+    #expect(settings.shortcut == .controlShiftSpace)
 }
 
 @Test("desktop execution rejects stale, expired, and unapproved actions")
@@ -97,10 +150,10 @@ func desktopExecutionGrantValidation() async throws {
     )
 }
 
-@Test("secure Accessibility boundaries require the real role and subrole pair")
+@Test("secure Accessibility boundaries reject both role and subrole representations")
 func secureAccessibilityBoundary() {
     #expect(AXDesktopDriver.isSecureTextField(role: "AXTextField", subrole: "AXSecureTextField"))
-    #expect(!AXDesktopDriver.isSecureTextField(role: "AXSecureTextField", subrole: nil))
+    #expect(AXDesktopDriver.isSecureTextField(role: "AXSecureTextField", subrole: nil))
     #expect(!AXDesktopDriver.isSecureTextField(role: "AXTextField", subrole: "AXTextField"))
     #expect(AXDesktopDriver.canReadValue(role: "AXTextField", subrole: nil))
     #expect(!AXDesktopDriver.canReadValue(role: nil, subrole: nil))

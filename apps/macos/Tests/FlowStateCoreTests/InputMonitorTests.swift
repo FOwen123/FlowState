@@ -83,6 +83,15 @@ func automationEventTagging() {
     #expect(InputTakeoverMonitor.isAutomationEvent(nsEvent))
 }
 
+@Test("native key events carry the automation tag")
+func nativeKeyEventsCarryAutomationTag() {
+    let source = CGEventSource(stateID: .combinedSessionState)!
+    let event = CGEvent(keyboardEventSource: source, virtualKey: 48, keyDown: true)!
+    AXDesktopDriver.tagAutomationEvent(event)
+    let nsEvent = NSEvent(cgEvent: event)!
+    #expect(InputTakeoverMonitor.isAutomationEvent(nsEvent))
+}
+
 @Test("Flow State local UI events cannot pause automation in another app")
 func flowStateLocalEventsAreIgnored() {
     let event = NSEvent.mouseEvent(

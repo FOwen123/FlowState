@@ -8,7 +8,7 @@ extension ExplicitMemoryStore {
             .sorted { a,b in a.source == b.source ? a.updatedAt > b.updatedAt : a.source == .explicit }
         if mode == .command {
             let text = transcript.trimmingCharacters(in:.whitespacesAndNewlines)
-            for prefix in ["open ", "開啟 ", "打開 "] where text.lowercased().hasPrefix(prefix) {
+            for prefix in ["open "] where text.lowercased().hasPrefix(prefix) {
                 let phrase = String(text.dropFirst(prefix.count)).trimmingCharacters(in:.punctuationCharacters).lowercased()
                 if let alias = preferences.first(where:{ $0.category == .appAlias && $0.trigger.lowercased() == phrase }) {
                     return prefix + alias.value

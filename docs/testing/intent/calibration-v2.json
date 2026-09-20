@@ -1,0 +1,3973 @@
+{
+  "seed": 17,
+  "fixture": {
+    "path": "tests/fixtures/intent/en.json",
+    "version": 2,
+    "sha256": "b471c2a0201a64facc6db693e20fe66024a4a112d545e6e46cf07cac30720b05"
+  },
+  "versions": {
+    "promptVersion": "intent-questions-v2",
+    "candidateSetVersion": "fixture-candidates-v1"
+  },
+  "mode": "live",
+  "split": "calibration",
+  "budget": {
+    "maxCases": 80,
+    "maxCalls": 80,
+    "maxTokens": 160000
+  },
+  "calls": 80,
+  "tokens": 98475,
+  "stoppedReason": null,
+  "rows": [
+    {
+      "id": "ambiguous-file/variant-1",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.58,
+        "action": 0.99,
+        "target": 0.94
+      },
+      "topTwoMargin": {
+        "intent": 0.24999999999999994,
+        "action": 0.98,
+        "target": 0.8799999999999999
+      },
+      "confidence": {
+        "intent": 0.44,
+        "action": 0.98,
+        "target": 0.91
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 617,
+      "usage": {
+        "input_tokens": 1152,
+        "output_tokens": 153
+      }
+    },
+    {
+      "id": "ambiguous-file/variant-2",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.6900000000000001,
+        "action": 0.94,
+        "target": 0.95
+      },
+      "topTwoMargin": {
+        "intent": 0.45000000000000007,
+        "action": 0.8799999999999999,
+        "target": 0.8999999999999999
+      },
+      "confidence": {
+        "intent": 0.58,
+        "action": 0.93,
+        "target": 0.92
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 541,
+      "usage": {
+        "input_tokens": 1153,
+        "output_tokens": 153
+      }
+    },
+    {
+      "id": "ambiguous-file/variant-3",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.45,
+        "action": 0.99,
+        "target": 0.96
+      },
+      "topTwoMargin": {
+        "intent": 0.020000000000000018,
+        "action": 0.98,
+        "target": 0.9199999999999999
+      },
+      "confidence": {
+        "intent": 0.27,
+        "action": 0.98,
+        "target": 0.94
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 255,
+      "usage": {
+        "input_tokens": 1152,
+        "output_tokens": 153
+      }
+    },
+    {
+      "id": "ambiguous-file/variant-4",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.79,
+        "action": 0.86,
+        "target": 0.96
+      },
+      "topTwoMargin": {
+        "intent": 0.5800000000000001,
+        "action": 0.72,
+        "target": 0.9199999999999999
+      },
+      "confidence": {
+        "intent": 0.72,
+        "action": 0.83,
+        "target": 0.94
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 245,
+      "usage": {
+        "input_tokens": 1152,
+        "output_tokens": 153
+      }
+    },
+    {
+      "id": "ambiguous-recipient/variant-1",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.91,
+        "action": 0.98,
+        "target": 0.85
+      },
+      "topTwoMargin": {
+        "intent": 0.86,
+        "action": 0.96,
+        "target": 0.7
+      },
+      "confidence": {
+        "intent": 0.87,
+        "action": 0.98,
+        "target": 0.7
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 254,
+      "usage": {
+        "input_tokens": 1067,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "ambiguous-recipient/variant-2",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "unsupported",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.54,
+        "action": 1,
+        "target": 0.99
+      },
+      "topTwoMargin": {
+        "intent": 0.09000000000000002,
+        "action": 1,
+        "target": 0.98
+      },
+      "confidence": {
+        "intent": 0.38,
+        "action": 1,
+        "target": 0.98
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 253,
+      "usage": {
+        "input_tokens": 1069,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "ambiguous-recipient/variant-3",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.56,
+        "action": 0.97,
+        "target": 0.96
+      },
+      "topTwoMargin": {
+        "intent": 0.14000000000000007,
+        "action": 0.94,
+        "target": 0.9199999999999999
+      },
+      "confidence": {
+        "intent": 0.41,
+        "action": 0.96,
+        "target": 0.91
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 271,
+      "usage": {
+        "input_tokens": 1067,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "ambiguous-recipient/variant-4",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "unsupported",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.58,
+        "action": 0.98,
+        "target": 0.94
+      },
+      "topTwoMargin": {
+        "intent": 0.17999999999999994,
+        "action": 0.96,
+        "target": 0.8799999999999999
+      },
+      "confidence": {
+        "intent": 0.44,
+        "action": 0.98,
+        "target": 0.88
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 234,
+      "usage": {
+        "input_tokens": 1068,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "compound-search/variant-1",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.78,
+        "action": 0.7,
+        "target": 0.88
+      },
+      "topTwoMargin": {
+        "intent": 0.63,
+        "action": 0.39999999999999997,
+        "target": 0.76
+      },
+      "confidence": {
+        "intent": 0.7,
+        "action": 0.64,
+        "target": 0.76
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 294,
+      "usage": {
+        "input_tokens": 1070,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "compound-search/variant-2",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.94,
+        "action": 0.61,
+        "target": 0.9
+      },
+      "topTwoMargin": {
+        "intent": 0.9099999999999999,
+        "action": 0.21999999999999997,
+        "target": 0.8
+      },
+      "confidence": {
+        "intent": 0.93,
+        "action": 0.54,
+        "target": 0.8
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 263,
+      "usage": {
+        "input_tokens": 1070,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "compound-search/variant-3",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.65,
+        "action": 0.89,
+        "target": 0.82
+      },
+      "topTwoMargin": {
+        "intent": 0.37,
+        "action": 0.78,
+        "target": 0.6399999999999999
+      },
+      "confidence": {
+        "intent": 0.53,
+        "action": 0.87,
+        "target": 0.64
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 259,
+      "usage": {
+        "input_tokens": 1071,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "compound-search/variant-4",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.72,
+        "action": 0.75,
+        "target": 0.79
+      },
+      "topTwoMargin": {
+        "intent": 0.51,
+        "action": 0.5,
+        "target": 0.5800000000000001
+      },
+      "confidence": {
+        "intent": 0.63,
+        "action": 0.7,
+        "target": 0.59
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 334,
+      "usage": {
+        "input_tokens": 1071,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "compound-send/variant-1",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.8,
+        "action": 0.99,
+        "target": 0.78
+      },
+      "topTwoMargin": {
+        "intent": 0.63,
+        "action": 0.98,
+        "target": 0.56
+      },
+      "confidence": {
+        "intent": 0.74,
+        "action": 0.98,
+        "target": 0.56
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 233,
+      "usage": {
+        "input_tokens": 1070,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "compound-send/variant-2",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.81,
+        "action": 0.98,
+        "target": 0.86
+      },
+      "topTwoMargin": {
+        "intent": 0.6200000000000001,
+        "action": 0.96,
+        "target": 0.72
+      },
+      "confidence": {
+        "intent": 0.74,
+        "action": 0.98,
+        "target": 0.72
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 239,
+      "usage": {
+        "input_tokens": 1070,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "compound-send/variant-3",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.58,
+        "action": 0.91,
+        "target": 0.64
+      },
+      "topTwoMargin": {
+        "intent": 0.4099999999999999,
+        "action": 0.8300000000000001,
+        "target": 0.28
+      },
+      "confidence": {
+        "intent": 0.45,
+        "action": 0.89,
+        "target": 0.28
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 229,
+      "usage": {
+        "input_tokens": 1069,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "compound-send/variant-4",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.63,
+        "action": 0.99,
+        "target": 0.91
+      },
+      "topTwoMargin": {
+        "intent": 0.27,
+        "action": 0.98,
+        "target": 0.8200000000000001
+      },
+      "confidence": {
+        "intent": 0.51,
+        "action": 0.98,
+        "target": 0.82
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 246,
+      "usage": {
+        "input_tokens": 1070,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "literal-open/variant-1",
+      "expected": {
+        "intent": "dictation",
+        "requiredClarification": false,
+        "arguments": {
+          "text": "open Brave"
+        },
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "openApplication",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.58,
+        "action": 0.58,
+        "target": 0.85
+      },
+      "topTwoMargin": {
+        "intent": 0.36,
+        "action": 0.36,
+        "target": 0.7
+      },
+      "confidence": {
+        "intent": 0.45,
+        "action": 0.5,
+        "target": 0.69
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 271,
+      "usage": {
+        "input_tokens": 1080,
+        "output_tokens": 146
+      }
+    },
+    {
+      "id": "literal-open/variant-2",
+      "expected": {
+        "intent": "dictation",
+        "requiredClarification": false,
+        "arguments": {
+          "text": "open Safari"
+        },
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "openApplication",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.83,
+        "action": 0.84,
+        "target": 0.94
+      },
+      "topTwoMargin": {
+        "intent": 0.7,
+        "action": 0.69,
+        "target": 0.8799999999999999
+      },
+      "confidence": {
+        "intent": 0.78,
+        "action": 0.81,
+        "target": 0.87
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 305,
+      "usage": {
+        "input_tokens": 1081,
+        "output_tokens": 146
+      }
+    },
+    {
+      "id": "literal-open/variant-3",
+      "expected": {
+        "intent": "dictation",
+        "requiredClarification": false,
+        "arguments": {
+          "text": "launch Spotify"
+        },
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "openApplication",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.74,
+        "action": 0.53,
+        "target": 0.93
+      },
+      "topTwoMargin": {
+        "intent": 0.55,
+        "action": 0.12000000000000005,
+        "target": 0.8600000000000001
+      },
+      "confidence": {
+        "intent": 0.65,
+        "action": 0.46,
+        "target": 0.87
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 283,
+      "usage": {
+        "input_tokens": 1080,
+        "output_tokens": 146
+      }
+    },
+    {
+      "id": "literal-open/variant-4",
+      "expected": {
+        "intent": "dictation",
+        "requiredClarification": false,
+        "arguments": {
+          "text": "switch to Finder"
+        },
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "openApplication",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.69,
+        "action": 0.51,
+        "target": 0.91
+      },
+      "topTwoMargin": {
+        "intent": 0.5199999999999999,
+        "action": 0.030000000000000027,
+        "target": 0.8200000000000001
+      },
+      "confidence": {
+        "intent": 0.59,
+        "action": 0.42,
+        "target": 0.82
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 255,
+      "usage": {
+        "input_tokens": 1081,
+        "output_tokens": 146
+      }
+    },
+    {
+      "id": "literal-punctuation/variant-1",
+      "expected": {
+        "intent": "dictation",
+        "requiredClarification": false,
+        "arguments": {
+          "text": "the ratio is 100%"
+        },
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "dictation",
+        "action": "insertText",
+        "target": "editor"
+      },
+      "probabilities": {
+        "intent": 0.96,
+        "action": 0.95,
+        "target": 0.55
+      },
+      "topTwoMargin": {
+        "intent": 0.94,
+        "action": 0.9099999999999999,
+        "target": 0.10000000000000003
+      },
+      "confidence": {
+        "intent": 0.94,
+        "action": 0.95,
+        "target": 0.09
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 249,
+      "usage": {
+        "input_tokens": 1086,
+        "output_tokens": 146
+      }
+    },
+    {
+      "id": "literal-punctuation/variant-2",
+      "expected": {
+        "intent": "dictation",
+        "requiredClarification": false,
+        "arguments": {
+          "text": "quote open Brave end quote"
+        },
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "dictation",
+        "action": "insertText",
+        "target": "editor"
+      },
+      "probabilities": {
+        "intent": 0.67,
+        "action": 0.55,
+        "target": 0.61
+      },
+      "topTwoMargin": {
+        "intent": 0.47000000000000003,
+        "action": 0.25000000000000006,
+        "target": 0.21999999999999997
+      },
+      "confidence": {
+        "intent": 0.55,
+        "action": 0.46,
+        "target": 0.22
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 246,
+      "usage": {
+        "input_tokens": 1083,
+        "output_tokens": 146
+      }
+    },
+    {
+      "id": "literal-punctuation/variant-3",
+      "expected": {
+        "intent": "dictation",
+        "requiredClarification": false,
+        "arguments": {
+          "text": "a colon followed by a comma"
+        },
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "dictation",
+        "action": "insertText",
+        "target": "editor"
+      },
+      "probabilities": {
+        "intent": 0.98,
+        "action": 0.91,
+        "target": 0.62
+      },
+      "topTwoMargin": {
+        "intent": 0.96,
+        "action": 0.8200000000000001,
+        "target": 0.24
+      },
+      "confidence": {
+        "intent": 0.97,
+        "action": 0.89,
+        "target": 0.23
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 260,
+      "usage": {
+        "input_tokens": 1085,
+        "output_tokens": 146
+      }
+    },
+    {
+      "id": "literal-punctuation/variant-4",
+      "expected": {
+        "intent": "dictation",
+        "requiredClarification": false,
+        "arguments": {
+          "text": "hello, how are you?"
+        },
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "dictation",
+        "action": "insertText",
+        "target": "editor"
+      },
+      "probabilities": {
+        "intent": 0.97,
+        "action": 0.9,
+        "target": 0.54
+      },
+      "topTwoMargin": {
+        "intent": 0.95,
+        "action": 0.81,
+        "target": 0.08000000000000002
+      },
+      "confidence": {
+        "intent": 0.96,
+        "action": 0.89,
+        "target": 0.09
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 330,
+      "usage": {
+        "input_tokens": 1084,
+        "output_tokens": 146
+      }
+    },
+    {
+      "id": "focus-message/variant-1",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "role": "AXTextArea",
+          "label": "Message"
+        },
+        "action": "focus",
+        "target": "focus-message"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "focus",
+        "target": "focus-message"
+      },
+      "probabilities": {
+        "intent": 0.89,
+        "action": 0.75,
+        "target": 0.92
+      },
+      "topTwoMargin": {
+        "intent": 0.79,
+        "action": 0.5,
+        "target": 0.8400000000000001
+      },
+      "confidence": {
+        "intent": 0.86,
+        "action": 0.7,
+        "target": 0.84
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 233,
+      "usage": {
+        "input_tokens": 1083,
+        "output_tokens": 145
+      }
+    },
+    {
+      "id": "focus-message/variant-2",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "role": "AXTextArea",
+          "label": "Message"
+        },
+        "action": "focus",
+        "target": "focus-message"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "focus",
+        "target": "focus-message"
+      },
+      "probabilities": {
+        "intent": 0.94,
+        "action": 0.71,
+        "target": 0.97
+      },
+      "topTwoMargin": {
+        "intent": 0.8799999999999999,
+        "action": 0.42,
+        "target": 0.94
+      },
+      "confidence": {
+        "intent": 0.91,
+        "action": 0.65,
+        "target": 0.94
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 238,
+      "usage": {
+        "input_tokens": 1084,
+        "output_tokens": 145
+      }
+    },
+    {
+      "id": "focus-message/variant-3",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "role": "AXTextArea",
+          "label": "Message"
+        },
+        "action": "focus",
+        "target": "focus-message"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "focus",
+        "target": "focus-message"
+      },
+      "probabilities": {
+        "intent": 0.87,
+        "action": 0.58,
+        "target": 0.96
+      },
+      "topTwoMargin": {
+        "intent": 0.75,
+        "action": 0.15999999999999998,
+        "target": 0.9199999999999999
+      },
+      "confidence": {
+        "intent": 0.83,
+        "action": 0.5,
+        "target": 0.91
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 256,
+      "usage": {
+        "input_tokens": 1086,
+        "output_tokens": 145
+      }
+    },
+    {
+      "id": "focus-message/variant-4",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "role": "AXTextArea",
+          "label": "Message"
+        },
+        "action": "focus",
+        "target": "focus-message"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "focus",
+        "target": "focus-message"
+      },
+      "probabilities": {
+        "intent": 0.94,
+        "action": 0.75,
+        "target": 0.98
+      },
+      "topTwoMargin": {
+        "intent": 0.8799999999999999,
+        "action": 0.5,
+        "target": 0.96
+      },
+      "confidence": {
+        "intent": 0.92,
+        "action": 0.7,
+        "target": 0.95
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 255,
+      "usage": {
+        "input_tokens": 1086,
+        "output_tokens": 145
+      }
+    },
+    {
+      "id": "select-drafts/variant-1",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "label": "Drafts"
+        },
+        "action": "select",
+        "target": "select-drafts"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "select",
+        "target": "select-drafts"
+      },
+      "probabilities": {
+        "intent": 0.97,
+        "action": 0.97,
+        "target": 0.81
+      },
+      "topTwoMargin": {
+        "intent": 0.94,
+        "action": 0.94,
+        "target": 0.6200000000000001
+      },
+      "confidence": {
+        "intent": 0.95,
+        "action": 0.95,
+        "target": 0.62
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 286,
+      "usage": {
+        "input_tokens": 1090,
+        "output_tokens": 147
+      }
+    },
+    {
+      "id": "select-drafts/variant-2",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "label": "Drafts"
+        },
+        "action": "select",
+        "target": "select-drafts"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "select",
+        "target": "select-drafts"
+      },
+      "probabilities": {
+        "intent": 0.98,
+        "action": 0.98,
+        "target": 0.9
+      },
+      "topTwoMargin": {
+        "intent": 0.96,
+        "action": 0.96,
+        "target": 0.8
+      },
+      "confidence": {
+        "intent": 0.98,
+        "action": 0.98,
+        "target": 0.79
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 252,
+      "usage": {
+        "input_tokens": 1091,
+        "output_tokens": 147
+      }
+    },
+    {
+      "id": "select-drafts/variant-3",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "label": "Drafts"
+        },
+        "action": "select",
+        "target": "select-drafts"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "select",
+        "target": "select-drafts"
+      },
+      "probabilities": {
+        "intent": 0.85,
+        "action": 0.96,
+        "target": 0.81
+      },
+      "topTwoMargin": {
+        "intent": 0.71,
+        "action": 0.9299999999999999,
+        "target": 0.6200000000000001
+      },
+      "confidence": {
+        "intent": 0.79,
+        "action": 0.96,
+        "target": 0.61
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 307,
+      "usage": {
+        "input_tokens": 1093,
+        "output_tokens": 147
+      }
+    },
+    {
+      "id": "select-drafts/variant-4",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "label": "Drafts"
+        },
+        "action": "select",
+        "target": "select-drafts"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "select",
+        "target": "select-drafts"
+      },
+      "probabilities": {
+        "intent": 0.68,
+        "action": 0.93,
+        "target": 0.66
+      },
+      "topTwoMargin": {
+        "intent": 0.37000000000000005,
+        "action": 0.8600000000000001,
+        "target": 0.32
+      },
+      "confidence": {
+        "intent": 0.57,
+        "action": 0.91,
+        "target": 0.32
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 242,
+      "usage": {
+        "input_tokens": 1093,
+        "output_tokens": 147
+      }
+    },
+    {
+      "id": "key-plain-arrowdown/variant-1",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "key": "ArrowDown"
+        },
+        "action": "press",
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "press",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.95,
+        "action": 0.98,
+        "target": 0.55
+      },
+      "topTwoMargin": {
+        "intent": 0.8999999999999999,
+        "action": 0.97,
+        "target": 0.10000000000000003
+      },
+      "confidence": {
+        "intent": 0.93,
+        "action": 0.97,
+        "target": 0.09
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 242,
+      "usage": {
+        "input_tokens": 1081,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "key-plain-arrowdown/variant-2",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "key": "ArrowDown"
+        },
+        "action": "press",
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "press",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.96,
+        "action": 0.96,
+        "target": 0.56
+      },
+      "topTwoMargin": {
+        "intent": 0.9199999999999999,
+        "action": 0.94,
+        "target": 0.12000000000000005
+      },
+      "confidence": {
+        "intent": 0.95,
+        "action": 0.95,
+        "target": 0.11
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 258,
+      "usage": {
+        "input_tokens": 1082,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "key-plain-arrowdown/variant-3",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "key": "ArrowDown"
+        },
+        "action": "press",
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "press",
+        "target": "editor"
+      },
+      "probabilities": {
+        "intent": 0.93,
+        "action": 0.93,
+        "target": 0.55
+      },
+      "topTwoMargin": {
+        "intent": 0.8600000000000001,
+        "action": 0.89,
+        "target": 0.10000000000000003
+      },
+      "confidence": {
+        "intent": 0.9,
+        "action": 0.91,
+        "target": 0.11
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 262,
+      "usage": {
+        "input_tokens": 1084,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "key-plain-arrowdown/variant-4",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "key": "ArrowDown"
+        },
+        "action": "press",
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "press",
+        "target": "editor"
+      },
+      "probabilities": {
+        "intent": 0.92,
+        "action": 0.94,
+        "target": 0.53
+      },
+      "topTwoMargin": {
+        "intent": 0.8400000000000001,
+        "action": 0.9099999999999999,
+        "target": 0.06000000000000005
+      },
+      "confidence": {
+        "intent": 0.9,
+        "action": 0.93,
+        "target": 0.06
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 264,
+      "usage": {
+        "input_tokens": 1084,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "key-plain-tab/variant-1",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "key": "Tab"
+        },
+        "action": "press",
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "press",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.95,
+        "action": 1,
+        "target": 0.62
+      },
+      "topTwoMargin": {
+        "intent": 0.9199999999999999,
+        "action": 1,
+        "target": 0.24
+      },
+      "confidence": {
+        "intent": 0.94,
+        "action": 0.99,
+        "target": 0.24
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 273,
+      "usage": {
+        "input_tokens": 1079,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "key-plain-tab/variant-2",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "key": "Tab"
+        },
+        "action": "press",
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "press",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.95,
+        "action": 0.99,
+        "target": 0.57
+      },
+      "topTwoMargin": {
+        "intent": 0.9099999999999999,
+        "action": 0.98,
+        "target": 0.13999999999999996
+      },
+      "confidence": {
+        "intent": 0.94,
+        "action": 0.99,
+        "target": 0.14
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 291,
+      "usage": {
+        "input_tokens": 1080,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "key-plain-tab/variant-3",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "key": "Tab"
+        },
+        "action": "press",
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "press",
+        "target": "editor"
+      },
+      "probabilities": {
+        "intent": 0.95,
+        "action": 0.98,
+        "target": 0.55
+      },
+      "topTwoMargin": {
+        "intent": 0.8999999999999999,
+        "action": 0.96,
+        "target": 0.10000000000000003
+      },
+      "confidence": {
+        "intent": 0.93,
+        "action": 0.98,
+        "target": 0.11
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 276,
+      "usage": {
+        "input_tokens": 1082,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "key-plain-tab/variant-4",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "key": "Tab"
+        },
+        "action": "press",
+        "target": "editor"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "press",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.92,
+        "action": 0.98,
+        "target": 0.54
+      },
+      "topTwoMargin": {
+        "intent": 0.8400000000000001,
+        "action": 0.96,
+        "target": 0.08000000000000002
+      },
+      "confidence": {
+        "intent": 0.88,
+        "action": 0.98,
+        "target": 0.08
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.input"
+      ],
+      "latencyMs": 275,
+      "usage": {
+        "input_tokens": 1082,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "open-brave/variant-1",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {},
+        "action": "openApplication",
+        "target": "open-brave"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "openApplication",
+        "target": "open-brave"
+      },
+      "probabilities": {
+        "intent": 1,
+        "action": 1,
+        "target": 0.98
+      },
+      "topTwoMargin": {
+        "intent": 1,
+        "action": 1,
+        "target": 0.96
+      },
+      "confidence": {
+        "intent": 1,
+        "action": 1,
+        "target": 0.96
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.open"
+      ],
+      "latencyMs": 243,
+      "usage": {
+        "input_tokens": 1101,
+        "output_tokens": 150
+      }
+    },
+    {
+      "id": "open-brave/variant-2",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {},
+        "action": "openApplication",
+        "target": "open-brave"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "openApplication",
+        "target": "open-brave"
+      },
+      "probabilities": {
+        "intent": 1,
+        "action": 0.99,
+        "target": 0.99
+      },
+      "topTwoMargin": {
+        "intent": 1,
+        "action": 0.98,
+        "target": 0.98
+      },
+      "confidence": {
+        "intent": 1,
+        "action": 0.99,
+        "target": 0.99
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.open"
+      ],
+      "latencyMs": 234,
+      "usage": {
+        "input_tokens": 1102,
+        "output_tokens": 150
+      }
+    },
+    {
+      "id": "open-brave/variant-3",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {},
+        "action": "openApplication",
+        "target": "open-brave"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "openApplication",
+        "target": "open-brave"
+      },
+      "probabilities": {
+        "intent": 1,
+        "action": 1,
+        "target": 1
+      },
+      "topTwoMargin": {
+        "intent": 1,
+        "action": 1,
+        "target": 1
+      },
+      "confidence": {
+        "intent": 1,
+        "action": 0.99,
+        "target": 0.99
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.open"
+      ],
+      "latencyMs": 368,
+      "usage": {
+        "input_tokens": 1104,
+        "output_tokens": 150
+      }
+    },
+    {
+      "id": "open-brave/variant-4",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {},
+        "action": "openApplication",
+        "target": "open-brave"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "openApplication",
+        "target": "open-brave"
+      },
+      "probabilities": {
+        "intent": 1,
+        "action": 1,
+        "target": 1
+      },
+      "topTwoMargin": {
+        "intent": 1,
+        "action": 1,
+        "target": 1
+      },
+      "confidence": {
+        "intent": 1,
+        "action": 1,
+        "target": 0.99
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.open"
+      ],
+      "latencyMs": 281,
+      "usage": {
+        "input_tokens": 1104,
+        "output_tokens": 150
+      }
+    },
+    {
+      "id": "launch-preview/variant-1",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {},
+        "action": "openApplication",
+        "target": "launch-preview"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "openApplication",
+        "target": "launch-preview"
+      },
+      "probabilities": {
+        "intent": 0.99,
+        "action": 0.98,
+        "target": 0.93
+      },
+      "topTwoMargin": {
+        "intent": 0.98,
+        "action": 0.96,
+        "target": 0.8600000000000001
+      },
+      "confidence": {
+        "intent": 0.99,
+        "action": 0.98,
+        "target": 0.86
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.open"
+      ],
+      "latencyMs": 250,
+      "usage": {
+        "input_tokens": 1095,
+        "output_tokens": 148
+      }
+    },
+    {
+      "id": "launch-preview/variant-2",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {},
+        "action": "openApplication",
+        "target": "launch-preview"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "openApplication",
+        "target": "launch-preview"
+      },
+      "probabilities": {
+        "intent": 1,
+        "action": 1,
+        "target": 0.99
+      },
+      "topTwoMargin": {
+        "intent": 1,
+        "action": 1,
+        "target": 0.98
+      },
+      "confidence": {
+        "intent": 1,
+        "action": 0.99,
+        "target": 0.99
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.open"
+      ],
+      "latencyMs": 245,
+      "usage": {
+        "input_tokens": 1096,
+        "output_tokens": 148
+      }
+    },
+    {
+      "id": "launch-preview/variant-3",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {},
+        "action": "openApplication",
+        "target": "launch-preview"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "openApplication",
+        "target": "launch-preview"
+      },
+      "probabilities": {
+        "intent": 1,
+        "action": 0.99,
+        "target": 0.99
+      },
+      "topTwoMargin": {
+        "intent": 1,
+        "action": 0.98,
+        "target": 0.98
+      },
+      "confidence": {
+        "intent": 1,
+        "action": 0.99,
+        "target": 0.97
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.open"
+      ],
+      "latencyMs": 241,
+      "usage": {
+        "input_tokens": 1098,
+        "output_tokens": 148
+      }
+    },
+    {
+      "id": "launch-preview/variant-4",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {},
+        "action": "openApplication",
+        "target": "launch-preview"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "openApplication",
+        "target": "launch-preview"
+      },
+      "probabilities": {
+        "intent": 0.99,
+        "action": 0.99,
+        "target": 0.98
+      },
+      "topTwoMargin": {
+        "intent": 0.98,
+        "action": 0.98,
+        "target": 0.96
+      },
+      "confidence": {
+        "intent": 0.98,
+        "action": 0.99,
+        "target": 0.97
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.open"
+      ],
+      "latencyMs": 287,
+      "usage": {
+        "input_tokens": 1098,
+        "output_tokens": 148
+      }
+    },
+    {
+      "id": "scroll-up-ten/variant-1",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "direction": "up",
+          "amount": 10
+        },
+        "action": "scroll",
+        "target": "reader"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "scroll",
+        "target": "reader"
+      },
+      "probabilities": {
+        "intent": 0.96,
+        "action": 0.82,
+        "target": 0.63
+      },
+      "topTwoMargin": {
+        "intent": 0.9199999999999999,
+        "action": 0.6399999999999999,
+        "target": 0.26
+      },
+      "confidence": {
+        "intent": 0.95,
+        "action": 0.79,
+        "target": 0.26
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 283,
+      "usage": {
+        "input_tokens": 1068,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "scroll-up-ten/variant-2",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "direction": "up",
+          "amount": 10
+        },
+        "action": "scroll",
+        "target": "reader"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "scroll",
+        "target": "reader"
+      },
+      "probabilities": {
+        "intent": 0.95,
+        "action": 0.82,
+        "target": 0.64
+      },
+      "topTwoMargin": {
+        "intent": 0.8999999999999999,
+        "action": 0.6399999999999999,
+        "target": 0.28
+      },
+      "confidence": {
+        "intent": 0.93,
+        "action": 0.79,
+        "target": 0.28
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 254,
+      "usage": {
+        "input_tokens": 1069,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "scroll-up-ten/variant-3",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "direction": "up",
+          "amount": 10
+        },
+        "action": "scroll",
+        "target": "reader"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "scroll",
+        "target": "reader"
+      },
+      "probabilities": {
+        "intent": 0.95,
+        "action": 0.8,
+        "target": 0.67
+      },
+      "topTwoMargin": {
+        "intent": 0.8999999999999999,
+        "action": 0.6000000000000001,
+        "target": 0.34
+      },
+      "confidence": {
+        "intent": 0.94,
+        "action": 0.77,
+        "target": 0.34
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 319,
+      "usage": {
+        "input_tokens": 1071,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "scroll-up-ten/variant-4",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "direction": "up",
+          "amount": 10
+        },
+        "action": "scroll",
+        "target": "reader"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "scroll",
+        "target": "reader"
+      },
+      "probabilities": {
+        "intent": 0.96,
+        "action": 0.84,
+        "target": 0.68
+      },
+      "topTwoMargin": {
+        "intent": 0.9199999999999999,
+        "action": 0.6799999999999999,
+        "target": 0.36000000000000004
+      },
+      "confidence": {
+        "intent": 0.95,
+        "action": 0.81,
+        "target": 0.35
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 248,
+      "usage": {
+        "input_tokens": 1071,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "scroll-down-five/variant-1",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "direction": "down",
+          "amount": 5
+        },
+        "action": "scroll",
+        "target": "reader"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "scroll",
+        "target": "reader"
+      },
+      "probabilities": {
+        "intent": 0.97,
+        "action": 0.83,
+        "target": 0.6
+      },
+      "topTwoMargin": {
+        "intent": 0.94,
+        "action": 0.6599999999999999,
+        "target": 0.19999999999999996
+      },
+      "confidence": {
+        "intent": 0.96,
+        "action": 0.79,
+        "target": 0.19
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 279,
+      "usage": {
+        "input_tokens": 1068,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "scroll-down-five/variant-2",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "direction": "down",
+          "amount": 5
+        },
+        "action": "scroll",
+        "target": "reader"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "scroll",
+        "target": "reader"
+      },
+      "probabilities": {
+        "intent": 0.96,
+        "action": 0.82,
+        "target": 0.65
+      },
+      "topTwoMargin": {
+        "intent": 0.9199999999999999,
+        "action": 0.6399999999999999,
+        "target": 0.30000000000000004
+      },
+      "confidence": {
+        "intent": 0.95,
+        "action": 0.79,
+        "target": 0.3
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 292,
+      "usage": {
+        "input_tokens": 1069,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "scroll-down-five/variant-3",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "direction": "down",
+          "amount": 5
+        },
+        "action": "scroll",
+        "target": "reader"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "scroll",
+        "target": "reader"
+      },
+      "probabilities": {
+        "intent": 0.96,
+        "action": 0.81,
+        "target": 0.68
+      },
+      "topTwoMargin": {
+        "intent": 0.9199999999999999,
+        "action": 0.6200000000000001,
+        "target": 0.36000000000000004
+      },
+      "confidence": {
+        "intent": 0.94,
+        "action": 0.78,
+        "target": 0.36
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 308,
+      "usage": {
+        "input_tokens": 1071,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "scroll-down-five/variant-4",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "direction": "down",
+          "amount": 5
+        },
+        "action": "scroll",
+        "target": "reader"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "scroll",
+        "target": "reader"
+      },
+      "probabilities": {
+        "intent": 0.96,
+        "action": 0.85,
+        "target": 0.64
+      },
+      "topTwoMargin": {
+        "intent": 0.9199999999999999,
+        "action": 0.7,
+        "target": 0.28
+      },
+      "confidence": {
+        "intent": 0.94,
+        "action": 0.82,
+        "target": 0.28
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 268,
+      "usage": {
+        "input_tokens": 1071,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "service-send/variant-1",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "draftId": "reviewed-draft"
+        },
+        "action": "sendEmail",
+        "target": "draft"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "sendEmail",
+        "target": "draft"
+      },
+      "probabilities": {
+        "intent": 0.9,
+        "action": 0.73,
+        "target": 0.93
+      },
+      "topTwoMargin": {
+        "intent": 0.8,
+        "action": 0.48,
+        "target": 0.8600000000000001
+      },
+      "confidence": {
+        "intent": 0.86,
+        "action": 0.68,
+        "target": 0.85
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText",
+        "sendEmail"
+      ],
+      "supportedCapabilities": [
+        "mail.send"
+      ],
+      "latencyMs": 274,
+      "usage": {
+        "input_tokens": 1110,
+        "output_tokens": 154
+      }
+    },
+    {
+      "id": "service-send/variant-2",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "draftId": "reviewed-draft"
+        },
+        "action": "sendEmail",
+        "target": "draft"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "sendEmail",
+        "target": "draft"
+      },
+      "probabilities": {
+        "intent": 0.85,
+        "action": 0.52,
+        "target": 0.92
+      },
+      "topTwoMargin": {
+        "intent": 0.7,
+        "action": 0.10000000000000003,
+        "target": 0.8400000000000001
+      },
+      "confidence": {
+        "intent": 0.79,
+        "action": 0.44,
+        "target": 0.84
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText",
+        "sendEmail"
+      ],
+      "supportedCapabilities": [
+        "mail.send"
+      ],
+      "latencyMs": 360,
+      "usage": {
+        "input_tokens": 1111,
+        "output_tokens": 154
+      }
+    },
+    {
+      "id": "service-send/variant-3",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "draftId": "reviewed-draft"
+        },
+        "action": "sendEmail",
+        "target": "draft"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "none",
+        "target": "draft"
+      },
+      "probabilities": {
+        "intent": 0.71,
+        "action": 0.48,
+        "target": 0.91
+      },
+      "topTwoMargin": {
+        "intent": 0.42,
+        "action": 0.010000000000000009,
+        "target": 0.8200000000000001
+      },
+      "confidence": {
+        "intent": 0.6,
+        "action": 0.41,
+        "target": 0.82
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText",
+        "sendEmail"
+      ],
+      "supportedCapabilities": [
+        "mail.send"
+      ],
+      "latencyMs": 271,
+      "usage": {
+        "input_tokens": 1113,
+        "output_tokens": 152
+      }
+    },
+    {
+      "id": "service-send/variant-4",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "draftId": "reviewed-draft"
+        },
+        "action": "sendEmail",
+        "target": "draft"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "sendEmail",
+        "target": "draft"
+      },
+      "probabilities": {
+        "intent": 0.89,
+        "action": 0.7,
+        "target": 0.93
+      },
+      "topTwoMargin": {
+        "intent": 0.78,
+        "action": 0.42999999999999994,
+        "target": 0.8600000000000001
+      },
+      "confidence": {
+        "intent": 0.85,
+        "action": 0.65,
+        "target": 0.87
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText",
+        "sendEmail"
+      ],
+      "supportedCapabilities": [
+        "mail.send"
+      ],
+      "latencyMs": 671,
+      "usage": {
+        "input_tokens": 1113,
+        "output_tokens": 154
+      }
+    },
+    {
+      "id": "service-attach/variant-1",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "fileId": "approved-report"
+        },
+        "action": "attachFile",
+        "target": "report"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "attachFile",
+        "target": "report"
+      },
+      "probabilities": {
+        "intent": 0.99,
+        "action": 0.95,
+        "target": 0.96
+      },
+      "topTwoMargin": {
+        "intent": 0.98,
+        "action": 0.8999999999999999,
+        "target": 0.9199999999999999
+      },
+      "confidence": {
+        "intent": 0.99,
+        "action": 0.94,
+        "target": 0.92
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText",
+        "attachFile"
+      ],
+      "supportedCapabilities": [
+        "file.upload"
+      ],
+      "latencyMs": 268,
+      "usage": {
+        "input_tokens": 1107,
+        "output_tokens": 154
+      }
+    },
+    {
+      "id": "service-attach/variant-2",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "fileId": "approved-report"
+        },
+        "action": "attachFile",
+        "target": "report"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "attachFile",
+        "target": "report"
+      },
+      "probabilities": {
+        "intent": 0.98,
+        "action": 0.91,
+        "target": 0.93
+      },
+      "topTwoMargin": {
+        "intent": 0.96,
+        "action": 0.8200000000000001,
+        "target": 0.8600000000000001
+      },
+      "confidence": {
+        "intent": 0.97,
+        "action": 0.88,
+        "target": 0.86
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText",
+        "attachFile"
+      ],
+      "supportedCapabilities": [
+        "file.upload"
+      ],
+      "latencyMs": 249,
+      "usage": {
+        "input_tokens": 1108,
+        "output_tokens": 154
+      }
+    },
+    {
+      "id": "service-attach/variant-3",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "fileId": "approved-report"
+        },
+        "action": "attachFile",
+        "target": "report"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "attachFile",
+        "target": "report"
+      },
+      "probabilities": {
+        "intent": 0.94,
+        "action": 0.89,
+        "target": 0.9
+      },
+      "topTwoMargin": {
+        "intent": 0.8799999999999999,
+        "action": 0.79,
+        "target": 0.8
+      },
+      "confidence": {
+        "intent": 0.92,
+        "action": 0.88,
+        "target": 0.81
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText",
+        "attachFile"
+      ],
+      "supportedCapabilities": [
+        "file.upload"
+      ],
+      "latencyMs": 281,
+      "usage": {
+        "input_tokens": 1110,
+        "output_tokens": 154
+      }
+    },
+    {
+      "id": "service-attach/variant-4",
+      "expected": {
+        "intent": "action",
+        "requiredClarification": false,
+        "arguments": {
+          "fileId": "approved-report"
+        },
+        "action": "attachFile",
+        "target": "report"
+      },
+      "actual": {
+        "intent": "action",
+        "action": "attachFile",
+        "target": "report"
+      },
+      "probabilities": {
+        "intent": 0.95,
+        "action": 0.93,
+        "target": 0.97
+      },
+      "topTwoMargin": {
+        "intent": 0.8999999999999999,
+        "action": 0.8600000000000001,
+        "target": 0.94
+      },
+      "confidence": {
+        "intent": 0.93,
+        "action": 0.92,
+        "target": 0.93
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText",
+        "attachFile"
+      ],
+      "supportedCapabilities": [
+        "file.upload"
+      ],
+      "latencyMs": 258,
+      "usage": {
+        "input_tokens": 1110,
+        "output_tokens": 154
+      }
+    },
+    {
+      "id": "unsupported-purchase/variant-1",
+      "expected": {
+        "intent": "unsupported",
+        "requiredClarification": false,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "unsupported",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.73,
+        "action": 0.92,
+        "target": 0.89
+      },
+      "topTwoMargin": {
+        "intent": 0.5,
+        "action": 0.8400000000000001,
+        "target": 0.78
+      },
+      "confidence": {
+        "intent": 0.64,
+        "action": 0.9,
+        "target": 0.79
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 322,
+      "usage": {
+        "input_tokens": 1068,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "unsupported-purchase/variant-2",
+      "expected": {
+        "intent": "unsupported",
+        "requiredClarification": false,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.53,
+        "action": 0.9400000000000001,
+        "target": 0.91
+      },
+      "topTwoMargin": {
+        "intent": 0.11000000000000004,
+        "action": 0.8800000000000001,
+        "target": 0.8200000000000001
+      },
+      "confidence": {
+        "intent": 0.37,
+        "action": 0.92,
+        "target": 0.82
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 250,
+      "usage": {
+        "input_tokens": 1067,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "unsupported-purchase/variant-3",
+      "expected": {
+        "intent": "unsupported",
+        "requiredClarification": false,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "unsupported",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.59,
+        "action": 0.88,
+        "target": 0.55
+      },
+      "topTwoMargin": {
+        "intent": 0.35,
+        "action": 0.76,
+        "target": 0.10000000000000003
+      },
+      "confidence": {
+        "intent": 0.46,
+        "action": 0.85,
+        "target": 0.11
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 376,
+      "usage": {
+        "input_tokens": 1068,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "unsupported-purchase/variant-4",
+      "expected": {
+        "intent": "unsupported",
+        "requiredClarification": false,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "unsupported",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.56,
+        "action": 0.89,
+        "target": 0.86
+      },
+      "topTwoMargin": {
+        "intent": 0.23000000000000004,
+        "action": 0.78,
+        "target": 0.72
+      },
+      "confidence": {
+        "intent": 0.41,
+        "action": 0.87,
+        "target": 0.72
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 322,
+      "usage": {
+        "input_tokens": 1068,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "unsupported-delete/variant-1",
+      "expected": {
+        "intent": "unsupported",
+        "requiredClarification": false,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "unsupported",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.92,
+        "action": 1,
+        "target": 0.94
+      },
+      "topTwoMargin": {
+        "intent": 0.87,
+        "action": 1,
+        "target": 0.8799999999999999
+      },
+      "confidence": {
+        "intent": 0.89,
+        "action": 1,
+        "target": 0.88
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 277,
+      "usage": {
+        "input_tokens": 1069,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "unsupported-delete/variant-2",
+      "expected": {
+        "intent": "unsupported",
+        "requiredClarification": false,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "unsupported",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.73,
+        "action": 1,
+        "target": 0.94
+      },
+      "topTwoMargin": {
+        "intent": 0.51,
+        "action": 1,
+        "target": 0.8799999999999999
+      },
+      "confidence": {
+        "intent": 0.65,
+        "action": 1,
+        "target": 0.89
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 297,
+      "usage": {
+        "input_tokens": 1069,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "unsupported-delete/variant-3",
+      "expected": {
+        "intent": "unsupported",
+        "requiredClarification": false,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "unsupported",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.75,
+        "action": 0.99,
+        "target": 0.95
+      },
+      "topTwoMargin": {
+        "intent": 0.55,
+        "action": 0.98,
+        "target": 0.8999999999999999
+      },
+      "confidence": {
+        "intent": 0.67,
+        "action": 0.99,
+        "target": 0.89
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 266,
+      "usage": {
+        "input_tokens": 1071,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "unsupported-delete/variant-4",
+      "expected": {
+        "intent": "unsupported",
+        "requiredClarification": false,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "unsupported",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.83,
+        "action": 1,
+        "target": 0.94
+      },
+      "topTwoMargin": {
+        "intent": 0.7,
+        "action": 1,
+        "target": 0.8799999999999999
+      },
+      "confidence": {
+        "intent": 0.77,
+        "action": 0.99,
+        "target": 0.88
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 265,
+      "usage": {
+        "input_tokens": 1067,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "visual-button/variant-1",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.89,
+        "action": 1,
+        "target": 0.98
+      },
+      "topTwoMargin": {
+        "intent": 0.78,
+        "action": 1,
+        "target": 0.96
+      },
+      "confidence": {
+        "intent": 0.85,
+        "action": 1,
+        "target": 0.97
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 293,
+      "usage": {
+        "input_tokens": 1067,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "visual-button/variant-2",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.86,
+        "action": 0.99,
+        "target": 0.96
+      },
+      "topTwoMargin": {
+        "intent": 0.72,
+        "action": 0.98,
+        "target": 0.9199999999999999
+      },
+      "confidence": {
+        "intent": 0.81,
+        "action": 0.99,
+        "target": 0.91
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 340,
+      "usage": {
+        "input_tokens": 1069,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "visual-button/variant-3",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.7,
+        "action": 0.98,
+        "target": 0.97
+      },
+      "topTwoMargin": {
+        "intent": 0.39999999999999997,
+        "action": 0.97,
+        "target": 0.94
+      },
+      "confidence": {
+        "intent": 0.59,
+        "action": 0.98,
+        "target": 0.94
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 301,
+      "usage": {
+        "input_tokens": 1067,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "visual-button/variant-4",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.84,
+        "action": 1,
+        "target": 0.97
+      },
+      "topTwoMargin": {
+        "intent": 0.7,
+        "action": 1,
+        "target": 0.94
+      },
+      "confidence": {
+        "intent": 0.79,
+        "action": 0.99,
+        "target": 0.95
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 276,
+      "usage": {
+        "input_tokens": 1071,
+        "output_tokens": 144
+      }
+    },
+    {
+      "id": "visual-icon/variant-1",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "unsupported",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.4,
+        "action": 0.96,
+        "target": 0.7
+      },
+      "topTwoMargin": {
+        "intent": 0.050000000000000044,
+        "action": 0.9299999999999999,
+        "target": 0.39999999999999997
+      },
+      "confidence": {
+        "intent": 0.21,
+        "action": 0.95,
+        "target": 0.41
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 308,
+      "usage": {
+        "input_tokens": 1068,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "visual-icon/variant-2",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "action",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.68,
+        "action": 0.93,
+        "target": 0.66
+      },
+      "topTwoMargin": {
+        "intent": 0.36000000000000004,
+        "action": 0.8700000000000001,
+        "target": 0.32
+      },
+      "confidence": {
+        "intent": 0.57,
+        "action": 0.91,
+        "target": 0.33
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 258,
+      "usage": {
+        "input_tokens": 1068,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "visual-icon/variant-3",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "action",
+        "action": "none",
+        "target": "reader"
+      },
+      "probabilities": {
+        "intent": 0.47000000000000003,
+        "action": 0.92,
+        "target": 0.53
+      },
+      "topTwoMargin": {
+        "intent": 0.16000000000000003,
+        "action": 0.87,
+        "target": 0.06000000000000005
+      },
+      "confidence": {
+        "intent": 0.29,
+        "action": 0.92,
+        "target": 0.05
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 304,
+      "usage": {
+        "input_tokens": 1070,
+        "output_tokens": 143
+      }
+    },
+    {
+      "id": "visual-icon/variant-4",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "action": "none",
+        "target": "none"
+      },
+      "probabilities": {
+        "intent": 0.66,
+        "action": 1,
+        "target": 0.91
+      },
+      "topTwoMargin": {
+        "intent": 0.36000000000000004,
+        "action": 1,
+        "target": 0.8200000000000001
+      },
+      "confidence": {
+        "intent": 0.55,
+        "action": 0.99,
+        "target": 0.83
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v2",
+      "candidateSetVersion": "fixture-candidates-v1",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press",
+        "insertText"
+      ],
+      "supportedCapabilities": [
+        "app.control"
+      ],
+      "latencyMs": 288,
+      "usage": {
+        "input_tokens": 1071,
+        "output_tokens": 144
+      }
+    }
+  ],
+  "note": "Live evaluation routes only; no desktop, email, file or deployment effects are performed."
+}

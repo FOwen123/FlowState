@@ -9,21 +9,17 @@ import {
 } from "@testing-library/react";
 import { MemoryPanel } from "../../apps/web/src/MemoryPanel";
 afterEach(cleanup);
-it("saves an explicit bilingual preference and waits for backend confirmation", async () => {
+it("saves an explicit Unicode preference and waits for backend confirmation", async () => {
   const save = vi.fn().mockResolvedValue(undefined);
   render(<MemoryPanel items={[]} onSave={save} onRemove={vi.fn()} />);
-  fireEvent.click(
-    screen.getByRole("button", { name: "Add preference / 新增偏好" }),
-  );
-  fireEvent.change(screen.getByLabelText("When I say / 當我說"), {
+  fireEvent.click(screen.getByRole("button", { name: "Add preference" }));
+  fireEvent.change(screen.getByLabelText("When I say"), {
     target: { value: "我的瀏覽器" },
   });
-  fireEvent.change(screen.getByLabelText("Use / 使用"), {
+  fireEvent.change(screen.getByLabelText("Use"), {
     target: { value: "Brave" },
   });
-  fireEvent.click(
-    screen.getByRole("button", { name: "Save to my account / 儲存至帳戶" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Save to my account" }));
   await waitFor(() =>
     expect(save).toHaveBeenCalledWith(expect.stringMatching(/^memory:/), {
       kind: "vocabulary",
@@ -53,15 +49,13 @@ it("edits existing values and confirms deletion", async () => {
     />,
   );
   fireEvent.click(screen.getByRole("button", { name: "Edit My browser" }));
-  expect((screen.getByLabelText("Use / 使用") as HTMLInputElement).value).toBe(
+  expect((screen.getByLabelText("Use") as HTMLInputElement).value).toBe(
     "Brave",
   );
-  fireEvent.click(screen.getByRole("button", { name: "Cancel / 取消" }));
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   fireEvent.click(screen.getByRole("button", { name: "Delete My browser" }));
   expect(remove).not.toHaveBeenCalled();
-  fireEvent.click(
-    screen.getByRole("button", { name: "Confirm delete / 確認刪除" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
   await waitFor(() => expect(remove).toHaveBeenCalledWith("memory:a"));
 });
 it("does not erase the editor or claim success on failed save", async () => {
@@ -72,24 +66,20 @@ it("does not erase the editor or claim success on failed save", async () => {
       onRemove={vi.fn()}
     />,
   );
-  fireEvent.click(
-    screen.getByRole("button", { name: "Add preference / 新增偏好" }),
-  );
-  fireEvent.change(screen.getByLabelText("When I say / 當我說"), {
+  fireEvent.click(screen.getByRole("button", { name: "Add preference" }));
+  fireEvent.change(screen.getByLabelText("When I say"), {
     target: { value: "Flow" },
   });
-  fireEvent.change(screen.getByLabelText("Use / 使用"), {
+  fireEvent.change(screen.getByLabelText("Use"), {
     target: { value: "Flow State" },
   });
-  fireEvent.click(
-    screen.getByRole("button", { name: "Save to my account / 儲存至帳戶" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Save to my account" }));
   await waitFor(() =>
     expect(screen.getByRole("alert").textContent).toContain(
       "Network unavailable",
     ),
   );
-  expect((screen.getByLabelText("Use / 使用") as HTMLInputElement).value).toBe(
+  expect((screen.getByLabelText("Use") as HTMLInputElement).value).toBe(
     "Flow State",
   );
 });

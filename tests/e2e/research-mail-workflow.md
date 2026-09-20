@@ -3,7 +3,7 @@
 Use the Convex development deployment and an explicitly approved test inbox/recipient. Keep credentials in ignored files and backend secrets. Browser login and CLI simulated identities are separate forms of evidence.
 
 1. Sign in with the configured Clerk application; register a browser device. In a second signed-in account, verify the first account's runs, preferences and grants cannot be read or altered.
-2. Request a public article or research topic. Verify Firecrawl returns sources, Jev selects only known candidates, and the summary retains source attribution. Repeat with Traditional Chinese output.
+2. Request a public article or research topic. Verify Firecrawl returns sources, Jev selects only known candidates, and the summary retains source attribution. Verify English output; preserve Unicode names in source material.
 3. Cancel during research. Verify late provider responses cannot save a new preview or overwrite cancelled state.
 4. Review sender, recipient, subject, body and any attachments. Edit any field and verify the previous approval is invalidated. Confirm once; distinguish provider acceptance from delivered status.
 5. Retry the same operation ID and simulate a lost provider response using a fixture. Verify no second email. An uncertain result needs reconciliation, not blind resend.

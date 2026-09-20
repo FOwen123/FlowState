@@ -31,6 +31,7 @@ public final class CloudSession: ObservableObject {
     private var activePlanID: String?
     private var planGeneration: UInt64 = 0
     private var planning = false
+    private var intentGeneration: UInt64 = 0
     @Published public private(set) var signedIn = false
     @Published public private(set) var connecting = false
     @Published public private(set) var run: CloudRun?
@@ -58,6 +59,7 @@ public final class CloudSession: ObservableObject {
                 case .unauthenticated:
                     if self.signedIn { self.onSessionInvalidated?() }
                     self.signedIn = false; self.connecting = false
+                    self.intentGeneration &+= 1
                     self.planGeneration &+= 1; self.proposal = nil; self.activePlanID = nil
                     self.generation &+= 1; self.operationGeneration &+= 1; self.runSubscription = nil; self.run = nil; self.activeRunID = nil
                 }
@@ -73,6 +75,7 @@ public final class CloudSession: ObservableObject {
         try await registerDevice()
     }
     public func signOut() async {
+        cancelIntent()
         onSessionInvalidated?()
         await cancelPlan()
         planGeneration &+= 1; proposal = nil; activePlanID = nil
@@ -103,6 +106,52 @@ public final class CloudSession: ObservableObject {
         observe(runID: created.runId)
         try await client.action("workflows:runResearch", with: ["runId": created.runId])
     }
+    public func cancelIntent() { intentGeneration &+= 1 }
+
+    public func routeIntent(utterance: String, sessionID: String, utteranceID: String,
+                            contextRevision: Int, mode: String, context: CloudIntentContext,
+                            grant: DesktopExecutionGrant?, observation: CloudIntentObservation? = nil,
+                            observationAllowedUntil: Date? = nil) async throws -> IntentDecision {
+        guard signedIn else { throw CloudSessionError.signInRequired }
+        let token = intentGeneration
+        try await registerDevice()
+        guard signedIn, token == intentGeneration else { throw CancellationError() }
+        var capabilities = Set<String>()
+        if let grant, grant.expiresAt > Date() {
+            for action in grant.allowedActions {
+                capabilities.insert(action == .openApplication ? "app.open" : (action == .insertText || action == .press) ? "app.input" : "app.control")
+            }
+            for target in grant.allowedBundleIdentifiers {
+                for capability in capabilities.sorted() {
+                    guard signedIn, token == intentGeneration, grant.expiresAt > Date() else { throw CancellationError() }
+                    try await client.mutation("grants:grant", with: ["deviceId": deviceID, "capability": capability,
+                        "target": target, "expiresAt": grant.expiresAt.timeIntervalSince1970 * 1000])
+                }
+            }
+        }
+        if observation != nil, let expiry = observationAllowedUntil, expiry > Date(),
+           let target = context.focusedAppBundleIdentifier {
+            for capability in ["app.observe", "app.upload"] {
+                guard signedIn, token == intentGeneration else { throw CancellationError() }
+                try await client.mutation("grants:grant", with: ["deviceId": deviceID, "capability": capability,
+                    "target": target, "expiresAt": expiry.timeIntervalSince1970 * 1000])
+                capabilities.insert(capability)
+            }
+        }
+        guard signedIn, token == intentGeneration else { throw CancellationError() }
+        let response: IntentDecision = try await client.action("intents:route", with: [
+            "deviceId": deviceID, "sessionId": sessionID, "utteranceId": utteranceID,
+            "contextRevision": Double(contextRevision), "utterance": utterance, "mode": mode,
+            "context": context, "supportedActions": ["openApplication", "scroll", "focus", "select", "press", "insertText"],
+            "supportedCapabilities": capabilities.sorted().map { $0 as (any ConvexEncodable)? }, "policyVersion": "intent-v1", "observation": observation,
+        ])
+        try requireCurrentIntent(signedIn: signedIn, currentGeneration: intentGeneration, requestGeneration: token,
+            expectedSession: sessionID, returnedSession: response.sessionID,
+            expectedUtterance: utteranceID, returnedUtterance: response.utteranceID,
+            expectedRevision: contextRevision, returnedRevision: response.contextRevision)
+        return response
+    }
+
     public func preparePlan(command: String, targetBundleIdentifier: String, locale: String) async throws {
         guard signedIn else { throw CloudSessionError.signInRequired }
         guard !planning else { throw CloudSessionError.busy }
@@ -149,7 +198,7 @@ public final class CloudSession: ObservableObject {
         let token = planGeneration
         let expiry = min(expiresAt.timeIntervalSince1970 * 1000, plan.expiresAt)
         try checkPlan(token:token,expiresAt:expiry)
-        let capabilities = Set(plan.actions.map { $0.desktopAction.kind == .insertText ? "app.input" : "app.control" })
+        let capabilities = cloudExecutionCapabilities(for: plan.actions)
         for capability in capabilities {
             try await client.mutation("grants:grant",with:["deviceId":deviceID,"capability":capability,"target":target,"expiresAt":expiry])
             try checkPlan(token:token,expiresAt:expiry)
@@ -216,6 +265,11 @@ public final class CloudSession: ObservableObject {
         try await client.action("workflows:sendApprovedResearchEmail", with: ["runId": snapshot.id, "approvalId": approval.approvalId])
     }
 }
+
+func cloudExecutionCapabilities(for actions: [NativePlanAction]) -> Set<String> {
+    Set(actions.map(\.capability))
+}
+
 public enum CloudSessionError: Error, LocalizedError {
     case signInRequired
     case reviewChanged
