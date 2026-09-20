@@ -1,0 +1,31 @@
+import { chromium } from '@playwright/test';
+import assert from 'node:assert/strict';
+import { pathToFileURL } from 'node:url';
+const browser = await chromium.launch();
+try {
+ const page = await browser.newPage({viewport:{width:1440,height:900}});
+ await page.goto(pathToFileURL(`${process.cwd()}/design/hero-motion/index.html`).href);
+ assert.equal(await page.locator('.art').evaluate(el=>getComputedStyle(el).position),'fixed');
+ assert.equal(await page.locator('.copy').evaluate(el=>getComputedStyle(el).textAlign),'center');
+ assert.equal(await page.locator('.art').evaluate(el=>getComputedStyle(el).animationDirection),'normal');
+ await page.locator('#scenery').click();
+ assert.equal(await page.locator('body').getAttribute('data-scene'),'scenery');
+ await page.waitForFunction(()=>document.querySelector('#woodland')?.dataset.ready==='true');
+ const frame=()=>page.locator('#woodland').evaluate(c=>c.toDataURL());
+ const before=await frame(); await page.waitForTimeout(300);
+ assert.notEqual(await frame(),before);
+ await page.locator('#pause').click();
+ const paused=await frame(); await page.waitForTimeout(200); assert.equal(await frame(),paused);
+ await page.screenshot({path:'/tmp/flowstate-woodland.png'});
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.locator('#pause').click();
+ const reduced=await frame(); await page.waitForTimeout(200); assert.equal(await frame(),reduced);
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ await page.locator('#ribbons').click();
+ assert.equal(await page.locator('body').getAttribute('data-scene'),'ribbons');
+ assert.ok(await page.locator('.art').evaluate(el=>[...el.querySelectorAll('img')].every(img=>img.complete && img.naturalWidth>0)));
+ await page.screenshot({path:'/tmp/flowstate-hero-motion.png'});
+ await page.emulateMedia({reducedMotion:'reduce'});
+ assert.equal(await page.locator('.art').evaluate(el=>getComputedStyle(el).animationName),'none');
+ console.log('Both directions, motion, pause, image loading, and reduced motion passed.');
+} finally {await browser.close();}

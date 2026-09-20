@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flow State · Forest clearing</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#020705;color:#fff;font:16px/1.5 Inter,Arial,sans-serif;min-height:100svh}
+.scene{min-height:max(760px,100svh);position:relative;isolation:isolate;overflow:hidden}
+.forest{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
+header{height:96px;padding:0 max(32px,6.95vw);display:flex;align-items:center;justify-content:space-between;gap:24px}
+.brand{font:500 24px/30px "Space Grotesk",Arial,sans-serif;letter-spacing:-.02em}
+.controls{display:flex;gap:10px}button{font:13px/20px Inter,Arial,sans-serif;color:#bdc9c0;border:1px solid #304438;background:#07120ce6;border-radius:999px;padding:9px 16px;cursor:pointer}button:hover{border-color:#648370;color:white}button:focus-visible{outline:2px solid white;outline-offset:4px}
+main{width:min(840px,100%);margin:134px auto 200px;padding:0 24px;text-align:center}
+.eyebrow{font-size:12px;letter-spacing:.14em;color:#a2b5a9;margin:0 0 26px}
+h1{font:500 clamp(44px,4.723vw,68px)/1.118 "Space Grotesk",Arial,sans-serif;letter-spacing:-.045em;margin:0 0 26px}
+.description{font-size:18px;line-height:29px;color:#bdc9c0;margin:0 0 32px}.availability{display:inline-block;padding:16px 26px;border:1px solid #37644c;border-radius:999px;background:#0b241a;color:#e3ede6;font-size:15px}
+.note{font-size:13px;color:#a2b5a9;margin:14px 0 0}
+footer{position:absolute;bottom:38px;left:6.95%;right:6.95%;display:flex;justify-content:space-between;gap:24px;color:#a2b5a9;font-size:13px;line-height:22px}
+footer span:last-child{text-align:right}.copy-hidden main{visibility:hidden}
+@media(max-width:650px){header{padding:20px 24px;height:auto;align-items:flex-start}.brand{font-size:20px;white-space:nowrap}.controls{flex-direction:column;gap:6px}button{padding:6px 12px;font-size:12px}main{margin:115px auto 220px}.eyebrow{font-size:10px;letter-spacing:.1em}h1{font-size:43px}.description{font-size:16px;line-height:26px}.description br{display:none}footer{left:24px;right:24px;bottom:24px;flex-direction:column;gap:10px}footer span:last-child{text-align:left;max-width:280px}}
+</style></head>
+<body><div class="scene">
+<canvas class="forest" aria-hidden="true"></canvas>
+<header><div class="brand">Flow State</div><div class="controls" aria-label="Preview controls"><button id="motion" aria-pressed="false">Pause motion</button><button id="copy" aria-pressed="false">Hide copy</button></div></header>
+<main><p class="eyebrow">VOICE CONTROL FOR EVERYDAY LIFE</p><h1>Control your Mac.<br>With your voice.</h1><p class="description">Flow State turns your voice into action. <br>Open apps, write text, and move through your day.</p><div class="availability">Made for your Mac</div><p class="note">In development · English voice control</p></main>
+<footer><span>01 / THE CLEARING<br>Living pixels · Woodland dusk</span><span>Continuous pixel field · Full-bleed woodland</span></footer></div>
+<script>
+const canvas=document.querySelector('canvas.forest');
+const context=canvas.getContext('2d');
+const motion=document.getElementById('motion'),copy=document.getElementById('copy');
+const preference=matchMedia('(prefers-reduced-motion: reduce)');
+let paused=preference.matches,time=0,last=0,request=0,points=[],frame;
+// One spatial noise field for the entire viewport; time never loops or reverses.
+function hash(x,y){let n=Math.imul(x,374761393)+Math.imul(y,668265263);n=Math.imul(n^(n>>>13),1274126177);return ((n^(n>>>16))>>>0)/4294967295;}
+function noise(x,y){
+ const ix=Math.floor(x),iy=Math.floor(y);let u=x-ix,v=y-iy;
+ u=u*u*(3-2*u);v=v*v*(3-2*v);
+ const a=hash(ix,iy),b=hash(ix+1,iy),c=hash(ix,iy+1),d=hash(ix+1,iy+1);
+ return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;
+}
+function resize(){
+ canvas.width=innerWidth;canvas.height=innerHeight;
+ frame=context.createImageData(canvas.width,canvas.height);points=[];
+ const w=canvas.width,h=canvas.height;
+ for(let i=0;i<frame.data.length;i+=4){frame.data[i]=3;frame.data[i+1]=11;frame.data[i+2]=7;frame.data[i+3]=255;}
+ for(let y=0;y<h;y+=3)for(let x=0;x<w;x+=3){
+  const u=x/w,v=y/h;
+  const clearing=Math.exp(-Math.pow((u-.5)/.265,4)-Math.pow((v-.46)/.32,4));
+  const edge=Math.pow(Math.abs(u-.5)*2,.7);
+  const crown=noise(u*8+15,v*6+3);
+  // Slender, irregular dark trunks and fern canopy remain registered to the scene.
+  const trunkCenter=noise(u*18,1+v*.3);
+  const trunks=1-Math.exp(-Math.pow((trunkCenter-.5)*15,2))*.7;
+  const woodland=(.5+edge*.3+crown*.4)*trunks;
+  points.push({x,y,index:(y*w+x)*4,mask:(1-clearing*.97)*woodland,grain:hash(x,y),shade:hash(y+71,x+12)});
+ }
+ draw();
+}
+function draw(){
+ const pixels=frame.data;
+ for(const p of points){
+  // Domain warping makes connected curtains of density, never moving pixel positions.
+  const warp=noise(p.x*.0018+8+time*.035,p.y*.0022-time*.045);
+  const broad=noise(p.x*.0032+warp*1.8+time*.065,p.y*.0025+warp-time*.09);
+  const detail=noise(p.x*.011-time*.11,p.y*.008+time*.075);
+  const field=broad*.78+detail*.22;
+  const density=Math.max(0,Math.min(1,(field-.24)*2.8));
+  const reveal=Math.max(0,Math.min(1,(density-p.grain*.68)*5));
+  const light=p.mask*reveal*(.18+density*.75)*(.6+p.shade*.4);
+  pixels[p.index]=3+light*29;pixels[p.index+1]=11+light*121;pixels[p.index+2]=7+light*57;
+ }
+ context.putImageData(frame,0,0);
+}
+function tick(now){
+ request=0;if(paused||document.hidden)return;
+ if(!last)last=now;
+ const elapsed=now-last;
+ // 30 fps is sufficient for the slow field; avoid redrawing duplicate frames.
+ if(elapsed>=1000/30){time+=Math.min(elapsed,100)/1000;last=now;draw();}
+ request=requestAnimationFrame(tick);
+}
+function sync(){
+ cancelAnimationFrame(request);request=0;last=0;
+ motion.textContent=paused?(preference.matches?'Play animation':'Resume motion'):'Pause motion';
+ motion.setAttribute('aria-pressed',String(paused));
+ if(!paused&&!document.hidden)request=requestAnimationFrame(tick);
+}
+motion.addEventListener('click',()=>{paused=!paused;sync();});
+copy.addEventListener('click',()=>{
+ const hidden=document.body.classList.toggle('copy-hidden');
+ copy.textContent=hidden?'Show copy':'Hide copy';copy.setAttribute('aria-pressed',String(hidden));
+});
+preference.addEventListener('change',()=>{paused=preference.matches;sync();});
+document.addEventListener('visibilitychange',sync);
+addEventListener('resize',resize);
+resize();sync();
+</script></body></html>
