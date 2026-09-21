@@ -19,7 +19,7 @@ import Testing
     model.transcript = "Open Brave."
     model.lastResponse = "Previous task completed."
     let view = NSHostingView(rootView: VoiceHUDView(model: model))
-    #expect(abs(view.fittingSize.width - 140) < 1)
+    #expect(abs(view.fittingSize.width - 280) < 1)
     #expect(abs(view.fittingSize.height - 56) < 1)
 }
 
@@ -31,7 +31,7 @@ import Testing
     model.transcript = String(repeating: "A sentence that should stay readable. ", count: 8)
     let view = NSHostingView(rootView: VoiceHUDView(model: model))
     #expect(abs(view.fittingSize.height - 56) < 1)
-    #expect(abs(view.fittingSize.width - 140) < 1)
+    #expect(abs(view.fittingSize.width - 280) < 1)
 }
 
 @Test("the session menu stays a compact native list")
@@ -62,4 +62,24 @@ import Testing
     if let path = ProcessInfo.processInfo.environment["FLOWSTATE_HUD_PREVIEW"] {
         try raster.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
     }
+}
+
+@Test("feedback ignores transcript length")
+@MainActor func feedbackDoesNotRepeatDictation() {
+    let model = VoiceHUDModel()
+    model.status = "Done"
+    let before = NSHostingView(rootView: VoiceHUDView(model: model)).fittingSize
+    model.transcript = String(repeating: "Words the user dictated. ", count: 100)
+    let after = NSHostingView(rootView: VoiceHUDView(model: model)).fittingSize
+    #expect(before == after)
+}
+
+@Test("feedback expands upward without moving the waveform anchor")
+@MainActor func feedbackAnchorIsStable() {
+    let screen = NSRect(x: 100, y: 50, width: 1440, height: 900)
+    let listening = VoiceHUDController.frame(size: NSSize(width: 280, height: 56), visibleFrame: screen)
+    let feedback = VoiceHUDController.frame(size: NSSize(width: 280, height: 180), visibleFrame: screen)
+    #expect(listening.minX == feedback.minX)
+    #expect(listening.minY == feedback.minY)
+    #expect(listening.midX == screen.midX)
 }

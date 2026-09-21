@@ -30,9 +30,8 @@ final class VoiceHUDController {
         let panel = makePanelIfNeeded()
         if let host = panel.contentView as? NSHostingView<VoiceHUDView> {
             host.rootView = VoiceHUDView(model: model)
-            panel.setContentSize(host.fittingSize)
+            position(panel, size: host.fittingSize)
         }
-        position(panel)
         panel.orderFrontRegardless()
     }
 
@@ -64,21 +63,18 @@ final class VoiceHUDController {
         return panel
     }
 
-    private func position(_ panel: NSPanel) {
-        let mouseLocation = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) })
-            ?? NSScreen.main
-            ?? NSScreen.screens.first
-        guard let screen else { return }
-
-        let visibleFrame = screen.visibleFrame
-        let frame = panel.frame
-        let origin = NSPoint(
-            x: visibleFrame.midX - frame.width / 2,
-            y: visibleFrame.minY + 24
-        )
-        panel.setFrameOrigin(origin)
+    private func position(_ panel: NSPanel, size: NSSize) {
+        // Use the primary display, not the pointer's current display. Resize
+        // upwards so the waveform and cancel control never move with feedback.
+        guard let screen = NSScreen.screens.first else { return }
+        panel.setFrame(Self.frame(size: size, visibleFrame: screen.visibleFrame), display: true)
     }
+
+    static func frame(size: NSSize, visibleFrame: NSRect) -> NSRect {
+        NSRect(x: visibleFrame.midX - size.width / 2,
+               y: visibleFrame.minY + 24, width: size.width, height: size.height)
+    }
+
 }
 
 @MainActor
@@ -100,7 +96,6 @@ private final class VoiceHUDPanel: NSPanel {
 }
 
 struct VoiceHUDView: View {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @ObservedObject var model: VoiceHUDModel
 
     private var showsDetails: Bool {
@@ -111,6 +106,31 @@ struct VoiceHUDView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+
+            if showsDetails {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(L10n.text(model.status == "The focused control is not editable."
+                        ? "Click a text field, then dictate again." : model.status))
+                        .font(.custom("Helvetica Neue", size: 14))
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel(L10n.text("Voice status"))
+                    if let currentStep = model.currentStep {
+                        Text(currentStep)
+                            .font(.custom("Helvetica Neue", size: 13))
+                            .foregroundStyle(PaperStyle.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityLabel(L10n.text("Current plan step"))
+                    }
+                    if model.canConfirm {
+                        Button(L10n.text("Confirm action")) { model.onConfirm?() }
+                            .accessibilityLabel(L10n.text("Confirm proposed action"))
+                            .buttonStyle(VoiceHUDActionStyle())
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+            }
             HStack(alignment: .center, spacing: 16) {
                 VoiceHUDWaveform(isListening: model.isListening)
                     .frame(width: 48, height: 26)
@@ -135,52 +155,12 @@ struct VoiceHUDView: View {
             .padding(.trailing, 6)
             .padding(.vertical, 6)
 
-            if showsDetails {
-                VStack(alignment: .leading, spacing: 12) {
-                    if !model.transcript.isEmpty {
-                        Text(model.transcript)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityLabel(L10n.text("Latest transcript"))
-                    }
-                    Text(L10n.text(model.status == "The focused control is not editable."
-                        ? "Click a text field, then dictate again." : model.status))
-                        .font(.custom("Helvetica Neue", size: 14))
-                        .foregroundStyle(.white)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityLabel(L10n.text("Voice status"))
-                    if let currentStep = model.currentStep {
-                        Text(currentStep)
-                            .font(.custom("Helvetica Neue", size: 13))
-                            .foregroundStyle(PaperStyle.muted)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityLabel(L10n.text("Current plan step"))
-                    }
-                    if let lastResponse = model.lastResponse, lastResponse != model.status {
-                        Text(lastResponse)
-                            .font(.custom("Helvetica Neue", size: 13))
-                            .foregroundStyle(PaperStyle.muted)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityLabel(L10n.text("Last spoken response"))
-                    }
-                    if model.canConfirm {
-                        Button(L10n.text("Confirm action")) { model.onConfirm?() }
-                            .accessibilityLabel(L10n.text("Confirm proposed action"))
-                            .buttonStyle(VoiceHUDActionStyle())
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
-            }
         }
-        .frame(width: showsDetails ? 360 : 140)
-        .glassEffect(showsDetails || reduceTransparency ? .identity : .regular.tint(PaperStyle.hud),
-                     in: .rect(cornerRadius: showsDetails ? 20 : 28))
+        .frame(width: 280)
         .background {
-            if showsDetails || reduceTransparency {
-                RoundedRectangle(cornerRadius: showsDetails ? 20 : 28)
-                    .fill(PaperStyle.hud)
-                    .overlay { RoundedRectangle(cornerRadius: showsDetails ? 20 : 28).stroke(PaperStyle.controlBorder, lineWidth: 1) }
-            }
+            RoundedRectangle(cornerRadius: 20)
+                .fill(PaperStyle.hud)
+                .overlay { RoundedRectangle(cornerRadius: 20).stroke(PaperStyle.controlBorder, lineWidth: 1) }
         }
         .preferredColorScheme(.dark)
         .accessibilityElement(children: .contain)
@@ -192,10 +172,10 @@ private struct VoiceHUDActionStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.custom("Helvetica Neue", size: 14))
-            .foregroundStyle(configuration.isPressed ? PaperStyle.accent : .white)
+            .foregroundStyle(.white)
             .padding(.horizontal, 14)
             .frame(minHeight: 36)
-            .background(configuration.isPressed ? PaperStyle.selected : .clear, in: Capsule())
+            .background(configuration.isPressed ? Color.white.opacity(0.12) : .clear, in: Capsule())
             .overlay(Capsule().stroke(PaperStyle.controlBorder, lineWidth: 1))
     }
 }
@@ -211,7 +191,7 @@ private struct VoiceHUDWaveform: View {
                     let phase = timeline.date.timeIntervalSinceReferenceDate * 4 + Double(index) * 0.7
                     let level = isListening && !reduceMotion ? 0.25 + 0.75 * ((sin(phase) + 1) / 2) : [0.2, 0.6, 0.85, 0.7, 1, 0.5, 0.2][index]
                     Capsule()
-                        .fill(isListening ? PaperStyle.accent : PaperStyle.muted)
+                        .fill(Color.white)
                         .frame(width: 3, height: 4 + CGFloat(level * 20))
                 }
             }

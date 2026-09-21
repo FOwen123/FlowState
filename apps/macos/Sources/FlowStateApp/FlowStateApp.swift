@@ -2451,7 +2451,7 @@ struct FlowStateMenuView: View {
         .buttonStyle(FlowStateMenuRowStyle())
         .padding(6)
         .frame(width: 280)
-        .glassEffect(.regular.tint(PaperStyle.hud), in: .rect(cornerRadius: 12))
+        .background(PaperStyle.hud, in: .rect(cornerRadius: 12))
         .preferredColorScheme(.dark)
     }
 }
@@ -2470,8 +2470,8 @@ private struct FlowStateMenuRowStyle: ButtonStyle {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 10)
                 .frame(height: 32)
-                .foregroundStyle(hovering || configuration.isPressed ? PaperStyle.accent : .white)
-                .background(hovering || configuration.isPressed ? PaperStyle.selected : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .foregroundStyle(.white)
+                .background(hovering || configuration.isPressed ? Color.white.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 6))
                 .contentShape(Rectangle())
                 .onHover { hovering = $0 }
         }

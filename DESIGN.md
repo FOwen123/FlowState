@@ -325,3 +325,7 @@ These are implementation acceptance checks. Updating this document does not esta
 ### Feedback panel refinement — September 21, 2026
 
 Ordinary listening stays a minimal waveform and cancel strip. Expanded feedback uses an opaque dark HUD surface for consistent text contrast over other apps. Keep only the cancel control and conditional action confirmation in the panel; Replay, spoken-response preferences, and Settings belong in the settings window reached from the menu bar. Avoid repeating the same spoken response as the status.
+
+### Stable floating controls — September 21, 2026
+
+This supersedes earlier native floating-control color, glass, waveform, and transcript-strip rules. Use the user-selected menu background `#19221f`, white waveform and labels, and the existing subdued border. Both menu and HUD use opaque surfaces; do not switch to bright glass or an emerald waveform while listening. Keep the HUD 280px wide at the bottom center of the primary display, 24px above its visible frame. The waveform/cancel row stays at the bottom; required feedback expands upward. Do not follow the pointer between displays or echo dictated text or previous spoken replies. Keep concise status, current task steps and required confirmations readable. The settings and web themes are unchanged by this floating-control override.
