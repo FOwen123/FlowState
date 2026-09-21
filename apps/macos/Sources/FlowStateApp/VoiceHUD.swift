@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import SwiftUI
 import FlowStateCore
 
@@ -6,6 +7,7 @@ import FlowStateCore
 final class VoiceHUDController {
     private let model = VoiceHUDModel()
     private var panel: VoiceHUDPanel?
+    private var destinationFrame: NSRect?
 
     func show(
         status: String,
@@ -30,7 +32,8 @@ final class VoiceHUDController {
         let panel = makePanelIfNeeded()
         if let host = panel.contentView as? NSHostingView<VoiceHUDView> {
             host.rootView = VoiceHUDView(model: model)
-            position(panel, size: host.fittingSize)
+            let measured = NSHostingView(rootView: VoiceHUDView(model: model))
+            position(panel, size: measured.fittingSize)
         }
         panel.orderFrontRegardless()
     }
@@ -58,7 +61,9 @@ final class VoiceHUDController {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
-        panel.contentView = NSHostingView(rootView: VoiceHUDView(model: model))
+        let host = NSHostingView(rootView: VoiceHUDView(model: model))
+        host.sizingOptions = []
+        panel.contentView = host
         self.panel = panel
         return panel
     }
@@ -67,7 +72,18 @@ final class VoiceHUDController {
         // Use the primary display, not the pointer's current display. Resize
         // upwards so the waveform and cancel control never move with feedback.
         guard let screen = NSScreen.screens.first else { return }
-        panel.setFrame(Self.frame(size: size, visibleFrame: screen.visibleFrame), display: true)
+        let target = Self.frame(size: size, visibleFrame: screen.visibleFrame)
+        guard target != destinationFrame else { return }
+        destinationFrame = target
+        if panel.isVisible && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.35
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                panel.animator().setFrame(target, display: true)
+            }
+        } else {
+            panel.setFrame(target, display: true)
+        }
     }
 
     static func frame(size: NSSize, visibleFrame: NSRect) -> NSRect {
@@ -162,6 +178,7 @@ struct VoiceHUDView: View {
                 .fill(PaperStyle.hud)
                 .overlay { RoundedRectangle(cornerRadius: 20).stroke(PaperStyle.controlBorder, lineWidth: 1) }
         }
+        .frame(maxHeight: .infinity, alignment: .bottom)
         .preferredColorScheme(.dark)
         .accessibilityElement(children: .contain)
 

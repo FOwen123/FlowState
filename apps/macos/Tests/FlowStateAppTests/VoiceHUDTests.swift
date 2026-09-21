@@ -103,3 +103,26 @@ import Testing
         try raster.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
     }
 }
+
+@Test("no-speech feedback grows gradually above the existing bar", .enabled(if: ProcessInfo.processInfo.environment["FLOWSTATE_HUD_MOTION_SMOKE"] == "1"))
+@MainActor func noSpeechFeedbackAnimates() async throws {
+    let existing = Set(NSApplication.shared.windows.map(\.windowNumber))
+    let controller = VoiceHUDController()
+    controller.show(status: "Listening — say a command or press Stop", transcript: "", isListening: true, onStop: {})
+    defer { controller.hide() }
+    let panel = try #require(NSApplication.shared.windows.first { !existing.contains($0.windowNumber) && $0.isVisible })
+    let initial = panel.frame
+    controller.show(status: "No speech detected. Try again.", transcript: "", isListening: false, onStop: {})
+    #expect(abs(panel.frame.height - initial.height) < 1)
+    try await Task.sleep(for: .milliseconds(150))
+    let intermediate = panel.frame
+    try await Task.sleep(for: .milliseconds(350))
+    #expect(intermediate.height >= initial.height)
+    #expect(intermediate.height <= panel.frame.height)
+    #expect(panel.frame.height > initial.height)
+    #expect(panel.frame.minY == initial.minY)
+    #expect(panel.frame.midX == initial.midX)
+    controller.show(status: "Listening — say a command or press Stop", transcript: "", isListening: true, onStop: {})
+    try await Task.sleep(for: .milliseconds(450))
+    #expect(panel.frame == initial)
+}
