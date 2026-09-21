@@ -2,12 +2,12 @@ import FlowStateCore
 import SwiftUI
 
 enum FlowStateSettingsSection: String, CaseIterable, Identifiable {
+    case cloud
     case voice
     case models
     case tasks
     case memory
     case permissions
-    case cloud
 
     var id: String { rawValue }
 
@@ -636,14 +636,6 @@ private struct MemorySettingsView: View {
             }
 
             settingsPanel {
-                ToggleRow(
-                    title: "Sync preferences",
-                    subtitle: "Not available yet. Preferences currently stay on this Mac.",
-                    isOn: Binding(
-                        get: { false },
-                        set: { _ in }
-                    )
-                )
                 ToggleRow(
                     title: "Allow learned preferences",
                     subtitle: "Automatic suggestions are not available yet. Your saved preferences take priority.",

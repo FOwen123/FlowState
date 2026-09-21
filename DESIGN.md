@@ -338,4 +338,4 @@ During feedback expansion, lay out the hosted content once at its destination si
 
 ### Settings organization — September 21, 2026
 
-Use short sidebar labels: General, Models, History, Memory, Permissions, Account. General starts with Mac Control; dictation is a separate secondary shortcut. Models contains speech download and language. Omit the Gmail settings page; existing desktop mail workflows do not need a dedicated sidebar section. Settings buttons use plain surfaces with explicit hit areas and visibly dimmed disabled states. Account copy should describe the action directly, without benefit lists or promotional text.
+Use short sidebar labels: Account, General, Models, History, Memory, Permissions. General starts with Mac Control; dictation is a separate secondary shortcut. Models contains speech download and language. Omit the Gmail settings page; existing desktop mail workflows do not need a dedicated sidebar section. Settings buttons use plain surfaces with explicit hit areas and visibly dimmed disabled states. Account copy should describe the action directly, without benefit lists or promotional text.

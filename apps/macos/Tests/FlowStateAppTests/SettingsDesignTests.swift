@@ -5,7 +5,7 @@ import Testing
 
 @Test("settings navigation follows the Paper screen order")
 func settingsNavigationFollowsPaperOrder() {
-    #expect(FlowStateSettingsSection.allCases.map(\.title) == ["General", "Models", "History", "Memory", "Permissions", "Account"])
+    #expect(FlowStateSettingsSection.allCases.map(\.title) == ["Account", "General", "Models", "History", "Memory", "Permissions"])
 }
 
 @Test("models settings distinguishes the active engine from the planned download")
