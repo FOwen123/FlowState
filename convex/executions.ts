@@ -377,21 +377,51 @@ export const beginExternalEffect = mutation({
     if (action?.executor !== "service") {
       throw new Error("external effect requires a structured service step");
     }
+    const matchingRequest = await ctx.db
+      .query("actionExecutionReceipts")
+      .withIndex("by_request", (q) =>
+        q
+          .eq("ownerKey", plan.ownerKey)
+          .eq("deviceId", plan.deviceId)
+          .eq("provider", args.provider)
+          .eq("requestFingerprint", args.requestFingerprint),
+      )
+      .collect();
+    const existingRequest = matchingRequest.find(
+      (receipt) =>
+        receipt.status === "pending" ||
+        receipt.status === "uncertain" ||
+        receipt.status === "succeeded",
+    );
+    if (existingRequest !== undefined) {
+      return {
+        status:
+          existingRequest.status === "pending" ||
+          existingRequest.status === "uncertain"
+            ? ("reconcile" as const)
+            : existingRequest.status,
+        receiptId: existingRequest._id,
+      };
+    }
+
     const prior = await ctx.db
       .query("actionExecutionReceipts")
       .withIndex("by_idempotency", (q) =>
         q.eq("provider", args.provider).eq("idempotencyKey", args.idempotencyKey),
       )
       .collect();
-    const ownerReceipts = prior.filter((receipt) => receipt.ownerKey === plan.ownerKey);
-    const existing = ownerReceipts.find(
+    const ownerDeviceReceipts = prior.filter(
       (receipt) =>
-        receipt.deviceId === plan.deviceId &&
+        receipt.ownerKey === plan.ownerKey &&
+        receipt.deviceId === plan.deviceId,
+    );
+    const existing = ownerDeviceReceipts.find(
+      (receipt) =>
         receipt.planId === plan._id &&
         receipt.ordinal === args.ordinal &&
         receipt.generation === args.generation,
     );
-    if (existing === undefined && ownerReceipts.length > 0) {
+    if (existing === undefined && ownerDeviceReceipts.length > 0) {
       throw new Error("external effect idempotency key collision");
     }
     if (existing !== undefined) {
@@ -451,8 +481,8 @@ export const reconcileExternalEffect = mutation({
     ) {
       throw new Error("external effect receipt fingerprint or scope is invalid");
     }
-    if (receipt.status !== "pending" && receipt.status !== "uncertain") {
-      throw new Error("external effect receipt is already reconciled");
+    if (receipt.status === "succeeded" || receipt.status === "failed") {
+      return { status: receipt.status, receiptId: args.receiptId };
     }
     await ctx.db.patch(receipt._id, {
       status: args.status,

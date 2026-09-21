@@ -203,7 +203,13 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_plan_step", ["planId", "ordinal"])
-    .index("by_idempotency", ["provider", "idempotencyKey"]),
+    .index("by_idempotency", ["provider", "idempotencyKey"])
+    .index("by_request", [
+      "ownerKey",
+      "deviceId",
+      "provider",
+      "requestFingerprint",
+    ]),
 
   actionStepApprovals: defineTable({
     ownerKey: v.string(),

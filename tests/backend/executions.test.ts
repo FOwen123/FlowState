@@ -386,7 +386,30 @@ it("deduplicates external effects and requires reconciliation before retry", asy
       status: "succeeded",
       requestFingerprint: "message-fingerprint-1",
     }),
-  ).rejects.toThrow(/reconciled/i);
+  ).resolves.toEqual({
+    status: "succeeded",
+    receiptId: first.receiptId,
+  });
+  await expect(
+    user.mutation(anyApi.executions.reconcileExternalEffect, {
+      receiptId: first.receiptId,
+      status: "failed",
+      requestFingerprint: "message-fingerprint-1",
+    }),
+  ).resolves.toEqual({
+    status: "succeeded",
+    receiptId: first.receiptId,
+  });
+  await expect(t.run((ctx) => ctx.db.get(first.receiptId))).resolves.toMatchObject({
+    status: "succeeded",
+  });
+  await expect(
+    user.mutation(anyApi.executions.reconcileExternalEffect, {
+      receiptId: first.receiptId,
+      status: "failed",
+      requestFingerprint: "different-message",
+    }),
+  ).rejects.toThrow(/fingerprint/i);
   await expect(
     user.mutation(anyApi.executions.finishStep, {
       planId,
@@ -395,6 +418,50 @@ it("deduplicates external effects and requires reconciliation before retry", asy
       verified: true,
     }),
   ).resolves.toMatchObject({ status: "succeeded" });
+});
+
+it("keeps a terminal failed receipt authoritative after a lost reconciliation response", async () => {
+  const t = convexTest(schema, modules);
+  const ownerKey = "terminal-failed-reconciliation";
+  const user = t.withIdentity({ subject: ownerKey, tokenIdentifier: ownerKey });
+  const planId = await t.run((ctx) =>
+    ctx.db.insert("actionPlans", {
+      ownerKey,
+      deviceId: "terminal-failed-device",
+      command: "send the approved message",
+      locale: "en",
+      status: "executing",
+      cancellationGeneration: 1,
+      expiresAt: Date.now() + 60_000,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }),
+  );
+  const receiptId = await t.run((ctx) =>
+    ctx.db.insert("actionExecutionReceipts", {
+      ownerKey,
+      deviceId: "terminal-failed-device",
+      planId,
+      ordinal: 0,
+      generation: 1,
+      provider: "agentmail",
+      idempotencyKey: "terminal-failed-key",
+      requestFingerprint: "terminal-failed-fingerprint",
+      status: "failed",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }),
+  );
+  await expect(
+    user.mutation(anyApi.executions.reconcileExternalEffect, {
+      receiptId,
+      status: "succeeded",
+      requestFingerprint: "terminal-failed-fingerprint",
+    }),
+  ).resolves.toEqual({ status: "failed", receiptId });
+  await expect(t.run((ctx) => ctx.db.get(receiptId))).resolves.toMatchObject({
+    status: "failed",
+  });
 });
 
 it("expires an unconsumed step approval when the plan is cancelled", async () => {
@@ -455,4 +522,253 @@ it("expires an unconsumed step approval when the plan is cancelled", async () =>
       fingerprint: "approval-cancel-plan",
     }),
   ).rejects.toThrow(/stale|cancelled/i);
+});
+
+it("recovers external receipts across plans by owner, device, provider, and request fingerprint", async () => {
+  const t = convexTest(schema, modules);
+  const user = t.withIdentity({
+    subject: "external-recovery-owner",
+    tokenIdentifier: "test|external-recovery-owner",
+  });
+  const otherUser = t.withIdentity({
+    subject: "external-recovery-other-owner",
+    tokenIdentifier: "test|external-recovery-other-owner",
+  });
+  const action = {
+    kind: "sendEmail",
+    parameters: {
+      recipient: "owner@example.com",
+      subject: "Ready",
+      body: "The project is ready.",
+    },
+    capability: "mail.send",
+    executor: "service",
+    requiresApproval: true,
+    route: "structuredIntegration",
+    riskClass: "confirm",
+    preconditions: { requiresFreshObservation: false },
+    verifier: { kind: "externalEffectReconciled" },
+    reversal: { kind: "reconcile", supported: false },
+  } as const;
+
+  await user.mutation(anyApi.workflows.registerDevice, {
+    deviceId: "external-recovery-device",
+  });
+  await user.mutation(anyApi.grants.grant, {
+    deviceId: "external-recovery-device",
+    capability: "mail.send",
+    expiresAt: Date.now() + 60_000,
+  });
+  await user.mutation(anyApi.workflows.registerDevice, {
+    deviceId: "external-recovery-other-device",
+  });
+  await user.mutation(anyApi.grants.grant, {
+    deviceId: "external-recovery-other-device",
+    capability: "mail.send",
+    expiresAt: Date.now() + 60_000,
+  });
+  await otherUser.mutation(anyApi.workflows.registerDevice, {
+    deviceId: "external-recovery-device",
+  });
+  await otherUser.mutation(anyApi.grants.grant, {
+    deviceId: "external-recovery-device",
+    capability: "mail.send",
+    expiresAt: Date.now() + 60_000,
+  });
+
+  const preparePlan = async (
+    actingUser: typeof user,
+    ownerKey: string,
+    deviceId: string,
+    planFingerprint: string,
+    generation = 1,
+  ) => {
+    const planId = await t.run((ctx) =>
+      ctx.db.insert("actionPlans", {
+        ownerKey,
+        deviceId,
+        command: "send the approved message",
+        locale: "en",
+        status: "approved",
+        cancellationGeneration: generation,
+        expiresAt: Date.now() + 60_000,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        planFingerprint,
+        actionsJson: JSON.stringify([action]),
+      }),
+    );
+    await actingUser.mutation(anyApi.executions.start, {
+      planId,
+      fingerprint: planFingerprint,
+    });
+    await actingUser.mutation(anyApi.executions.approveStep, {
+      planId,
+      ordinal: 0,
+      generation,
+      fingerprint: planFingerprint,
+    });
+    await actingUser.mutation(anyApi.executions.claimStep, {
+      planId,
+      ordinal: 0,
+      generation,
+    });
+    return { planId, generation };
+  };
+
+  const pendingPlan = await preparePlan(
+    user,
+    "test|external-recovery-owner",
+    "external-recovery-device",
+    "recovery-pending-plan",
+    1,
+  );
+  const pending = await user.mutation(anyApi.executions.beginExternalEffect, {
+    ...pendingPlan,
+    ordinal: 0,
+    provider: "agentmail",
+    idempotencyKey: "recovery-pending-key-1",
+    requestFingerprint: "opaque-pending-action",
+  });
+  const pendingReplayPlan = await preparePlan(
+    user,
+    "test|external-recovery-owner",
+    "external-recovery-device",
+    "recovery-pending-plan-2",
+    2,
+  );
+  await expect(
+    user.mutation(anyApi.executions.beginExternalEffect, {
+      ...pendingReplayPlan,
+      ordinal: 0,
+      provider: "agentmail",
+      idempotencyKey: "recovery-pending-key-2",
+      requestFingerprint: "opaque-pending-action",
+    }),
+  ).resolves.toEqual({ status: "reconcile", receiptId: pending.receiptId });
+
+  const uncertainPlan = await preparePlan(
+    user,
+    "test|external-recovery-owner",
+    "external-recovery-device",
+    "recovery-uncertain-plan",
+  );
+  const uncertain = await user.mutation(anyApi.executions.beginExternalEffect, {
+    ...uncertainPlan,
+    ordinal: 0,
+    provider: "agentmail",
+    idempotencyKey: "recovery-uncertain-key-1",
+    requestFingerprint: "opaque-uncertain-action",
+  });
+  await user.mutation(anyApi.executions.reconcileExternalEffect, {
+    receiptId: uncertain.receiptId,
+    status: "uncertain",
+    requestFingerprint: "opaque-uncertain-action",
+  });
+  const uncertainReplayPlan = await preparePlan(
+    user,
+    "test|external-recovery-owner",
+    "external-recovery-device",
+    "recovery-uncertain-plan-2",
+  );
+  await expect(
+    user.mutation(anyApi.executions.beginExternalEffect, {
+      ...uncertainReplayPlan,
+      ordinal: 0,
+      provider: "agentmail",
+      idempotencyKey: "recovery-uncertain-key-2",
+      requestFingerprint: "opaque-uncertain-action",
+    }),
+  ).resolves.toEqual({ status: "reconcile", receiptId: uncertain.receiptId });
+
+  const succeededPlan = await preparePlan(
+    user,
+    "test|external-recovery-owner",
+    "external-recovery-device",
+    "recovery-succeeded-plan",
+  );
+  const succeeded = await user.mutation(anyApi.executions.beginExternalEffect, {
+    ...succeededPlan,
+    ordinal: 0,
+    provider: "agentmail",
+    idempotencyKey: "recovery-succeeded-key-1",
+    requestFingerprint: "opaque-succeeded-action",
+  });
+  await user.mutation(anyApi.executions.reconcileExternalEffect, {
+    receiptId: succeeded.receiptId,
+    status: "succeeded",
+    requestFingerprint: "opaque-succeeded-action",
+  });
+  const succeededReplayPlan = await preparePlan(
+    user,
+    "test|external-recovery-owner",
+    "external-recovery-device",
+    "recovery-succeeded-plan-2",
+  );
+  await expect(
+    user.mutation(anyApi.executions.beginExternalEffect, {
+      ...succeededReplayPlan,
+      ordinal: 0,
+      provider: "agentmail",
+      idempotencyKey: "recovery-succeeded-key-2",
+      requestFingerprint: "opaque-succeeded-action",
+    }),
+  ).resolves.toEqual({ status: "succeeded", receiptId: succeeded.receiptId });
+
+  const differentFingerprintPlan = await preparePlan(
+    user,
+    "test|external-recovery-owner",
+    "external-recovery-device",
+    "recovery-different-plan",
+  );
+  const differentFingerprint = await user.mutation(
+    anyApi.executions.beginExternalEffect,
+    {
+      ...differentFingerprintPlan,
+      ordinal: 0,
+      provider: "agentmail",
+      idempotencyKey: "recovery-different-key",
+      requestFingerprint: "opaque-different-action",
+    },
+  );
+  expect(differentFingerprint).toMatchObject({ status: "pending" });
+  expect(differentFingerprint.receiptId).not.toBe(succeeded.receiptId);
+
+  const otherDevicePlan = await preparePlan(
+    user,
+    "test|external-recovery-owner",
+    "external-recovery-other-device",
+    "recovery-other-device-plan",
+  );
+  const otherDevice = await user.mutation(
+    anyApi.executions.beginExternalEffect,
+    {
+      ...otherDevicePlan,
+      ordinal: 0,
+      provider: "agentmail",
+      idempotencyKey: "recovery-succeeded-key-1",
+      requestFingerprint: "opaque-succeeded-action",
+    },
+  );
+  expect(otherDevice).toMatchObject({ status: "pending" });
+  expect(otherDevice.receiptId).not.toBe(succeeded.receiptId);
+
+  const otherOwnerPlan = await preparePlan(
+    otherUser,
+    "test|external-recovery-other-owner",
+    "external-recovery-device",
+    "recovery-other-owner-plan",
+  );
+  const otherOwner = await otherUser.mutation(
+    anyApi.executions.beginExternalEffect,
+    {
+      ...otherOwnerPlan,
+      ordinal: 0,
+      provider: "agentmail",
+      idempotencyKey: "recovery-succeeded-key-1",
+      requestFingerprint: "opaque-succeeded-action",
+    },
+  );
+  expect(otherOwner).toMatchObject({ status: "pending" });
+  expect(otherOwner.receiptId).not.toBe(succeeded.receiptId);
 });
