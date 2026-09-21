@@ -30,7 +30,31 @@ public enum NativePlanActionKind: String, Codable, Equatable, Sendable {
     case focus
     case select
     case press
+    case openURL
+    case attachFile
+    case sendEmail
+    case draftMessage
     case insertText
+}
+
+public enum NativePlanRoute: String, Codable, Equatable, Sendable {
+    case structuredIntegration
+    case nativeAccessibility
+    case visualComputerUse
+
+    /// Source-compatible spelling for older native call sites. Canonical
+    /// backend payloads use `visualComputerUse`.
+    public static var freshVisual: Self { .visualComputerUse }
+}
+
+public enum NativePlanRisk: String, Codable, Equatable, Sendable {
+    case reversible
+    case confirm
+    case unsupported
+
+    /// Source-compatible aliases for the pre-canonical native vocabulary.
+    public static var routine: Self { .reversible }
+    public static var consequential: Self { .confirm }
 }
 
 public enum NativePlanParameters: Equatable, Sendable {
@@ -39,7 +63,51 @@ public enum NativePlanParameters: Equatable, Sendable {
     case focus(role: String, label: String?)
     case select(label: String)
     case press(key: String, modifiers: String?)
+    case openURL(url: String)
+    case attachFile(fileID: String)
+    case sendEmail(recipient: String, subject: String, body: String)
+    case draftMessage(recipient: String, subject: String, body: String)
     case insertText(text: String, replaceSelection: Bool)
+}
+
+public struct NativePlanPreconditions: Codable, Equatable, Sendable {
+    public let targetBundleIdentifier: String?
+    public let requiresFreshObservation: Bool
+
+    public init(targetBundleIdentifier: String? = nil, requiresFreshObservation: Bool) {
+        self.targetBundleIdentifier = targetBundleIdentifier
+        self.requiresFreshObservation = requiresFreshObservation
+    }
+}
+
+public enum NativePlanVerifierKind: String, Codable, Equatable, Sendable {
+    case boundedAction
+    case externalEffectReconciled
+    case visualObservation
+}
+
+public struct NativePlanVerifier: Codable, Equatable, Sendable {
+    public let kind: NativePlanVerifierKind
+
+    public init(kind: NativePlanVerifierKind) {
+        self.kind = kind
+    }
+}
+
+public enum NativePlanReversalKind: String, Codable, Equatable, Sendable {
+    case none
+    case reconcile
+    case undo
+}
+
+public struct NativePlanReversal: Codable, Equatable, Sendable {
+    public let kind: NativePlanReversalKind
+    public let supported: Bool
+
+    public init(kind: NativePlanReversalKind, supported: Bool) {
+        self.kind = kind
+        self.supported = supported
+    }
 }
 
 public indirect enum NativePlanJSONValue: Codable, Equatable, Sendable {
@@ -91,22 +159,38 @@ public indirect enum NativePlanJSONValue: Codable, Equatable, Sendable {
 public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConvertible {
     public let kind: NativePlanActionKind
     public let targetID: String?
-    public let targetBundleIdentifier: String
+    public let targetBundleIdentifier: String?
     public let parameters: NativePlanParameters
     public let capability: String
     public let executor: String
     public let requiresApproval: Bool
     public let visualTarget: NativePlanJSONValue?
+    public let route: NativePlanRoute
+    public let preconditions: NativePlanPreconditions
+    public let verifier: NativePlanVerifier
+    public let riskClass: NativePlanRisk
+    public let reversal: NativePlanReversal
+    public let expiresAt: Date?
+
+    public var risk: NativePlanRisk { riskClass }
+    public var reversalSupported: Bool { reversal.supported }
 
     public init(
         kind: NativePlanActionKind,
         targetID: String? = nil,
-        targetBundleIdentifier: String,
+        targetBundleIdentifier: String? = nil,
         parameters: NativePlanParameters,
         capability: String,
         executor: String = "desktop",
         requiresApproval: Bool,
-        visualTarget: NativePlanJSONValue? = nil
+        visualTarget: NativePlanJSONValue? = nil,
+        route: NativePlanRoute = .nativeAccessibility,
+        preconditions: NativePlanPreconditions? = nil,
+        verifier: NativePlanVerifier? = nil,
+        risk: NativePlanRisk? = nil,
+        reversal: NativePlanReversal? = nil,
+        reversalSupported: Bool? = nil,
+        expiresAt: Date? = nil
     ) {
         self.kind = kind
         self.targetID = targetID
@@ -116,42 +200,67 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         self.executor = executor
         self.requiresApproval = requiresApproval
         self.visualTarget = visualTarget
+        self.route = route
+        self.preconditions = preconditions ?? NativePlanPreconditions(
+            targetBundleIdentifier: targetBundleIdentifier,
+            requiresFreshObservation: route == .visualComputerUse
+        )
+        self.verifier = verifier ?? NativePlanVerifier(kind: route == .visualComputerUse ? .visualObservation : .boundedAction)
+        self.riskClass = risk ?? (requiresApproval ? .confirm : .reversible)
+        self.reversal = reversal ?? NativePlanReversal(
+            kind: reversalSupported == true ? .undo : .none,
+            supported: reversalSupported ?? false
+        )
+        self.expiresAt = expiresAt
     }
 
-    public var desktopAction: DesktopAction {
+    public func isCurrent(at now: Date = Date()) -> Bool {
+        expiresAt.map { $0 > now } ?? true
+    }
+
+    public var desktopAction: DesktopAction? {
         switch parameters {
         case .openApplication:
-            .openApplication(bundleIdentifier: targetBundleIdentifier)
+            targetBundleIdentifier.map(DesktopAction.openApplication(bundleIdentifier:))
         case let .scroll(lines):
-            .scroll(lines: lines)
+            .some(.scroll(lines: lines))
         case let .focus(role, label):
-            .focus(role: role, label: label)
+            .some(.focus(role: role, label: label))
         case let .select(label):
-            .select(label: label)
+            .some(.select(label: label))
         case let .press(key, modifiers):
-            .press(key: key, modifiers: modifiers)
-        case let .insertText(text, _):
-            .insertText(text)
+            .some(.press(key: key, modifiers: modifiers))
+        case .openURL, .attachFile, .sendEmail, .draftMessage, .insertText:
+            nil
         }
     }
 
     public var summary: String {
+        let app = targetBundleIdentifier ?? "the selected app"
         switch parameters {
         case .openApplication:
-            return "Open \(targetBundleIdentifier)"
+            return "Open \(app)"
         case let .scroll(lines):
             let direction = lines < 0 ? "down" : "up"
-            return "Scroll \(direction) in \(targetBundleIdentifier) (amount: \(abs(lines)))"
+            return "Scroll \(direction) in \(app) (amount: \(abs(lines)))"
         case let .focus(role, label):
-            return label.map { "Focus \($0) (\(role)) in \(targetBundleIdentifier)" }
-                ?? "Focus \(role) in \(targetBundleIdentifier)"
+            return label.map { "Focus \($0) (\(role)) in \(app)" }
+                ?? "Focus \(role) in \(app)"
         case let .select(label):
-            return "Select \(label) in \(targetBundleIdentifier)"
+            return "Select \(label) in \(app)"
         case let .press(key, modifiers):
-            return modifiers.map { "Press \($0)-\(key) in \(targetBundleIdentifier)" }
-                ?? "Press \(key) in \(targetBundleIdentifier)"
+            return modifiers.map { "Press \($0)-\(key) in \(app)" }
+                ?? "Press \(key) in \(app)"
+        case let .openURL(url):
+            return "Open URL \(url)"
+        case let .attachFile(fileID):
+            return "Attach approved file \(fileID)"
+        case let .sendEmail(recipient, subject, _):
+            return "Send email to \(recipient): \(subject)"
+        case let .draftMessage(recipient, subject, _):
+            return "Draft email to \(recipient): \(subject)"
         case let .insertText(text, _):
-            return "Insert text into \(targetBundleIdentifier): \(text)"
+            return "Insert text into \(app): \(text)"
         }
     }
 
@@ -166,6 +275,16 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         case executor
         case requiresApproval
         case visualTarget
+        case route
+        case preconditions
+        case verifier
+        case riskClass
+        case reversal
+        // Legacy native metadata is accepted only for source-compatible
+        // construction; canonical payloads use riskClass and reversal.
+        case risk
+        case reversalSupported
+        case expiresAt
     }
 
     private struct EmptyCodingKey: CodingKey {
@@ -206,6 +325,22 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         case modifiers
     }
 
+    private enum OpenURLCodingKeys: String, CodingKey, CaseIterable {
+        case url
+    }
+
+    private enum AttachFileCodingKeys: String, CodingKey, CaseIterable {
+        case fileId
+    }
+
+    private enum SendEmailCodingKeys: String, CodingKey, CaseIterable {
+        case recipient
+        case subject
+        case body
+    }
+
+    private typealias DraftMessageCodingKeys = SendEmailCodingKeys
+
     public init(from decoder: Decoder) throws {
         let allFields = try decoder.container(keyedBy: NativePlanCodingKey.self)
         try rejectUnknownKeys(
@@ -218,14 +353,17 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         guard let kind = NativePlanActionKind(rawValue: kindValue) else {
             throw NativePlanDecodingError.unsupportedAction(kindValue)
         }
+        guard kind != .insertText else {
+            throw NativePlanDecodingError.unsupportedAction("insertText is available only through the Dictation shortcut.")
+        }
         let targetID = try container.decodeIfPresent(String.self, forKey: .targetId)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if let targetID, targetID.isEmpty {
             throw NativePlanDecodingError.invalidTarget
         }
-        let target = try container.decode(String.self, forKey: .targetBundleIdentifier)
+        let target = try container.decodeIfPresent(String.self, forKey: .targetBundleIdentifier)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !target.isEmpty else { throw NativePlanDecodingError.invalidTarget }
+        if let target, target.isEmpty { throw NativePlanDecodingError.invalidTarget }
 
         let capability = try container.decode(String.self, forKey: .capability)
         let allowedCapabilities: Set<String> = switch kind {
@@ -235,17 +373,97 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
             ["app.control"]
         case .press, .insertText:
             ["app.input"]
+        case .openURL:
+            ["app.control"]
+        case .attachFile:
+            ["file.upload"]
+        case .sendEmail:
+            ["mail.send"]
+        case .draftMessage:
+            ["mail.draft"]
         }
         guard allowedCapabilities.contains(capability) else {
             throw NativePlanDecodingError.unsupportedCapability(capability)
         }
 
         let executor = try container.decode(String.self, forKey: .executor)
-        guard executor == "desktop" else {
+        guard executor == "desktop" || executor == "service" else {
             throw NativePlanDecodingError.unsupportedExecutor(executor)
         }
+        let expectedExecutor = switch kind {
+        case .openURL, .attachFile, .sendEmail, .draftMessage: "service"
+        default: "desktop"
+        }
+        guard executor == expectedExecutor else {
+            throw NativePlanDecodingError.unsupportedExecutor(executor)
+        }
+        let requiresApproval = try container.decode(Bool.self, forKey: .requiresApproval)
 
-        if container.contains(.visualTarget), try !container.decodeNil(forKey: .visualTarget) {
+        let visualTarget = try container.decodeIfPresent(NativePlanJSONValue.self, forKey: .visualTarget)
+
+        let route: NativePlanRoute
+        if let rawRoute = try container.decodeIfPresent(String.self, forKey: .route) {
+            guard let decodedRoute = NativePlanRoute(rawValue: rawRoute) else {
+                throw NativePlanDecodingError.malformed("Unknown plan route.")
+            }
+            route = decodedRoute
+        } else {
+            route = .nativeAccessibility
+        }
+        let preconditions = try container.decodeIfPresent(NativePlanPreconditions.self, forKey: .preconditions)
+            ?? NativePlanPreconditions(targetBundleIdentifier: target, requiresFreshObservation: route == .visualComputerUse)
+        if preconditions.targetBundleIdentifier != target {
+            throw NativePlanDecodingError.invalidTarget
+        }
+        let verifier = try container.decodeIfPresent(NativePlanVerifier.self, forKey: .verifier)
+            ?? NativePlanVerifier(kind: route == .visualComputerUse ? .visualObservation : .boundedAction)
+        let risk: NativePlanRisk
+        if let canonicalRisk = try container.decodeIfPresent(NativePlanRisk.self, forKey: .riskClass) {
+            risk = canonicalRisk
+        } else if let legacyRisk = try container.decodeIfPresent(NativePlanRisk.self, forKey: .risk) {
+            risk = legacyRisk
+        } else {
+            risk = requiresApproval ? .confirm : .reversible
+        }
+        let reversal = try container.decodeIfPresent(NativePlanReversal.self, forKey: .reversal)
+            ?? NativePlanReversal(kind: (try container.decodeIfPresent(Bool.self, forKey: .reversalSupported) ?? false) ? .undo : .none,
+                                  supported: try container.decodeIfPresent(Bool.self, forKey: .reversalSupported) ?? false)
+        let expiresAt = try container.decodeIfPresent(Date.self, forKey: .expiresAt)
+
+        if kind == .openApplication && target == nil {
+            throw NativePlanDecodingError.invalidTarget
+        }
+        if route == .structuredIntegration && executor != "service" {
+            throw NativePlanDecodingError.unsupportedExecutor(executor)
+        }
+        if route == .structuredIntegration,
+           ![NativePlanActionKind.openURL, .attachFile, .sendEmail, .draftMessage].contains(kind) {
+            throw NativePlanDecodingError.unsupportedAction(kind.rawValue)
+        }
+        if route == .structuredIntegration,
+           [NativePlanActionKind.openURL, .draftMessage].contains(kind),
+           target == nil {
+            throw NativePlanDecodingError.invalidTarget
+        }
+        if kind == .openURL, route == .structuredIntegration,
+           requiresApproval || risk != .reversible {
+            throw NativePlanDecodingError.invalidParameters(
+                "openURL must be a reversible handoff without approval."
+            )
+        }
+        if kind == .draftMessage, route == .structuredIntegration,
+           !requiresApproval || risk != .confirm {
+            throw NativePlanDecodingError.invalidParameters(
+                "draftMessage requires confirmation."
+            )
+        }
+        if route == .nativeAccessibility && executor != "desktop" {
+            throw NativePlanDecodingError.unsupportedExecutor(executor)
+        }
+        if route == .nativeAccessibility && target == nil {
+            throw NativePlanDecodingError.invalidTarget
+        }
+        if route == .visualComputerUse && visualTarget == nil {
             throw NativePlanDecodingError.unsupportedVisualTarget
         }
 
@@ -318,6 +536,44 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
                 throw NativePlanDecodingError.invalidParameters("press modifiers are not on the native allowlist.")
             }
             parameters = .press(key: key, modifiers: modifiers)
+        case .openURL:
+            let allParameters = try parametersDecoder.container(keyedBy: NativePlanCodingKey.self)
+            try rejectUnknownKeys(allParameters.allKeys, allowed: ["url"])
+            let parametersContainer = try parametersDecoder.container(keyedBy: OpenURLCodingKeys.self)
+            let url = try parametersContainer.decode(String.self, forKey: .url).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard url.count <= 2_000, let parsed = URL(string: url), parsed.scheme == "http" || parsed.scheme == "https" else {
+                throw NativePlanDecodingError.invalidParameters("openURL requires an HTTP(S) URL.")
+            }
+            parameters = .openURL(url: parsed.absoluteString)
+        case .attachFile:
+            let allParameters = try parametersDecoder.container(keyedBy: NativePlanCodingKey.self)
+            try rejectUnknownKeys(allParameters.allKeys, allowed: ["fileId"])
+            let parametersContainer = try parametersDecoder.container(keyedBy: AttachFileCodingKeys.self)
+            let fileID = try parametersContainer.decode(String.self, forKey: .fileId).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !fileID.isEmpty, fileID.count <= 200 else { throw NativePlanDecodingError.invalidParameters("fileId is invalid.") }
+            parameters = .attachFile(fileID: fileID)
+        case .sendEmail:
+            let allParameters = try parametersDecoder.container(keyedBy: NativePlanCodingKey.self)
+            try rejectUnknownKeys(allParameters.allKeys, allowed: ["recipient", "subject", "body"])
+            let parametersContainer = try parametersDecoder.container(keyedBy: SendEmailCodingKeys.self)
+            let recipient = try parametersContainer.decode(String.self, forKey: .recipient).trimmingCharacters(in: .whitespacesAndNewlines)
+            let subject = try parametersContainer.decode(String.self, forKey: .subject).trimmingCharacters(in: .whitespacesAndNewlines)
+            let body = try parametersContainer.decode(String.self, forKey: .body)
+            guard !recipient.isEmpty, recipient.count <= 320, !subject.isEmpty, subject.count <= 998, body.count <= 100_000 else {
+                throw NativePlanDecodingError.invalidParameters("sendEmail parameters are invalid.")
+            }
+            parameters = .sendEmail(recipient: recipient, subject: subject, body: body)
+        case .draftMessage:
+            let allParameters = try parametersDecoder.container(keyedBy: NativePlanCodingKey.self)
+            try rejectUnknownKeys(allParameters.allKeys, allowed: ["recipient", "subject", "body"])
+            let parametersContainer = try parametersDecoder.container(keyedBy: DraftMessageCodingKeys.self)
+            let recipient = try parametersContainer.decode(String.self, forKey: .recipient).trimmingCharacters(in: .whitespacesAndNewlines)
+            let subject = try parametersContainer.decode(String.self, forKey: .subject).trimmingCharacters(in: .whitespacesAndNewlines)
+            let body = try parametersContainer.decode(String.self, forKey: .body)
+            guard !recipient.isEmpty, recipient.count <= 320, !subject.isEmpty, subject.count <= 998, body.count <= 100_000 else {
+                throw NativePlanDecodingError.invalidParameters("draftMessage parameters are invalid.")
+            }
+            parameters = .draftMessage(recipient: recipient, subject: subject, body: body)
         case .insertText:
             let allParameters = try parametersDecoder.container(keyedBy: NativePlanCodingKey.self)
             try rejectUnknownKeys(
@@ -336,10 +592,12 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
             parameters = .insertText(text: text, replaceSelection: replaceSelection)
         }
 
-        let requiresApproval = try container.decode(Bool.self, forKey: .requiresApproval)
         let expectedApproval: Bool = switch parameters {
         case .insertText: true
         case let .press(key, modifiers): key == "Enter" || modifiers != nil
+        case .attachFile, .sendEmail: true
+        case .openURL: false
+        case .draftMessage: true
         default: false
         }
         guard !expectedApproval || requiresApproval else {
@@ -356,7 +614,13 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
             capability: capability,
             executor: executor,
             requiresApproval: requiresApproval,
-            visualTarget: nil
+            visualTarget: visualTarget,
+            route: route,
+            preconditions: preconditions,
+            verifier: verifier,
+            risk: risk,
+            reversal: reversal,
+            expiresAt: expiresAt
         )
     }
 
@@ -369,6 +633,12 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         try container.encode(executor, forKey: .executor)
         try container.encode(requiresApproval, forKey: .requiresApproval)
         try container.encodeIfPresent(visualTarget, forKey: .visualTarget)
+        try container.encode(route.rawValue, forKey: .route)
+        try container.encode(preconditions, forKey: .preconditions)
+        try container.encode(verifier, forKey: .verifier)
+        try container.encode(riskClass.rawValue, forKey: .riskClass)
+        try container.encode(reversal, forKey: .reversal)
+        try container.encodeIfPresent(expiresAt, forKey: .expiresAt)
 
         switch parameters {
         case .openApplication:
@@ -387,6 +657,22 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
             var parametersContainer = container.nestedContainer(keyedBy: PressCodingKeys.self, forKey: .parameters)
             try parametersContainer.encode(key, forKey: .key)
             try parametersContainer.encodeIfPresent(modifiers, forKey: .modifiers)
+        case let .openURL(url):
+            var parametersContainer = container.nestedContainer(keyedBy: OpenURLCodingKeys.self, forKey: .parameters)
+            try parametersContainer.encode(url, forKey: .url)
+        case let .attachFile(fileID):
+            var parametersContainer = container.nestedContainer(keyedBy: AttachFileCodingKeys.self, forKey: .parameters)
+            try parametersContainer.encode(fileID, forKey: .fileId)
+        case let .sendEmail(recipient, subject, body):
+            var parametersContainer = container.nestedContainer(keyedBy: SendEmailCodingKeys.self, forKey: .parameters)
+            try parametersContainer.encode(recipient, forKey: .recipient)
+            try parametersContainer.encode(subject, forKey: .subject)
+            try parametersContainer.encode(body, forKey: .body)
+        case let .draftMessage(recipient, subject, body):
+            var parametersContainer = container.nestedContainer(keyedBy: DraftMessageCodingKeys.self, forKey: .parameters)
+            try parametersContainer.encode(recipient, forKey: .recipient)
+            try parametersContainer.encode(subject, forKey: .subject)
+            try parametersContainer.encode(body, forKey: .body)
         case let .insertText(text, replaceSelection):
             var parametersContainer = container.nestedContainer(keyedBy: InsertTextCodingKeys.self, forKey: .parameters)
             try parametersContainer.encode(text, forKey: .text)

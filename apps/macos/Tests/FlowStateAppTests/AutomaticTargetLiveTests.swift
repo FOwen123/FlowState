@@ -9,7 +9,6 @@ import Testing
     let coordinator = SpeechSessionCoordinator()
     await coordinator.pushToTalkDown()
     let model = FlowStateAppModel(speechCoordinator: coordinator)
-    model.speechSettings.mode = .command
     model.consume(SpeechRecognitionResult(transcript: "Open Brave", language: .english, isFinal: true, utteranceID: UUID(), sessionEnded: false), token: 0)
     for _ in 0..<150 { if model.voiceStatus.hasPrefix("Completed:") { break }; try await Task.sleep(for: .milliseconds(20)) }
     #expect(NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.brave.Browser")

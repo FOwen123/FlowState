@@ -17,11 +17,11 @@ import Testing
     #expect(await session.consume(transcript: "scroll down", isFinal: true) == nil)
 }
 @Test func explicitCancelDiscardsPendingFinalDictation() async {
-    let session = SpeechSessionCoordinator(settings: SpeechSettings(mode: .dictation))
-    await session.pushToTalkDown()
-    await session.pushToTalkUp()
+    let session = SpeechSessionCoordinator(purpose: .dictation)
+    await session.pushToTalkDown(purpose: .dictation)
+    await session.pushToTalkUp(purpose: .dictation)
     await session.localStop()
-    #expect(await session.consume(transcript: "停止", isFinal: true) == nil)
+    #expect(await session.consumeResult(transcript: "停止", isFinal: true) == nil)
 }
 
 @Test func streamingRevisionsReplacePartialTextAndKeepFinalSegments() {
@@ -42,51 +42,26 @@ import Testing
     #expect(!capture.starting)
 }
 
-@Test func wakePhraseAcceptsRecognizerPunctuationButNotOtherSpeech() async {
-    let session = SpeechSessionCoordinator(settings: SpeechSettings(activation: .wakePhrase))
-    #expect(await session.detectWakePhrase("Do not say Hey Flow State") == false)
-    #expect(await session.detectWakePhrase("Hey Flow State.") == true)
-    await session.localStop()
-    await session.update(settings: SpeechSettings(activation: .wakePhrase, wakePhrase: "嘿，Flow State"))
-    #expect(await session.detectWakePhrase("嘿，Flow State。") == true)
+@Test("hold sessions carry their explicit purpose through final results")
+func holdSessionCarriesPurpose() async {
+    let dictation = SpeechSessionCoordinator(purpose: .dictation)
+    await dictation.pushToTalkDown()
+    await dictation.pushToTalkUp()
+    let result = await dictation.consumeResult(transcript: "open Brave", isFinal: true)
+    #expect(result?.purpose == .dictation)
+    #expect(result?.transcript == "open Brave")
+
+    let control = SpeechSessionCoordinator(purpose: .control)
+    await control.pushToTalkDown()
+    await control.pushToTalkUp()
+    #expect(await control.consumeResult(transcript: "open Brave", isFinal: true)?.purpose == .control)
 }
 
-@Test("the second toggle press finishes once and preserves the final command")
-func toggleShortcutFinishesFinalCommand() async {
-    let session = SpeechSessionCoordinator(settings: SpeechSettings(activation: .toggle))
-    await session.toggle()
-    #expect(await session.phase == .listening)
-    await session.toggle()
-    #expect(await session.phase == .stopping)
-    #expect(await session.consume(transcript: "scroll down", isFinal: true) == .scroll(-3))
-    #expect(await session.phase == .idle)
-    #expect(await session.consume(transcript: "scroll down", isFinal: true) == nil)
-}
-
-@Test("capture finishing enters stopping for every activation mode", arguments: ActivationMode.allCases)
-func captureFinishUsesCurrentSession(mode: ActivationMode) async {
-    let session = SpeechSessionCoordinator(settings: SpeechSettings(activation: mode))
-    switch mode {
-    case .pushToTalk: await session.pushToTalkDown()
-    case .toggle: await session.toggle()
-    case .wakePhrase: _ = await session.detectWakePhrase("Hey Flow State")
-    }
-    await session.finish()
-    #expect(await session.phase == .stopping)
-    await session.finish()
-    #expect(await session.phase == .stopping)
-    #expect(await session.consume(transcript: "scroll down", isFinal: true) == .scroll(-3))
-    #expect(await session.phase == .idle)
-}
-
-@Test("a third toggle press cannot restart speech while the final result is pending")
-func toggleWaitsForFinalResult() async {
-    let session = SpeechSessionCoordinator(settings: SpeechSettings(activation: .toggle))
-    let generation = await session.toggle()
-    await session.finish()
-    #expect(await session.toggle() == generation)
-    #expect(await session.phase == .stopping)
-    #expect(await session.consume(transcript: "scroll down", isFinal: true) == .scroll(-3))
-    #expect(await session.toggle() > generation)
-    #expect(await session.phase == .listening)
+@Test("a repeat key-down cannot start another purpose while a hold is active")
+func holdPurposeCannotOverlap() async {
+    let session = SpeechSessionCoordinator(purpose: .control)
+    let first = await session.pushToTalkDown()
+    let second = await session.pushToTalkDown(purpose: .dictation)
+    #expect(first == second)
+    #expect(await session.purpose == .control)
 }

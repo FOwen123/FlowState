@@ -16,6 +16,29 @@ private actor AutomaticTargetDriver: DesktopDriver {
     func restoreValue(_ value: String, expectedObservation: DesktopObservation, authorize: @escaping @Sendable () async -> Bool) async throws {}
 }
 
+private actor FinalizationDriver: DesktopDriver {
+    private var observing = false
+    private var released = false
+    private var inputs: [DesktopAction] = []
+
+    func observe() async throws -> DesktopObservation {
+        observing = true
+        while !released { try await Task.sleep(for: .milliseconds(1)) }
+        return DesktopObservation(bundleIdentifier: "com.example.Editor", focusedElementID: "field")
+    }
+
+    func perform(_ action: DesktopAction, expectedObservation: DesktopObservation, authorize: @escaping @Sendable () async -> Bool) async throws -> DesktopActionResult {
+        guard await authorize() else { throw DesktopExecutionError.staleGeneration }
+        inputs.append(action)
+        return DesktopActionResult(verified: true)
+    }
+
+    func restoreValue(_ value: String, expectedObservation: DesktopObservation, authorize: @escaping @Sendable () async -> Bool) async throws {}
+    func waitForObservation() async { while !observing { try? await Task.sleep(for: .milliseconds(1)) } }
+    func release() { released = true }
+    func recordedInputs() -> [DesktopAction] { inputs }
+}
+
 @Test("Accessibility access automatically targets the active app without a user grant", arguments: [
     VoiceCommand.scroll(-3), .scroll(3), .dictate("literal"), .focus(role: "AXTextField", label: nil), .select(label: "Editor"), .press(key: "Tab", modifiers: nil), .unknown
 ])
@@ -77,20 +100,59 @@ private actor AutomaticTargetDriver: DesktopDriver {
 }
 
 @Test("final speech reaches app controls with no manual app selection", arguments: [
-    ("Open Brave.", DesktopAction.openApplication(bundleIdentifier: "com.brave.Browser")),
-    ("Scroll down.", .scroll(lines: -3)),
-    ("Scroll up.", .scroll(lines: 3))
+    ("Scroll down.", DesktopAction.scroll(lines: -3)),
+    ("Scroll up.", DesktopAction.scroll(lines: 3))
 ])
 @MainActor func automaticSpeechPipeline(transcript: String, expected: DesktopAction) async throws {
     let driver = AutomaticTargetDriver()
     let coordinator = SpeechSessionCoordinator()
     await coordinator.pushToTalkDown()
     let model = FlowStateAppModel(desktopController: DesktopAutomationController(driver: driver), accessibilityGranted: { true }, frontmostApplication: { "com.example.Editor" }, speechCoordinator: coordinator)
-    model.speechSettings.mode = .command
     model.consume(SpeechRecognitionResult(transcript: transcript, language: .english, isFinal: true, utteranceID: UUID(), sessionEnded: false), token: 0)
     for _ in 0..<100 { if await !driver.inputs.isEmpty { break }; try await Task.sleep(for: .milliseconds(5)) }
     #expect(await driver.inputs == [expected])
     model.cancelInputTask()
+}
+
+@Test("an empty terminal result waits for the preceding finalized control task")
+@MainActor func emptyTerminalWaitsForFinalizedControlTask() async throws {
+    let driver = FinalizationDriver()
+    let coordinator = SpeechSessionCoordinator()
+    await coordinator.pushToTalkDown()
+    let model = FlowStateAppModel(
+        desktopController: DesktopAutomationController(driver: driver),
+        accessibilityGranted: { true },
+        frontmostApplication: { "com.example.Editor" },
+        speechCoordinator: coordinator
+    )
+    model.consume(SpeechRecognitionResult(
+        transcript: "Scroll down",
+        language: .english,
+        isFinal: true,
+        utteranceID: UUID(),
+        sessionEnded: false
+    ), token: 0)
+    await driver.waitForObservation()
+    model.consume(SpeechRecognitionResult(
+        transcript: "",
+        language: .english,
+        isFinal: true,
+        utteranceID: UUID(),
+        sessionEnded: true
+    ), token: 0)
+    try await Task.sleep(for: .milliseconds(20))
+    #expect(model.voiceStatus != "Voice session finished")
+    await driver.release()
+    for _ in 0..<100 {
+        if await !driver.recordedInputs().isEmpty { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    #expect(await driver.recordedInputs() == [.scroll(lines: -3)])
+    for _ in 0..<100 {
+        if model.voiceStatus == "Voice session finished" { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    #expect(model.voiceStatus == "Voice session finished")
 }
 
 @Test("Stop invalidates a finalized command before automatic setup can begin")
@@ -120,27 +182,39 @@ private actor AutomaticTargetDriver: DesktopDriver {
     #expect(reopened.inputBundleIdentifier.isEmpty)
 }
 
-@Test("wake activation needs no target app or Accessibility grant")
-@MainActor func automaticWakeDoesNotRequireTarget() async throws {
-    var settings = SpeechSettings()
-    settings.activation = .wakePhrase
-    let coordinator = SpeechSessionCoordinator(settings: settings)
+@Test("dictation cleanup and history retention settings persist")
+@MainActor func dictationCleanupAndRetentionPersist() throws {
+    let suite = "FlowState.DictationSettingsTests." + UUID().uuidString
+    let preferences = try #require(UserDefaults(suiteName: suite))
+    defer { preferences.removePersistentDomain(forName: suite) }
+
+    let model = FlowStateAppModel(preferences: preferences)
+    model.setDictationCleanup(enabled: false, instructions: "Keep product names unchanged")
+    model.setDictationRetentionDays(7)
+    model.setControlRetentionDays(14)
+
+    let reopened = FlowStateAppModel(preferences: preferences)
+    #expect(!reopened.dictationCleanupEnabled)
+    #expect(reopened.dictationCleanupInstructions == "Keep product names unchanged")
+    #expect(reopened.dictationRetentionDays == 7)
+    #expect(reopened.controlRetentionDays == 14)
+}
+
+@Test("unbound speech never starts a control session")
+@MainActor func unboundSpeechDoesNotStartControl() async throws {
+    let coordinator = SpeechSessionCoordinator(purpose: .control)
     let model = FlowStateAppModel(accessibilityGranted: { false }, frontmostApplication: { nil }, speechCoordinator: coordinator)
-    model.speechSettings = settings
-    model.consume(SpeechRecognitionResult(transcript: settings.wakePhrase, language: .english, isFinal: true, utteranceID: UUID(), sessionEnded: false), token: 0)
+    model.consume(SpeechRecognitionResult(transcript: "Hey Flow State", language: .english, isFinal: true, utteranceID: UUID(), sessionEnded: false, purpose: .control), token: 0)
     for _ in 0..<100 { if await coordinator.phase == .listening { break }; try await Task.sleep(for: .milliseconds(2)) }
-    #expect(await coordinator.phase == .listening)
+    #expect(await coordinator.phase == .idle)
     #expect(model.currentInputGrant == nil)
 }
 
-@Test("background speech before the wake phrase does not prepare app control")
+@Test("background speech does not prepare app control")
 @MainActor func automaticWakeIgnoresBackgroundSpeech() async throws {
-    var settings = SpeechSettings()
-    settings.activation = .wakePhrase
-    let coordinator = SpeechSessionCoordinator(settings: settings)
+    let coordinator = SpeechSessionCoordinator(purpose: .control)
     let model = FlowStateAppModel(desktopController: DesktopAutomationController(driver: AutomaticTargetDriver()), accessibilityGranted: { true }, frontmostApplication: { "com.example.Editor" }, speechCoordinator: coordinator)
-    model.speechSettings = settings
-    model.consume(SpeechRecognitionResult(transcript: "Hello there", language: .english, isFinal: true, utteranceID: UUID(), sessionEnded: false), token: 0)
+    model.consume(SpeechRecognitionResult(transcript: "Hello there", language: .english, isFinal: true, utteranceID: UUID(), sessionEnded: false, purpose: .control), token: 0)
     try await Task.sleep(for: .milliseconds(30))
     #expect(await coordinator.phase == .idle)
     #expect(model.currentInputGrant == nil)

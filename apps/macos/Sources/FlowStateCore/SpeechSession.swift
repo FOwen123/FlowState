@@ -74,18 +74,54 @@ public enum VoiceShortcut: String, CaseIterable, Codable, Sendable {
     }
 }
 
+public enum SpeechSessionPurpose: String, Codable, CaseIterable, Sendable {
+    case dictation
+    case control
+
+    public var displayName: String {
+        switch self {
+        case .dictation: "Dictation"
+        case .control: "Mac Control"
+        }
+    }
+}
+
+public enum SpeechShortcutValidationError: String, Error, Codable, Equatable, LocalizedError, Sendable {
+    case duplicate
+
+    public var errorDescription: String? {
+        switch self {
+        case .duplicate: "Dictation and Mac Control shortcuts must be different."
+        }
+    }
+}
+
 public struct SpeechSettings: Codable, Equatable, Sendable {
     public var language: SpeechLanguage
-    public var mode: VoiceMode
-    public var activation: ActivationMode
-    public var wakePhrase: String
-    public var shortcut: VoiceShortcut
+    public var dictationShortcut: VoiceShortcut
+    public var controlShortcut: VoiceShortcut
+
+    /// Legacy values remain source-compatible while callers migrate. They are
+    /// intentionally inert; purpose now comes from the shortcut that started
+    /// the session and every session is hold-only.
+    @available(*, deprecated, message: "Purpose is selected by the Dictation or Mac Control shortcut.")
+    public var mode: VoiceMode = .auto
+    @available(*, deprecated, message: "Activation is always hold-only.")
+    public var activation: ActivationMode = .pushToTalk
+    @available(*, deprecated, message: "Wake phrases are no longer supported.")
+    public var wakePhrase: String = "Hey Flow State"
+
+    @available(*, deprecated, message: "Use controlShortcut.")
+    public var shortcut: VoiceShortcut {
+        get { controlShortcut }
+        set { controlShortcut = newValue }
+    }
 
     /// Kept as a source-compatible bridge for older settings UI and persisted
     /// files. New code should read and write `shortcut`.
     public var pushToTalkKey: String {
-        get { shortcut.legacyDisplayName }
-        set { shortcut = Self.migrateLegacyShortcut(newValue) }
+        get { controlShortcut.legacyDisplayName }
+        set { controlShortcut = Self.migrateLegacyShortcut(newValue) }
     }
 
     public init(
@@ -94,17 +130,24 @@ public struct SpeechSettings: Codable, Equatable, Sendable {
         activation: ActivationMode = .pushToTalk,
         wakePhrase: String = "Hey Flow State",
         pushToTalkKey: String? = nil,
-        shortcut: VoiceShortcut = .controlShiftSpace
+        shortcut: VoiceShortcut? = nil,
+        dictationShortcut: VoiceShortcut? = nil,
+        controlShortcut: VoiceShortcut = .controlShiftSpace
     ) {
         self.language = language.rawValue == "zh-TW" ? .english : language
+        let migratedControl = pushToTalkKey.map(Self.migrateLegacyShortcut) ?? shortcut ?? controlShortcut
+        self.controlShortcut = migratedControl
+        self.dictationShortcut = dictationShortcut ?? Self.defaultDictationShortcut(avoiding: migratedControl)
         self.mode = mode
         self.activation = activation
         self.wakePhrase = wakePhrase
-        self.shortcut = pushToTalkKey.map(Self.migrateLegacyShortcut) ?? shortcut
     }
 
     private enum CodingKeys: String, CodingKey {
         case language
+        case dictationShortcut
+        case controlShortcut
+        // Legacy keys are decoded only for migration; they are never encoded.
         case mode
         case activation
         case wakePhrase
@@ -118,31 +161,43 @@ public struct SpeechSettings: Codable, Equatable, Sendable {
         mode = try values.decodeIfPresent(VoiceMode.self, forKey: .mode) ?? .auto
         activation = try values.decodeIfPresent(ActivationMode.self, forKey: .activation) ?? .pushToTalk
         wakePhrase = try values.decodeIfPresent(String.self, forKey: .wakePhrase) ?? "Hey Flow State"
-        // Older files stored the conflicting Option-Space label in
-        // `pushToTalkKey`; migrate those files to the safe default. An
-        // explicitly encoded new `shortcut` choice remains authoritative.
-        self.shortcut = try values.decodeIfPresent(VoiceShortcut.self, forKey: .shortcut)
-            ?? values.decodeIfPresent(String.self, forKey: .pushToTalkKey)
-                .map(Self.migrateLegacyShortcut)
+        let legacyControl = try values.decodeIfPresent(VoiceShortcut.self, forKey: .shortcut)
+            ?? values.decodeIfPresent(String.self, forKey: .pushToTalkKey).map(Self.migrateLegacyShortcut)
             ?? .controlShiftSpace
+        let decodedControl = try values.decodeIfPresent(VoiceShortcut.self, forKey: .controlShortcut) ?? legacyControl
+        let decodedDictation = try values.decodeIfPresent(VoiceShortcut.self, forKey: .dictationShortcut)
+        controlShortcut = decodedControl
+        dictationShortcut = decodedDictation ?? Self.defaultDictationShortcut(avoiding: decodedControl)
     }
 
     private static func migrateLegacyShortcut(_ value: String) -> VoiceShortcut {
-        // Option-Space was the old default and can conflict with system input
-        // sources. Keep explicit modern `shortcut` values intact, but migrate
-        // the legacy field to the safe default.
-        guard let shortcut = VoiceShortcut(legacyDisplayName: value) else { return .controlShiftSpace }
-        return shortcut == .optionSpace ? .controlShiftSpace : shortcut
+        VoiceShortcut(legacyDisplayName: value) ?? .controlShiftSpace
+    }
+
+    public static func shortcutConflict(_ lhs: VoiceShortcut, _ rhs: VoiceShortcut) -> Bool {
+        lhs == rhs
+    }
+
+    public static func validateShortcuts(
+        dictation: VoiceShortcut,
+        control: VoiceShortcut
+    ) -> SpeechShortcutValidationError? {
+        shortcutConflict(dictation, control) ? .duplicate : nil
+    }
+
+    public static func defaultDictationShortcut(
+        avoiding control: VoiceShortcut,
+        preferred: VoiceShortcut = .optionSpace
+    ) -> VoiceShortcut {
+        if preferred != control { return preferred }
+        return VoiceShortcut.allCases.first(where: { $0 != control }) ?? .optionSpace
     }
 
     public func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try values.encode(language, forKey: .language)
-        try values.encode(mode, forKey: .mode)
-        try values.encode(activation, forKey: .activation)
-        try values.encode(wakePhrase, forKey: .wakePhrase)
-        try values.encode(shortcut, forKey: .shortcut)
-        try values.encode(pushToTalkKey, forKey: .pushToTalkKey)
+        try values.encode(dictationShortcut, forKey: .dictationShortcut)
+        try values.encode(controlShortcut, forKey: .controlShortcut)
     }
 }
 
@@ -150,9 +205,19 @@ public enum SpeechSettingsStore {
     private static let key = "flowstate.speech-settings.v1"
 
     public static func load(defaults: UserDefaults = .standard) -> SpeechSettings {
-        guard let data = defaults.data(forKey: key),
-              let settings = try? JSONDecoder().decode(SpeechSettings.self, from: data)
-        else { return SpeechSettings() }
+        guard let data = defaults.data(forKey: key) else {
+            let settings = SpeechSettings()
+            save(settings, defaults: defaults)
+            return settings
+        }
+        guard let settings = try? JSONDecoder().decode(SpeechSettings.self, from: data) else { return SpeechSettings() }
+        // Persist the normalized two-shortcut shape once after decoding an
+        // older settings payload. This also prevents legacy toggle/wake fields
+        // from being reintroduced on the next launch.
+        if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           object["dictationShortcut"] == nil || object["controlShortcut"] == nil {
+            save(settings, defaults: defaults)
+        }
         return settings
     }
 
@@ -175,19 +240,22 @@ public struct SpeechRecognitionResult: Equatable, Sendable {
     public let isFinal: Bool
     public let utteranceID: UUID?
     public let sessionEnded: Bool
+    public let purpose: SpeechSessionPurpose
 
     public init(
         transcript: String,
         language: SpeechLanguage,
         isFinal: Bool,
         utteranceID: UUID? = nil,
-        sessionEnded: Bool? = nil
+        sessionEnded: Bool? = nil,
+        purpose: SpeechSessionPurpose = .control
     ) {
         self.transcript = transcript
         self.language = language.rawValue == "zh-TW" ? .english : language
         self.isFinal = isFinal
         self.utteranceID = utteranceID
         self.sessionEnded = sessionEnded ?? isFinal
+        self.purpose = purpose
     }
 }
 
@@ -330,30 +398,39 @@ public struct UtteranceEndpointDetector: Sendable {
 public actor SpeechSessionCoordinator {
     public private(set) var phase: SpeechSessionPhase = .idle
     public private(set) var settings: SpeechSettings
+    public private(set) var purpose: SpeechSessionPurpose
     public private(set) var generation: UInt64 = 0
     private var consumedUtteranceIDs: Set<UUID> = []
 
-    public init(settings: SpeechSettings = SpeechSettings()) {
+    public init(settings: SpeechSettings = SpeechSettings(), purpose: SpeechSessionPurpose = .control) {
         self.settings = settings
+        self.purpose = purpose
     }
 
-    public func update(settings: SpeechSettings) {
+    public func update(settings: SpeechSettings, purpose: SpeechSessionPurpose? = nil) {
         self.settings = settings
+        if let purpose, phase == .idle { self.purpose = purpose }
     }
 
     @discardableResult
-    public func pushToTalkDown() -> UInt64 {
-        guard settings.activation == .pushToTalk, phase == .idle else { return generation }
+    public func pushToTalkDown(purpose: SpeechSessionPurpose? = nil) -> UInt64 {
+        guard phase == .idle else { return generation }
+        if let purpose { self.purpose = purpose }
         return beginListening()
     }
 
-    public func pushToTalkUp() {
-        guard settings.activation == .pushToTalk else { return }
+    public func pushToTalkUp(purpose: SpeechSessionPurpose? = nil) {
+        guard purpose == nil || purpose == self.purpose else { return }
         finish()
     }
 
     public func finish() {
         if phase == .listening { phase = .stopping }
+    }
+
+    public func finish(purpose: SpeechSessionPurpose?) {
+        guard purpose == nil || purpose == self.purpose else { return }
+        finish()
     }
 
     @discardableResult
@@ -364,6 +441,27 @@ public actor SpeechSessionCoordinator {
             return generation
         }
         return beginListening()
+    }
+
+    /// Captures an immutable purpose-tagged result without routing it through
+    /// command recognition. Dictation callers use this path exclusively.
+    public func consumeResult(
+        transcript: String,
+        isFinal: Bool,
+        sessionEnded: Bool = true,
+        utteranceID: UUID? = nil
+    ) -> SpeechRecognitionResult? {
+        guard phase == .listening || phase == .stopping else { return nil }
+        if sessionEnded { phase = .idle }
+        guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !isFinal else { return nil }
+        return SpeechRecognitionResult(
+            transcript: transcript,
+            language: settings.language,
+            isFinal: isFinal,
+            utteranceID: utteranceID,
+            sessionEnded: sessionEnded,
+            purpose: purpose
+        )
     }
 
     public func detectWakePhrase(_ transcript: String) -> Bool {
@@ -385,7 +483,7 @@ public actor SpeechSessionCoordinator {
         if sessionEnded { phase = .idle }
         guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         if isFinal, let utteranceID, !consumedUtteranceIDs.insert(utteranceID).inserted { return nil }
-        let command = VoiceCommandRouter.resolve(transcript, mode: settings.mode)
+        let command = VoiceCommandRouter.resolve(transcript, mode: purpose == .dictation ? .dictation : .command)
         if command == .stop {
             stopLocally()
             return .stop
@@ -393,10 +491,15 @@ public actor SpeechSessionCoordinator {
         if isFinal, sessionEnded { phase = .idle }
         // Partial command words are never executed. Dictation can be surfaced as a
         // partial result but callers should insert only final text.
-        return isFinal || settings.mode == .dictation ? command : nil
+        return isFinal || purpose == .dictation || settings.mode == .dictation ? command : nil
     }
 
     public func localStop() {
+        stopLocally()
+    }
+
+    public func localStop(ifGeneration expectedGeneration: UInt64) {
+        guard generation == expectedGeneration else { return }
         stopLocally()
     }
 

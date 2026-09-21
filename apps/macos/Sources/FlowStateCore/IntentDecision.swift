@@ -160,7 +160,7 @@ public struct IntentDecisionAction: Codable, Equatable, Sendable {
     public let nativePlanAction: NativePlanAction
 
     public var kind: NativePlanActionKind { nativePlanAction.kind }
-    public var targetBundleIdentifier: String { nativePlanAction.targetBundleIdentifier }
+    public var targetBundleIdentifier: String? { nativePlanAction.targetBundleIdentifier }
     public var capability: String { nativePlanAction.capability }
     public var executor: String { nativePlanAction.executor }
     public var requiresApproval: Bool { nativePlanAction.requiresApproval }
@@ -185,6 +185,9 @@ public struct IntentDecisionAction: Codable, Equatable, Sendable {
         let kind = try values.decode(String.self, forKey: .kind)
         guard let actionKind = NativePlanActionKind(rawValue: kind) else {
             throw IntentDecisionDecodingError.invalidCombination("unsupported native action \(kind).")
+        }
+        guard actionKind != .insertText else {
+            throw IntentDecisionDecodingError.invalidCombination("insertText is available only through the Dictation shortcut.")
         }
         let targetID = try values.decodeIfPresent(String.self, forKey: .targetId)?.trimmedNonEmpty
         let targetBundle = try values.decodeIfPresent(String.self, forKey: .targetBundleIdentifier)?.trimmedNonEmpty
@@ -245,10 +248,15 @@ public struct IntentDecisionAction: Codable, Equatable, Sendable {
         case .openApplication: "app.open"
         case .scroll, .focus, .select: "app.control"
         case .press, .insertText: "app.input"
+        case .openURL: "app.control"
+        case .attachFile: "file.upload"
+        case .sendEmail: "mail.send"
+        case .draftMessage: "mail.draft"
         }
     }
 
     private static func defaultRequiresApproval(kind: NativePlanActionKind, parameters: [String: NativePlanJSONValue]) -> Bool {
+        if kind == .openURL || kind == .attachFile || kind == .sendEmail || kind == .draftMessage { return true }
         guard kind == .insertText || kind == .press else { return false }
         if kind == .insertText { return true }
         let key = parameters["key"]?.stringValue
@@ -335,9 +343,7 @@ public struct IntentDecision: Codable, Equatable, Sendable {
         case .execute:
             guard action != nil else { throw IntentDecisionDecodingError.invalidCombination("execute requires action.") }
         case .dictation:
-            if let action, action.kind != .insertText {
-                throw IntentDecisionDecodingError.invalidCombination("dictation requires insertText or no action.")
-            }
+            throw IntentDecisionDecodingError.invalidCombination("dictation is not a Mac Control decision; use the Dictation shortcut.")
         case .clarify:
             guard action == nil, clarification != nil else {
                 throw IntentDecisionDecodingError.invalidCombination("clarify cannot execute an action and needs clarification.")

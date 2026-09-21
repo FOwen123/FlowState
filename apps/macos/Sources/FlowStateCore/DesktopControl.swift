@@ -10,6 +10,12 @@ public enum DesktopActionKind: String, CaseIterable, Codable, Sendable {
     case select
     case press
     case insertText
+
+    /// Generic text insertion is retained as a decoding compatibility case,
+    /// but it is no longer a control grant or an executable action.
+    public static var allCases: [DesktopActionKind] {
+        [.openApplication, .scroll, .focus, .select, .press]
+    }
 }
 
 public enum DesktopAction: Equatable, Codable, Sendable {
@@ -78,6 +84,7 @@ public struct DesktopExecutionGrant: Codable, Equatable, Sendable {
     public func allows(_ action: DesktopAction, bundleIdentifier: String) -> Bool {
         guard expiresAt > Date(),
               allowedBundleIdentifiers.contains(bundleIdentifier),
+              action.kind != .insertText,
               allowedActions.contains(action.kind) else { return false }
         if case let .openApplication(actionBundleIdentifier) = action {
             return actionBundleIdentifier == bundleIdentifier
@@ -313,8 +320,9 @@ public protocol DesktopDriver: Sendable {
     ) async throws
 }
 
-/// Serializes desktop effects and rejects late work after local cancellation or
-/// physical takeover. The caller must supply a grant for each task.
+/// Serializes desktop effects and rejects late work after local cancellation.
+/// Physical user input is observed by the app, but does not revoke a task;
+/// every subsequent effect re-observes its target and preconditions.
 public actor DesktopAutomationController {
     private let driver: any DesktopDriver
     private var grant: DesktopExecutionGrant?
@@ -382,10 +390,9 @@ public actor DesktopAutomationController {
 
     public func notePhysicalTakeover(lifecycleEpoch: UInt64? = nil) {
         guard acceptLifecycleEpoch(lifecycleEpoch) else { return }
-        guard stateValue == .ready || stateValue == .running else { return }
-        generation &+= 1
-        activeOperation = nil
-        stateValue = .pausedForUser
+        // Unrelated user input is not an authoritative cancellation signal.
+        // Keep the grant and operation generation intact so the next action
+        // can reobserve and either continue or fail closed on target drift.
     }
 
     @discardableResult
@@ -436,6 +443,9 @@ public actor DesktopAutomationController {
         expectedBundleIdentifier: String,
         expectedObservation: DesktopObservation? = nil
     ) async throws -> VerifiedDesktopAction {
+        guard action.kind != .insertText else {
+            throw DesktopExecutionError.actionNotGranted
+        }
         guard stateValue == .ready else {
             if stateValue == .pausedForUser { throw DesktopExecutionError.pausedForTakeover }
             if stateValue == .reconciliationRequired { throw DesktopExecutionError.reconciliationRequired }
@@ -749,6 +759,7 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
             }
             return try await scrollWebContent(in: window, lines: lines, expectedFocus: expectedObservation.focusedElementID, authorize: authorize)
         case .focus, .focusTarget, .select, .selectTarget, .press, .keyPress, .insertText:
+            guard action.kind != .insertText else { throw DesktopExecutionError.actionNotGranted }
             guard AXIsProcessTrusted() else { throw DesktopExecutionError.accessibilityDenied }
             let focused = try focusedElement(matching: expectedObservation)
             switch action {

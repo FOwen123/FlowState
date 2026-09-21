@@ -2,9 +2,10 @@ import Foundation
 import Testing
 @testable import FlowStateCore
 
-@Test("normalized English insert plan maps to a native action")
-func englishInsertPlanDecodes() throws {
-    let response = try NativePlanResponse.decode(data("""
+@Test("control plans reject normalized English insert plans")
+func englishInsertPlanDecodes() {
+    #expect(throws: NativePlanDecodingError.self) {
+        _ = try NativePlanResponse.decode(data("""
     {
       "planId": "plan-en",
       "status": "awaiting_approval",
@@ -20,18 +21,13 @@ func englishInsertPlanDecodes() throws {
       "capabilities": ["app.input"]
     }
     """))
-
-    #expect(response.planId == "plan-en")
-    #expect(response.actions[0].desktopAction == .insertText("Hello from FlowState"))
-    #expect(response.actions[0].targetBundleIdentifier == "com.apple.TextEdit")
-    #expect(response.actions[0].capability == "app.input")
-    #expect(response.actions[0].executor == "desktop")
-    #expect(response.actions[0].summary == "Insert text into com.apple.TextEdit: Hello from FlowState")
+    }
 }
 
-@Test("normalized Traditional Chinese insert plan defaults to replacing selection")
-func traditionalChineseInsertPlanDecodes() throws {
-    let response = try NativePlanResponse.decode(data("""
+@Test("control plans reject normalized Traditional Chinese insert plans")
+func traditionalChineseInsertPlanDecodes() {
+    #expect(throws: NativePlanDecodingError.self) {
+        _ = try NativePlanResponse.decode(data("""
     {
       "planId": "plan-zh-hant",
       "status": "awaiting_approval",
@@ -47,9 +43,7 @@ func traditionalChineseInsertPlanDecodes() throws {
       "capabilities": ["app.input"]
     }
     """))
-
-    #expect(response.actions[0].desktopAction == .insertText("請幫我打開這個頁面"))
-    #expect(response.actions[0].requiresApproval == true)
+    }
 }
 
 @Test("open and bounded scroll plans map to native actions")
@@ -87,6 +81,33 @@ func openAndScrollPlansDecode() throws {
     #expect(response.actions[1].capability == "app.control")
     #expect(response.actions[0].executor == "desktop")
     #expect(response.actions[1].executor == "desktop")
+}
+
+@Test("plan steps retain route, preconditions, verifier, risk, reversal, and expiry")
+func planStepExecutionMetadata() {
+    let expiry = Date(timeIntervalSince1970: 1_800_000_000)
+    let action = NativePlanAction(
+        kind: .scroll,
+        targetBundleIdentifier: "com.example.Reader",
+        parameters: .scroll(lines: -3),
+        capability: "app.control",
+        requiresApproval: false,
+        route: .nativeAccessibility,
+        preconditions: NativePlanPreconditions(targetBundleIdentifier: "com.example.Reader", requiresFreshObservation: true),
+        verifier: NativePlanVerifier(kind: .boundedAction),
+        risk: .routine,
+        reversalSupported: false,
+        expiresAt: expiry
+    )
+
+    #expect(action.route == .nativeAccessibility)
+    #expect(action.preconditions.requiresFreshObservation)
+    #expect(action.preconditions.targetBundleIdentifier == "com.example.Reader")
+    #expect(action.verifier.kind == .boundedAction)
+    #expect(action.risk == .routine)
+    #expect(!action.reversalSupported)
+    #expect(action.isCurrent(at: expiry.addingTimeInterval(-1)))
+    #expect(!action.isCurrent(at: expiry))
 }
 
 @Test("focus, select, and bounded key plans map to native actions")
@@ -166,7 +187,7 @@ func unknownTargetFieldIsRejected() {
 
 @Test("execution metadata is accepted separately from the normalized response")
 func executionMetadataWrapper() throws {
-    let response = try NativePlanResponse.decode(data(validInsertJSON))
+    let response = try NativePlanResponse.decode(data(validScrollJSON))
     let expiry = Date(timeIntervalSince1970: 1_800_000_000)
     let context = NativePlanExecutionContext(
         plan: response,
@@ -360,4 +381,159 @@ func stricterNavigationReviewPolicyDecodes() throws {
     """.utf8))
     #expect(action.requiresApproval)
     #expect(action.desktopAction == .scroll(lines: -3))
+}
+
+@Test("canonical backend plan payload decodes structured and native steps")
+func canonicalBackendPlanPayloadDecodes() throws {
+    let response = try NativePlanResponse.decode(data("""
+    {
+      "planId": "plan-canonical",
+      "status": "awaiting_approval",
+      "fingerprint": "fp-canonical",
+      "actions": [
+        {
+          "kind": "openApplication",
+          "targetBundleIdentifier": "com.brave.Browser",
+          "parameters": {},
+          "capability": "app.open",
+          "executor": "desktop",
+          "requiresApproval": false,
+          "route": "nativeAccessibility",
+          "riskClass": "reversible",
+          "preconditions": {"targetBundleIdentifier": "com.brave.Browser", "requiresFreshObservation": false},
+          "verifier": {"kind": "boundedAction"},
+          "reversal": {"kind": "none", "supported": false}
+        },
+        {
+          "kind": "openURL",
+          "targetBundleIdentifier": "com.brave.Browser",
+          "parameters": {"url": "https://example.com"},
+          "capability": "app.control",
+          "executor": "service",
+          "requiresApproval": false,
+          "route": "structuredIntegration",
+          "riskClass": "reversible",
+          "preconditions": {"targetBundleIdentifier": "com.brave.Browser", "requiresFreshObservation": false},
+          "verifier": {"kind": "externalEffectReconciled"},
+          "reversal": {"kind": "reconcile", "supported": false}
+        }
+      ],
+      "capabilities": ["app.open", "app.control"]
+    }
+    """))
+
+    #expect(response.actions.count == 2)
+    #expect(response.actions[0].route == .nativeAccessibility)
+    #expect(response.actions[0].preconditions.requiresFreshObservation == false)
+    #expect(response.actions[1].kind == .openURL)
+    #expect(response.actions[1].riskClass == .reversible)
+    #expect(response.actions[1].verifier.kind == .externalEffectReconciled)
+    #expect(response.actions[1].targetBundleIdentifier == "com.brave.Browser")
+}
+
+@Test("canonical draftMessage actions decode without becoming desktop typing")
+func canonicalDraftMessageDecodesAsServiceAction() throws {
+    let response = try NativePlanResponse.decode(data("""
+    {
+      "planId": "plan-draft",
+      "status": "awaiting_approval",
+      "fingerprint": "fp-draft",
+      "actions": [{
+        "kind": "draftMessage",
+        "targetBundleIdentifier": "com.brave.Browser",
+        "parameters": {"recipient": "person@example.com", "subject": "Hello", "body": "Draft only"},
+        "capability": "mail.draft",
+        "executor": "service",
+        "requiresApproval": true,
+        "route": "structuredIntegration",
+        "riskClass": "confirm",
+        "preconditions": {"targetBundleIdentifier": "com.brave.Browser", "requiresFreshObservation": false},
+        "verifier": {"kind": "externalEffectReconciled"},
+        "reversal": {"kind": "reconcile", "supported": false}
+      }],
+      "capabilities": ["mail.draft"]
+    }
+    """))
+
+    #expect(response.actions[0].kind == .draftMessage)
+    #expect(response.actions[0].desktopAction == nil)
+    #expect(response.actions[0].route == .structuredIntegration)
+    #expect(response.actions[0].requiresApproval)
+}
+
+@Test("canonical service actions preserve backend approval")
+func reversibleStructuredActionsDecodeWithBackendRisk() throws {
+    let response = try NativePlanResponse.decode(data("""
+    {
+      "planId": "plan-reversible-structured",
+      "status": "awaiting_approval",
+      "fingerprint": "fp-reversible-structured",
+      "actions": [
+        {
+          "kind": "openURL",
+          "targetBundleIdentifier": "com.brave.Browser",
+          "parameters": {"url": "https://example.com/project"},
+          "capability": "app.control",
+          "executor": "service",
+          "requiresApproval": false,
+          "route": "structuredIntegration",
+          "riskClass": "reversible",
+          "preconditions": {"targetBundleIdentifier": "com.brave.Browser", "requiresFreshObservation": false},
+          "verifier": {"kind": "externalEffectReconciled"},
+          "reversal": {"kind": "none", "supported": false}
+        },
+        {
+          "kind": "draftMessage",
+          "targetBundleIdentifier": "com.brave.Browser",
+          "parameters": {"recipient": "person@example.com", "subject": "Project", "body": "See the page."},
+          "capability": "mail.draft",
+          "executor": "service",
+          "requiresApproval": true,
+          "route": "structuredIntegration",
+          "riskClass": "confirm",
+          "preconditions": {"targetBundleIdentifier": "com.brave.Browser", "requiresFreshObservation": false},
+          "verifier": {"kind": "externalEffectReconciled"},
+          "reversal": {"kind": "reconcile", "supported": false}
+        }
+      ],
+      "capabilities": ["app.control", "mail.draft"]
+    }
+    """))
+
+    #expect(response.actions.map(\.requiresApproval) == [false, true])
+    #expect(response.actions.map(\.riskClass) == [.reversible, .confirm])
+}
+
+@Test("canonical draftMessage rejects a reversible unapproved payload")
+func canonicalDraftMessageRejectsReversiblePayload() {
+    #expect(throws: NativePlanDecodingError.self) {
+        _ = try NativePlanResponse.decode(data("""
+        {
+          "planId": "plan-draft-rejected",
+          "status": "awaiting_approval",
+          "fingerprint": "fp-draft-rejected",
+          "actions": [{
+            "kind": "draftMessage",
+            "targetBundleIdentifier": "com.brave.Browser",
+            "parameters": {"recipient": "person@example.com", "subject": "Hello", "body": "Draft only"},
+            "capability": "mail.draft",
+            "executor": "service",
+            "requiresApproval": false,
+            "route": "structuredIntegration",
+            "riskClass": "reversible",
+            "preconditions": {"targetBundleIdentifier": "com.brave.Browser", "requiresFreshObservation": false},
+            "verifier": {"kind": "externalEffectReconciled"},
+            "reversal": {"kind": "reconcile", "supported": false}
+          }],
+          "capabilities": ["mail.draft"]
+        }
+        """))
+    }
+}
+
+@Test("control plans reject the legacy generic insertText action")
+func controlPlanRejectsGenericInsertText() {
+    #expect(throws: NativePlanDecodingError.self) {
+        _ = try NativePlanResponse.decode(data(validInsertJSON))
+    }
 }

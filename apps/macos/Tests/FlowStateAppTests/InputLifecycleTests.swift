@@ -18,9 +18,9 @@ func cancellingInputGrantUsesPlanCancellationOnly() {
     #expect(!researchCancelled)
 }
 
-@Test("physical takeover retains the explicit grant for a reviewed resume")
+@Test("physical input leaves the explicit grant active for revalidation")
 @MainActor
-func takeoverRetainsGrantForResume() async throws {
+func physicalInputLeavesGrantActive() async throws {
     let controller = DesktopAutomationController()
     let model = FlowStateAppModel(desktopController: controller)
     model.inputBundleIdentifier = "com.example.Reader"
@@ -32,8 +32,37 @@ func takeoverRetainsGrantForResume() async throws {
     let grant = try #require(model.currentInputGrant)
     model.handlePhysicalTakeover(for: 1)
     #expect(model.currentInputGrant?.generation == grant.generation)
-    #expect(model.desktopState == .pausedForUser)
+    #expect(model.desktopState == .ready)
+    #expect(model.desktopStatus.contains("rechecking"))
     model.cancelInputTask()
     #expect(model.currentInputGrant == nil)
     #expect(model.desktopState == .cancelled)
+}
+
+@Test("new control task invalidates active local work before creating the next task")
+@MainActor
+func newControlTaskCancelsActiveExecution() async throws {
+    let controller = DesktopAutomationController()
+    let model = FlowStateAppModel(desktopController: controller)
+    model.inputBundleIdentifier = "com.example.Reader"
+    let oldTask = model.beginInputTask()
+    for _ in 0..<100 {
+        if model.currentInputGrant != nil { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    #expect(model.currentInputGrant != nil)
+
+    var cloudCancelled = false
+    model.onCancelCloud = { cloudCancelled = true }
+    model.startNewControlTask()
+
+    #expect(cloudCancelled)
+    #expect(model.currentInputGrant == nil)
+    #expect(model.desktopState == .cancelled)
+    oldTask?.cancel()
+    for _ in 0..<100 {
+        if await controller.state == .cancelled { break }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    #expect(await controller.state == .cancelled)
 }

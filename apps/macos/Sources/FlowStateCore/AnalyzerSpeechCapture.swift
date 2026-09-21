@@ -56,6 +56,7 @@ public final class AnalyzerSpeechCapture {
     }
 
     public func start(language: SpeechLanguage,
+                      purpose: SpeechSessionPurpose = .control,
                       onResult: @escaping @MainActor (SpeechRecognitionResult) -> Void,
                       onFailure: @escaping @MainActor () -> Void) async throws {
         guard analyzer == nil, !starting else { throw SpeechCaptureError.alreadyRunning }
@@ -95,12 +96,12 @@ public final class AnalyzerSpeechCapture {
                         self.streamingTranscript.reset()
                         continue
                     }
-                    onResult(SpeechRecognitionResult(transcript:text,language:.english,isFinal:false,sessionEnded:false))
+                    onResult(SpeechRecognitionResult(transcript:text,language:.english,isFinal:false,sessionEnded:false,purpose:purpose))
                 }
                 guard let self, self.generation == token else { return }
                 let finalTime = Date()
                 if let endpoint = self.endpointDetector.finish(at:finalTime) {
-                    self.emit(endpoint,language:.english,onResult:onResult)
+                    self.emit(endpoint,language:.english,purpose:purpose,onResult:onResult)
                 } else {
                     // An automatic endpoint may already have emitted the last
                     // transcript. Still notify consumers that the analyzer
@@ -110,7 +111,8 @@ public final class AnalyzerSpeechCapture {
                         language:.english,
                         isFinal:true,
                         utteranceID:UUID(),
-                        sessionEnded:true
+                        sessionEnded:true,
+                        purpose: purpose
                     ))
                 }
                 self.cleanup()
@@ -125,7 +127,7 @@ public final class AnalyzerSpeechCapture {
             Task { @MainActor [weak self] in
                 guard let self, self.generation == token else { return }
                 self.endpointDetector.updateSpeechActivity(active,at:Date())
-                self.pollEndpoint(at:Date(),language:.english,onResult:onResult)
+                    self.pollEndpoint(at:Date(),language:.english,purpose:purpose,onResult:onResult)
             }
             do {
                 let converted = try converter.convert(buffer)
@@ -143,7 +145,7 @@ public final class AnalyzerSpeechCapture {
             engine = audioEngine
             audioEngine.prepare()
             try audioEngine.start()
-            startEndpointPoller(token:token,language:.english,onResult:onResult)
+            startEndpointPoller(token:token,language:.english,purpose:purpose,onResult:onResult)
         } catch {
             audioEngine.inputNode.removeTap(onBus:0)
             if generation == token { stop() }
@@ -187,6 +189,7 @@ public final class AnalyzerSpeechCapture {
     private func startEndpointPoller(
         token: UInt64,
         language: SpeechLanguage,
+        purpose: SpeechSessionPurpose,
         onResult: @escaping @MainActor (SpeechRecognitionResult) -> Void
     ) {
         endpointPollTask?.cancel()
@@ -194,7 +197,7 @@ public final class AnalyzerSpeechCapture {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds:self?.endpointPollInterval ?? 100_000_000)
                 guard let self, self.generation == token else { return }
-                self.pollEndpoint(at:Date(),language:language,onResult:onResult)
+                self.pollEndpoint(at:Date(),language:language,purpose:purpose,onResult:onResult)
             }
         }
     }
@@ -202,15 +205,17 @@ public final class AnalyzerSpeechCapture {
     private func pollEndpoint(
         at now: Date,
         language: SpeechLanguage,
+        purpose: SpeechSessionPurpose,
         onResult: @escaping @MainActor (SpeechRecognitionResult) -> Void
     ) {
         guard let endpoint = endpointDetector.poll(at:now) else { return }
-        emit(endpoint,language:language,onResult:onResult)
+        emit(endpoint,language:language,purpose:purpose,onResult:onResult)
     }
 
     private func emit(
         _ endpoint: UtteranceEndpoint,
         language: SpeechLanguage,
+        purpose: SpeechSessionPurpose,
         onResult: @escaping @MainActor (SpeechRecognitionResult) -> Void
     ) {
         streamingTranscript.reset()
@@ -219,7 +224,8 @@ public final class AnalyzerSpeechCapture {
             language:language,
             isFinal:true,
             utteranceID:endpoint.utteranceID,
-            sessionEnded:endpoint.sessionEnded
+            sessionEnded:endpoint.sessionEnded,
+            purpose: purpose
         ))
     }
 

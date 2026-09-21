@@ -1,13 +1,54 @@
 import Foundation
 import ConvexMobile
+import FlowStateCore
 
 public struct CloudIntentCandidate: Codable, Sendable {
     public let id: String
     public let label: String
     public let bundleIdentifier: String?
     public let kind: String
-    public init(id: String, label: String, bundleIdentifier: String?, kind: String) {
-        self.id = id; self.label = label; self.bundleIdentifier = bundleIdentifier; self.kind = kind
+    public let normalizedNames: [String]
+    public let isRunning: Bool?
+    public let supportedActions: [String]
+    public let integrations: [String]
+    public init(
+        id: String,
+        label: String,
+        bundleIdentifier: String?,
+        kind: String,
+        normalizedNames: [String] = [],
+        isRunning: Bool? = nil,
+        supportedActions: [String] = [],
+        integrations: [String] = []
+    ) {
+        self.id = id
+        self.label = label
+        self.bundleIdentifier = bundleIdentifier
+        self.kind = kind
+        self.normalizedNames = normalizedNames
+        self.isRunning = isRunning
+        self.supportedActions = supportedActions
+        self.integrations = integrations
+    }
+}
+
+/// The bounded application snapshot sent with a reviewed control plan. The
+/// normalized names include the display name and any user-approved aliases;
+/// the backend deliberately receives no richer local application object.
+public struct CloudApplicationCandidate: Codable, ConvexEncodable, Sendable, Equatable {
+    public let bundleIdentifier: String
+    public let displayName: String
+    public let normalizedNames: [String]
+    public let supportedActions: [String]
+    public let integrations: [String]
+
+    public init(bundleIdentifier: String, displayName: String, normalizedNames: [String],
+                supportedActions: [String], integrations: [String]) {
+        self.bundleIdentifier = bundleIdentifier
+        self.displayName = displayName
+        self.normalizedNames = normalizedNames
+        self.supportedActions = supportedActions
+        self.integrations = integrations
     }
 }
 
@@ -22,7 +63,8 @@ public struct CloudIntentContext: Codable, ConvexEncodable, Sendable {
                 targetCandidates: [CloudIntentCandidate], recentInteraction: String? = nil) {
         self.focusedAppBundleIdentifier = focusedAppBundleIdentifier
         self.focusedRole = focusedRole; self.editable = editable
-        self.targetCandidates = targetCandidates; self.recentInteraction = recentInteraction
+        self.targetCandidates = targetCandidates
+        self.recentInteraction = recentInteraction.map(ControlConversationSession.structuredSummary)
     }
 }
 

@@ -209,7 +209,7 @@ private struct CloudConnectedView: View {
                 }
                 Spacer()
                 Button(text("account.sign_out")) {
-                    Task { await cloud.signOut() }
+                    Task { await model.signOutCloud() }
                 }
                 .buttonStyle(PaperBorderButtonStyle())
             }
@@ -269,11 +269,43 @@ private struct CloudConnectedView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(PaperStyle.muted)
 
+            if !model.externalEffectRecoveries.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(model.externalEffectRecoveries) { recovery in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("A reviewed handoff may already have completed.")
+                                .font(.system(size: 13, weight: .medium))
+                            Text(recovery.summary)
+                                .font(.system(size: 13))
+                                .foregroundStyle(PaperStyle.muted)
+                            HStack {
+                                Button("It completed") {
+                                    model.confirmExternalEffect(recovery)
+                                }
+                                .buttonStyle(PaperBorderButtonStyle())
+                                Button("It failed") {
+                                    model.rejectExternalEffect(recovery)
+                                }
+                                .buttonStyle(PaperBorderButtonStyle())
+                            }
+                        }
+                    }
+                }
+                .padding(12)
+                .background(PaperStyle.selected, in: RoundedRectangle(cornerRadius: 8))
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Choose whether the previous reviewed handoff completed or failed")
+            }
+
             if let plan = cloud.proposal {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(Array(plan.actions.enumerated()), id: \.offset) { index, action in
-                        let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: action.targetBundleIdentifier)
-                        let appName = appURL.map { FileManager.default.displayName(atPath: $0.path) } ?? action.targetBundleIdentifier
+                        let appName: String = if let bundleIdentifier = action.targetBundleIdentifier {
+                            NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
+                                .map { FileManager.default.displayName(atPath: $0.path) } ?? bundleIdentifier
+                        } else {
+                            "Selected app"
+                        }
                         let summary = L10n.planSummary(action.parameters, appName: appName)
                         Text(accountFormat("account.plan.action", index + 1, summary))
                             .textSelection(.enabled)
@@ -285,6 +317,12 @@ private struct CloudConnectedView: View {
                     ))
                     .font(.system(size: 13))
                     .foregroundStyle(PaperStyle.muted)
+                    if let currentStep = model.currentPlanStep {
+                        Text("Current step: \(currentStep)")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(PaperStyle.secondary)
+                            .textSelection(.enabled)
+                    }
                     HStack {
                         Button(text("account.managed.confirm")) {
                             model.executeCloudPlan(plan)

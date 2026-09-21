@@ -6,7 +6,7 @@ import Testing
 
 // Opt-in only: opens a disposable TextEdit document and exercises real AX input.
 @Test(.enabled(if: ProcessInfo.processInfo.environment["FLOWSTATE_NATIVE_SMOKE"] == "1"))
-@MainActor func liveTextEditOpenInsertUndoAndScroll() async throws {
+@MainActor func liveTextEditOpenAndScroll() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("FlowStateSmoke-\(UUID().uuidString).txt")
     let original = "FlowState disposable native test / 測試文件\n" + (1...200).map { "Line \($0) / 第 \($0) 行" }.joined(separator: "\n")
     try original.write(to: url, atomically: true, encoding: .utf8)
@@ -24,7 +24,7 @@ import Testing
     try #require(AXIsProcessTrusted(), "The test runner needs Accessibility permission independently of the app")
     let driver = AXDesktopDriver()
     let controller = DesktopAutomationController(driver: driver)
-    try await controller.begin(grant: DesktopExecutionGrant(allowedBundleIdentifiers: ["com.apple.TextEdit"], allowedActions: [.openApplication, .insertText, .scroll, .press], generation: 1, expiresAt: Date().addingTimeInterval(30)))
+    try await controller.begin(grant: DesktopExecutionGrant(allowedBundleIdentifiers: ["com.apple.TextEdit"], allowedActions: [.openApplication, .scroll, .press], generation: 1, expiresAt: Date().addingTimeInterval(30)))
     _ = try await controller.execute(.openApplication(bundleIdentifier: "com.apple.TextEdit"), expectedBundleIdentifier: "com.apple.TextEdit")
     var ready = false
     var lastObservation: DesktopObservation?
@@ -39,11 +39,6 @@ import Testing
     }
     if !ready { print("Fixture focus unavailable: app=\(lastObservation?.bundleIdentifier ?? "none"), focused=\(lastObservation?.focusedElementID != nil), valueLength=\(lastObservation?.value?.count ?? -1), error=\(observationError ?? "none")") }
     try #require(ready, "Refuse live input unless the focused text is exactly our disposable fixture")
-    let result = try await controller.execute(.insertText("Verified input / 輸入測試"), expectedBundleIdentifier: "com.apple.TextEdit")
-    #expect(result.valueBefore == original)
-    #expect(result.valueAfter?.contains("Verified input / 輸入測試") == true)
-    try await controller.undo(result)
-    #expect(try await driver.observe().value == original)
     print("Live fixture: testing select-all")
     _ = try await controller.execute(.press(key: "A", modifiers: "Command"), expectedBundleIdentifier: "com.apple.TextEdit")
     #expect(try await driver.observe().selectedTextRange == DesktopTextRange(location: 0, length: (original as NSString).length))
@@ -77,7 +72,7 @@ import Testing
         print("Synthetic TextEdit window capture, geometry revalidation and bounded in-memory encoding passed; no upload.")
     }
     // Leave the test document open for inspection; never close an unrelated document.
-    print("Live TextEdit activation, Unicode insertion, exact undo, select-all, arrow key and scrolling passed.")
+    print("Live TextEdit activation, select-all, arrow key and scrolling passed.")
 }
 
 private func liveAttribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {

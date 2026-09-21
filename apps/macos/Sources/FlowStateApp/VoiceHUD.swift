@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import FlowStateCore
 
 @MainActor
 final class VoiceHUDController {
@@ -10,17 +11,29 @@ final class VoiceHUDController {
         status: String,
         transcript: String,
         isListening: Bool,
+        purpose: SpeechSessionPurpose? = nil,
         onStop: @escaping () -> Void,
         onConfirm: (() -> Void)? = nil,
+        isMuted: Bool = false,
+        lastResponse: String? = nil,
+        currentStep: String? = nil,
+        onReplay: @escaping () -> Void = {},
+        onMute: @escaping () -> Void = {},
         onSettings: @escaping () -> Void = {}
     ) {
         model.status = status
         model.transcript = transcript
         model.isListening = isListening
+        model.purpose = purpose
         model.onStop = onStop
         model.onSettings = onSettings
         model.onConfirm = onConfirm
         model.canConfirm = onConfirm != nil
+        model.isMuted = isMuted
+        model.lastResponse = lastResponse
+        model.currentStep = currentStep
+        model.onReplay = onReplay
+        model.onMute = onMute
 
         let panel = makePanelIfNeeded()
         if let host = panel.contentView as? NSHostingView<VoiceHUDView> {
@@ -81,10 +94,16 @@ final class VoiceHUDModel: ObservableObject {
     @Published var status = "Ready"
     @Published var transcript = ""
     @Published var isListening = false
+    @Published var purpose: SpeechSessionPurpose?
     var onStop: () -> Void = {}
     var onSettings: () -> Void = {}
     var onConfirm: (() -> Void)?
     @Published var canConfirm = false
+    @Published var isMuted = false
+    @Published var lastResponse: String?
+    @Published var currentStep: String?
+    var onReplay: () -> Void = {}
+    var onMute: () -> Void = {}
 }
 
 private final class VoiceHUDPanel: NSPanel {
@@ -99,6 +118,7 @@ struct VoiceHUDView: View {
 
     private var showsDetails: Bool {
         model.canConfirm || !model.isListening ||
+            model.currentStep != nil || model.lastResponse != nil ||
             !(model.status.hasPrefix("Listening —") || model.status.hasPrefix("Listening for "))
     }
 
@@ -107,10 +127,12 @@ struct VoiceHUDView: View {
             HStack(alignment: .center, spacing: 16) {
                 VoiceHUDWaveform(isListening: model.isListening)
                     .frame(width: 48, height: 26)
-                    .accessibilityLabel(model.isListening ? "Listening" : "Processing")
+                    .accessibilityLabel(model.isListening
+                        ? L10n.format("Listening %@", model.purpose?.displayName ?? "")
+                        : L10n.text("Processing"))
                 Spacer(minLength: 0)
                 Button(action: model.onStop) {
-                    Image(systemName: "stop.fill")
+                    Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.white)
                         .frame(width: 32, height: 32)
@@ -119,8 +141,8 @@ struct VoiceHUDView: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Stop voice session")
-                .help("Stop listening and cancel the current command")
+                .accessibilityLabel(L10n.text("Cancel task"))
+                .help(L10n.text("Cancel listening and the current Mac Control task"))
             }
             .padding(.leading, 12)
             .padding(.trailing, 6)
@@ -131,24 +153,43 @@ struct VoiceHUDView: View {
                     if !model.transcript.isEmpty {
                         Text(model.transcript)
                             .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityLabel("Latest transcript")
+                            .accessibilityLabel(L10n.text("Latest transcript"))
                     }
                     Text(L10n.text(model.status))
                         .font(.custom("Helvetica Neue", size: 14))
                         .foregroundStyle(.white)
                         .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityLabel("Voice status")
+                        .accessibilityLabel(L10n.text("Voice status"))
+                    if let currentStep = model.currentStep {
+                        Text(currentStep)
+                            .font(.custom("Helvetica Neue", size: 13))
+                            .foregroundStyle(PaperStyle.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityLabel(L10n.text("Current plan step"))
+                    }
+                    if let lastResponse = model.lastResponse {
+                        Text(lastResponse)
+                            .font(.custom("Helvetica Neue", size: 13))
+                            .foregroundStyle(PaperStyle.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityLabel(L10n.text("Last spoken response"))
+                    }
                     HStack(spacing: 12) {
                         if model.canConfirm {
-                            Button("Confirm action") { model.onConfirm?() }
-                                .accessibilityLabel("Confirm proposed action")
+                            Button(L10n.text("Confirm action")) { model.onConfirm?() }
+                                .accessibilityLabel(L10n.text("Confirm proposed action"))
                         }
-                        Button("Settings…") {
+                        Button(L10n.text("Replay")) { model.onReplay() }
+                            .disabled(model.lastResponse == nil)
+                            .accessibilityLabel(L10n.text("Replay last spoken response"))
+                        Button(model.isMuted ? L10n.text("Unmute") : L10n.text("Mute")) { model.onMute() }
+                            .accessibilityLabel(L10n.text(model.isMuted ? "Unmute spoken responses" : "Mute spoken responses"))
+                        Button(L10n.text("Settings…")) {
                             model.onSettings()
                             NSApplication.shared.activate()
                             openSettings()
                         }
-                        .accessibilityLabel("Open control settings")
+                        .accessibilityLabel(L10n.text("Open control settings"))
                     }
                     .buttonStyle(VoiceHUDActionStyle())
                 }

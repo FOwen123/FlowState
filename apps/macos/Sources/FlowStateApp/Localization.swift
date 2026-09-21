@@ -42,6 +42,14 @@ enum L10n {
             return "Select \(label) in \(appName)"
         case let .press(key, modifiers):
             return "Press \(modifiers.map { $0 + "–" } ?? "")\(key) in \(appName)"
+        case let .openURL(url):
+            return "Open URL \(url)"
+        case let .attachFile(fileID):
+            return "Attach approved file \(fileID)"
+        case let .sendEmail(recipient, subject, _):
+            return "Send email to \(recipient): \(subject)"
+        case let .draftMessage(recipient, subject, _):
+            return "Draft email to \(recipient): \(subject)"
         }
     }
 

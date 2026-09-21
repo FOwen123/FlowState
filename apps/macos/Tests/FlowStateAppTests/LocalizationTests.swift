@@ -18,5 +18,5 @@ import Testing
 
 @Test func englishPlanSummaryPreservesUnicodeAndFormatCharacters() {
     let literal = "Hello / 你好 — 100% %@"
-    #expect(L10n.planSummary(.insertText(text: literal, replaceSelection: false), appName: "TextEdit") == "Insert text into TextEdit: " + literal)
+    #expect(L10n.planSummary(.focus(role: literal, label: nil), appName: "TextEdit") == "Focus \(literal) in TextEdit")
 }

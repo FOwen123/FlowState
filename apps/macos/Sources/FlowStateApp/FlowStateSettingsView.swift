@@ -160,27 +160,27 @@ private struct VoiceSettingsView: View {
         settingsColumn {
             pageHeading(
                 title: "Voice & activation",
-                subtitle: "Speak naturally. Decide when Flow State listens."
+                subtitle: "Hold one shortcut to dictate and another to control your Mac."
             )
 
             settingsPanel {
                 PickerRow(
-                    title: "Activation",
-                    subtitle: "Hold to talk, or press once to start and again to finish.",
+                    title: "Dictation shortcut",
+                    subtitle: "Hold to paste cleaned speech into the focused text field.",
                     selection: Binding(
-                        get: { model.speechSettings.activation },
-                        set: { updateActivation($0) }
+                        get: { model.speechSettings.dictationShortcut },
+                        set: { updateDictationShortcut($0) }
                     ),
-                    options: ActivationMode.allCases
+                    options: VoiceShortcut.allCases
                 )
                 PickerRow(
-                    title: "Voice mode",
-                    subtitle: "Choose whether to dictate text or control apps.",
+                    title: "Mac Control shortcut",
+                    subtitle: "Hold to control apps with a verified voice command.",
                     selection: Binding(
-                        get: { model.speechSettings.mode },
-                        set: { updateMode($0) }
+                        get: { model.speechSettings.controlShortcut },
+                        set: { updateControlShortcut($0) }
                     ),
-                    options: VoiceMode.allCases
+                    options: VoiceShortcut.allCases
                 )
                 PickerRow(
                     title: "Language",
@@ -195,28 +195,54 @@ private struct VoiceSettingsView: View {
                     ),
                     options: SpeechLanguage.allCases
                 )
-                if model.speechSettings.activation == .wakePhrase {
-                    TextFieldRow(
-                        title: "Wake phrase",
-                        subtitle: "Wake phrase detection is local and configurable.",
-                        text: Binding(
-                            get: { model.speechSettings.wakePhrase },
-                            set: { updateWakePhrase($0) }
-                        )
-                    )
-                }
-                PickerRow(
-                    title: "Keyboard shortcut",
-                    subtitle: "Release to finish in push-to-talk mode. Press again to finish in toggle mode.",
-                    selection: Binding(
-                        get: { model.speechSettings.shortcut },
-                        set: { updateShortcut($0) }
-                    ),
-                    options: VoiceShortcut.allCases
-                )
                 if let error = model.shortcutError {
                     Text(L10n.text(error)).font(.caption).foregroundStyle(.orange)
                 }
+            }
+
+            settingsPanel {
+                Text(L10n.text("Spoken responses"))
+                    .font(.headline)
+                Picker("Voice", selection: Binding(
+                    get: { model.spokenVoiceIdentifier ?? "" },
+                    set: { model.setSpokenVoice($0.isEmpty ? nil : $0) }
+                )) {
+                    Text(L10n.text("System default")).tag("")
+                    ForEach(SpokenResponseController.availableVoices(), id: \.id) { voice in
+                        Text("\(voice.name) (\(voice.locale))").tag(voice.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                ToggleRow(
+                    title: "Spoken task updates",
+                    subtitle: "Speak questions, meaningful milestones, failures, and verified completion.",
+                    isOn: Binding(
+                        get: { !model.spokenResponsesMuted },
+                        set: { model.setSpokenResponsesMuted(!$0) }
+                    )
+                )
+                Button(L10n.text("Replay last response")) { model.replayLastSpokenResponse() }
+                    .buttonStyle(PaperBorderButtonStyle())
+                    .disabled(model.lastSpokenResponse == nil)
+            }
+
+            settingsPanel {
+                ToggleRow(
+                    title: "Dictation cleanup",
+                    subtitle: "Apply conservative local cleanup before pasting. Managed cleanup, when configured, is text-only and time-bounded.",
+                    isOn: Binding(
+                        get: { model.dictationCleanupEnabled },
+                        set: { model.setDictationCleanup(enabled: $0) }
+                    )
+                )
+                TextFieldRow(
+                    title: "Cleanup instructions",
+                    subtitle: "Optional guidance for formatting only; it cannot authorize actions.",
+                    text: Binding(
+                        get: { model.dictationCleanupInstructions },
+                        set: { model.setDictationCleanupInstructions($0) }
+                    )
+                )
             }
 
             settingsPanel {
@@ -250,7 +276,7 @@ private struct VoiceSettingsView: View {
 
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "info.circle")
-                Text(L10n.text("Flow State listens only when you start a session. Stop ends listening and cancels current actions."))
+                Text(L10n.text("Hold Dictation to enter text. Hold Mac Control to control your Mac. Release either shortcut to finish."))
                     .font(.system(size: 13))
                     .foregroundStyle(PaperStyle.muted)
             }
@@ -261,27 +287,15 @@ private struct VoiceSettingsView: View {
         }
     }
 
-    private func updateActivation(_ value: ActivationMode) {
+    private func updateDictationShortcut(_ value: VoiceShortcut) {
         var settings = model.speechSettings
-        settings.activation = value
+        settings.dictationShortcut = value
         model.updateSpeechSettings(settings)
     }
 
-    private func updateMode(_ value: VoiceMode) {
+    private func updateControlShortcut(_ value: VoiceShortcut) {
         var settings = model.speechSettings
-        settings.mode = value
-        model.updateSpeechSettings(settings)
-    }
-
-    private func updateWakePhrase(_ value: String) {
-        var settings = model.speechSettings
-        settings.wakePhrase = value
-        model.updateSpeechSettings(settings)
-    }
-
-    private func updateShortcut(_ value: VoiceShortcut) {
-        var settings = model.speechSettings
-        settings.shortcut = value
+        settings.controlShortcut = value
         model.updateSpeechSettings(settings)
     }
 }
@@ -315,6 +329,8 @@ private struct TasksSettingsView: View {
                     isOn: $model.allowCloudScreenContext
                 )
                 HStack(spacing: 12) {
+                    Button(L10n.text("New task")) { model.startNewControlTask() }
+                        .buttonStyle(PaperBorderButtonStyle())
                     if model.desktopState == .reconciliationRequired {
                         Button("I've checked the result") { model.beginInputTask() }
                             .buttonStyle(PaperBorderButtonStyle())
@@ -335,6 +351,111 @@ private struct TasksSettingsView: View {
             settingsPanel {
                 SettingRow(title: "Current voice session", subtitle: model.voiceStatus, trailing: { Image(systemName: "waveform") })
                 SettingRow(title: "Current desktop task", subtitle: model.taskStatus, trailing: { Image(systemName: "rectangle.on.rectangle") })
+            }
+            settingsPanel {
+                Text(L10n.text("History retention")).font(.headline)
+                Stepper(
+                    L10n.format("Dictation: %.0f days", model.dictationRetentionDays),
+                    value: Binding(
+                        get: { model.dictationRetentionDays },
+                        set: { model.setDictationRetentionDays($0) }
+                    ),
+                    in: 1...3650,
+                    step: 1
+                )
+                Stepper(
+                    L10n.format("Mac Control: %.0f days", model.controlRetentionDays),
+                    value: Binding(
+                        get: { model.controlRetentionDays },
+                        set: { model.setControlRetentionDays($0) }
+                    ),
+                    in: 1...3650,
+                    step: 1
+                )
+            }
+            if let recovery = model.dictationRecovery {
+                settingsPanel {
+                    Text(L10n.text("Dictation needs attention")).font(.headline)
+                    Text(recovery.text).textSelection(.enabled)
+                    Text(recovery.reason)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    HStack(spacing: 12) {
+                        Button(L10n.text("Copy")) { model.copyDictationRecovery() }
+                            .buttonStyle(PaperBorderButtonStyle())
+                        Button(L10n.text("Retry original field")) { model.retryDictationRecovery() }
+                            .buttonStyle(PaperBorderButtonStyle())
+                        Button(L10n.text("Dismiss")) { model.dismissDictationRecovery() }
+                            .buttonStyle(PaperBorderButtonStyle())
+                    }
+                    Text(L10n.format("Available for %@", recovery.expiresAt.formatted(date: .omitted, time: .shortened)))
+                        .font(.caption)
+                        .foregroundStyle(PaperStyle.muted)
+                }
+            }
+            settingsPanel {
+                HStack {
+                    Text(L10n.text("Control history"))
+                        .font(.headline)
+                    Spacer()
+                    Button(L10n.text("Delete all")) { model.deleteAllControlHistory() }
+                        .buttonStyle(PaperBorderButtonStyle())
+                        .disabled(model.controlHistory.isEmpty)
+                }
+                ForEach(model.controlHistory) { entry in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(entry.request).textSelection(.enabled)
+                        if let plan = entry.approvedPlan {
+                            Text(plan).foregroundStyle(PaperStyle.muted)
+                        }
+                        ForEach(entry.stepOutcomes, id: \.self) { outcome in
+                            Text(outcome).font(.caption).foregroundStyle(PaperStyle.muted)
+                        }
+                        if let failure = entry.failureReason {
+                            Text(failure).font(.caption).foregroundStyle(.orange)
+                        }
+                        Button(L10n.text("Delete")) { model.deleteControlHistory(id: entry.id) }
+                            .buttonStyle(PaperBorderButtonStyle())
+                    }
+                    .padding(.vertical, 10)
+                    Divider().overlay(PaperStyle.divider)
+                }
+                if model.controlHistory.isEmpty {
+                    Text(L10n.text("No control tasks yet.")).foregroundStyle(PaperStyle.muted)
+                }
+            }
+            settingsPanel {
+                HStack {
+                    Text(L10n.text("Dictation history"))
+                        .font(.headline)
+                    Spacer()
+                    Button(L10n.text("Delete all")) { model.deleteAllDictationHistory() }
+                        .buttonStyle(PaperBorderButtonStyle())
+                        .disabled(model.dictationHistory.isEmpty)
+                }
+                ForEach(model.dictationHistory) { entry in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(entry.text)
+                            .textSelection(.enabled)
+                        if let failureReason = entry.failureReason {
+                            Text(L10n.format("Not inserted: %@", failureReason))
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+                        HStack {
+                            Button(L10n.text("Copy")) { model.copyDictationHistory(entry) }
+                                .buttonStyle(PaperBorderButtonStyle())
+                            Button(L10n.text("Delete")) { model.deleteDictationHistory(id: entry.id) }
+                                .buttonStyle(PaperBorderButtonStyle())
+                        }
+                    }
+                    .padding(.vertical, 10)
+                    Divider().overlay(PaperStyle.divider)
+                }
+                if model.dictationHistory.isEmpty {
+                    Text(L10n.text("No dictations yet."))
+                        .foregroundStyle(PaperStyle.muted)
+                }
             }
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "clock.arrow.circlepath")

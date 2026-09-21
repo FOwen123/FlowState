@@ -45,8 +45,7 @@ private actor IntentFixtureDriver: DesktopDriver {
     NativePlanParameters.openApplication,
     .scroll(lines: -3), .scroll(lines: 3),
     .focus(role: "AXTextField", label: "Editor"),
-    .select(label: "Editor"), .press(key: "Tab", modifiers: nil),
-    .insertText(text: "Type open Brave literally — 你好", replaceSelection: true)
+    .select(label: "Editor"), .press(key: "Tab", modifiers: nil)
 ])
 @MainActor func resolvedControlsUseSharedExecutor(parameters: NativePlanParameters) async throws {
     let driver = IntentFixtureDriver()
@@ -62,13 +61,16 @@ private actor IntentFixtureDriver: DesktopDriver {
     case .focus: kind = .focus
     case .select: kind = .select
     case .press: kind = .press
-    case .insertText: kind = .insertText
+    case .openURL, .attachFile, .sendEmail, .draftMessage:
+        preconditionFailure("structured service actions are not native desktop controls")
+    case .insertText: preconditionFailure("generic text is not a supported control parameter")
     }
-    let capability = kind == .openApplication ? "app.open" : (kind == .press || kind == .insertText) ? "app.input" : "app.control"
+    let capability = kind == .openApplication ? "app.open" : kind == .press ? "app.input" : "app.control"
     let action = NativePlanAction(kind: kind, targetBundleIdentifier: "com.example.Editor", parameters: parameters,
         capability: capability, requiresApproval: false)
+    let desktopAction = try #require(action.desktopAction)
     try await model.executeResolvedIntent(action, observation: await driver.observe(), epoch: grant.generation)
-    #expect(await driver.inputs == [action.desktopAction])
+    #expect(await driver.inputs == [desktopAction])
     model.cancelInputTask()
     await #expect(throws: (any Error).self) {
         try await model.executeResolvedIntent(action, observation: await driver.observe(), epoch: grant.generation)
@@ -80,7 +82,6 @@ private actor IntentFixtureDriver: DesktopDriver {
 @MainActor func exactCommandsDoNotDependOnCloudCalibration() {
     let model = FlowStateAppModel()
     model.useManagedCommands = true
-    model.speechSettings.mode = .auto
     #expect(model.shouldInterpret(.unknown))
     for command in [VoiceCommand.openApp("com.brave.Browser"), .scroll(-3), .stop, .resume, .undo, .dictate("open Brave"), .press(key: "Tab", modifiers: nil)] {
         #expect(!model.shouldInterpret(command))
@@ -123,23 +124,40 @@ private actor IntentFixtureDriver: DesktopDriver {
     model.cancelInputTask()
 }
 
-@Test("literal local dictation is bound to its original field")
-@MainActor func literalDictationRejectsChangedField() async throws {
-    let driver = IntentFixtureDriver()
-    let model = FlowStateAppModel(desktopController: DesktopAutomationController(driver: driver))
-    model.inputBundleIdentifier = "com.example.Editor"
-    model.beginInputTask()
-    for _ in 0..<100 { if model.currentInputGrant != nil { break }; try await Task.sleep(for: .milliseconds(2)) }
-    let observation = await driver.observe()
-    await driver.moveFocus()
-    model.executeDesktopAction(.insertText("literal"), expectedObservation: observation)
-    try await Task.sleep(for: .milliseconds(30))
-    #expect(await driver.inputs.isEmpty)
-    model.cancelInputTask()
+@Test("compound plans auto-run only the reversible prefix")
+@MainActor func compoundPlanAutoRunStopsAtApprovalStep() {
+    let reversible = NativePlanAction(
+        kind: .scroll,
+        targetBundleIdentifier: "com.example.Editor",
+        parameters: .scroll(lines: -2),
+        capability: "app.control",
+        requiresApproval: false,
+        risk: .reversible
+    )
+    let consequential = NativePlanAction(
+        kind: .press,
+        targetBundleIdentifier: "com.example.Editor",
+        parameters: .press(key: "Enter", modifiers: nil),
+        capability: "app.input",
+        requiresApproval: true,
+        risk: .confirm
+    )
+    let trailing = NativePlanAction(
+        kind: .scroll,
+        targetBundleIdentifier: "com.example.Editor",
+        parameters: .scroll(lines: 2),
+        capability: "app.control",
+        requiresApproval: false,
+        risk: .reversible
+    )
+
+    #expect(automaticPlanPrefixCount([reversible, consequential, trailing]) == 1)
+    #expect(automaticPlanPrefixCount([consequential, trailing]) == 0)
+    #expect(consequential.requiresApproval)
 }
 
-@Test("paused local controls explain how to resume instead of requesting another grant")
-@MainActor func blockedControlsExplainState() async throws {
+@Test("physical input continues while each next action is revalidated")
+@MainActor func physicalInputDoesNotPauseControl() async throws {
     let driver = IntentFixtureDriver()
     let model = FlowStateAppModel(desktopController: DesktopAutomationController(driver: driver))
     model.inputBundleIdentifier = "com.example.Editor"
@@ -147,20 +165,10 @@ private actor IntentFixtureDriver: DesktopDriver {
     for _ in 0..<100 { if model.currentInputGrant != nil { break }; try await Task.sleep(for: .milliseconds(2)) }
     let grant = try #require(model.currentInputGrant)
     model.handlePhysicalTakeover(for: grant.generation)
-    #expect(model.desktopState == .pausedForUser)
-    model.executeDesktopAction(.scroll(lines: 3))
-    #expect(model.voiceStatus == "Paused after mouse or keyboard input. Say Resume, then repeat your command.")
-    model.executeDesktopAction(.insertText("literal"))
-    #expect(model.voiceStatus == "Paused after mouse or keyboard input. Say Resume, then repeat your command.")
-    model.prepareLocalKeyConfirmation(key: "Enter", modifiers: nil)
-    try await Task.sleep(for: .milliseconds(10))
-    #expect(model.voiceStatus == "Paused after mouse or keyboard input. Say Resume, then repeat your command.")
-    #expect(await driver.inputs.isEmpty)
-    try await Task.sleep(for: .milliseconds(10))
-    model.resumeInputTask()
-    for _ in 0..<100 { if model.desktopState == .ready { break }; try await Task.sleep(for: .milliseconds(2)) }
     #expect(model.desktopState == .ready)
-    #expect(model.voiceStatus == "Desktop control resumed. Repeat your command.")
+    model.executeDesktopAction(.scroll(lines: 3))
+    for _ in 0..<100 { if await !driver.inputs.isEmpty { break }; try await Task.sleep(for: .milliseconds(2)) }
+    #expect(await driver.inputs == [.scroll(lines: 3)])
     model.cancelInputTask()
 }
 

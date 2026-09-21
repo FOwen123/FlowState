@@ -61,11 +61,13 @@ func configuredShortcutMatching() {
 func legacyShortcutSettingsDecode() throws {
     let legacy = Data(#"{"language":"en-US","mode":"command","activation":"pushToTalk","wakePhrase":"Hey Flow State","pushToTalkKey":"⌥ Space"}"#.utf8)
     let decoded = try JSONDecoder().decode(SpeechSettings.self, from: legacy)
-    #expect(decoded.shortcut == .controlShiftSpace)
+    #expect(decoded.controlShortcut == .optionSpace)
+    #expect(decoded.dictationShortcut == .controlOptionSpace)
 
     let missing = Data(#"{"language":"en-US","mode":"command","activation":"pushToTalk","wakePhrase":"Hey Flow State"}"#.utf8)
     let defaulted = try JSONDecoder().decode(SpeechSettings.self, from: missing)
-    #expect(defaulted.shortcut == .controlShiftSpace)
+    #expect(defaulted.controlShortcut == .controlShiftSpace)
+    #expect(defaulted.dictationShortcut == .optionSpace)
     let chosen = SpeechSettings(shortcut: .optionSpace)
     let restored = try JSONDecoder().decode(SpeechSettings.self, from: JSONEncoder().encode(chosen))
     #expect(restored.shortcut == .optionSpace)
@@ -128,6 +130,30 @@ func releaseWithoutOption() {
     #expect(state.consume(event(.keyDown,flags:.option)) == nil)
     #expect(state.consume(event(.keyUp,flags:[])) == false)
     #expect(state.consume(event(.keyDown,flags:.option)) == true)
+}
+
+@Test("speech settings persist separate hold-only dictation and control shortcuts")
+func speechSettingsUseSeparatePurposes() throws {
+    let settings = SpeechSettings(dictationShortcut: .optionSpace, controlShortcut: .controlShiftSpace)
+    #expect(settings.dictationShortcut == .optionSpace)
+    #expect(settings.controlShortcut == .controlShiftSpace)
+    #expect(SpeechSettings.shortcutConflict(settings.dictationShortcut, settings.controlShortcut) == false)
+    let duplicate = SpeechSettings(dictationShortcut: .controlShiftSpace, controlShortcut: .controlShiftSpace)
+    #expect(SpeechSettings.validateShortcuts(dictation: duplicate.dictationShortcut, control: duplicate.controlShortcut) == .duplicate)
+}
+
+@Test("legacy shortcut migrates to control and selects a non-conflicting dictation default")
+func legacyShortcutMigratesToControl() throws {
+    let data = Data(#"{"language":"en-US","mode":"command","activation":"pushToTalk","pushToTalkKey":"⌥ Space"}"#.utf8)
+    let decoded = try JSONDecoder().decode(SpeechSettings.self, from: data)
+    #expect(decoded.controlShortcut == .optionSpace)
+    #expect(decoded.dictationShortcut != decoded.controlShortcut)
+}
+
+@Test("duplicate shortcut validation rejects a partial two-monitor registration")
+func duplicateShortcutValidation() {
+    #expect(SpeechSettings.validateShortcuts(dictation: .controlShiftSpace, control: .controlShiftSpace) == .duplicate)
+    #expect(SpeechSettings.validateShortcuts(dictation: .optionSpace, control: .controlShiftSpace) == nil)
 }
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["FLOWSTATE_HOTKEY_SMOKE"] == "1"))

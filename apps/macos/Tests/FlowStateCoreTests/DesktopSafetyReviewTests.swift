@@ -74,7 +74,7 @@ func expectedObservationBindsCloudDelay() async throws {
     #expect(await driver.effectCountValue() == 0)
 }
 
-@Test("cloud insertion rejects a changed selection in the same focused element")
+@Test("control execution rejects generic insertion before observing a target")
 func expectedObservationBindsTextSelection() async throws {
     let driver = SelectionChangingDriver()
     let controller = DesktopAutomationController(driver: driver)
@@ -87,7 +87,7 @@ func expectedObservationBindsTextSelection() async throws {
     try await controller.begin(grant: grant)
     let expected = try await controller.observeCurrent()
 
-    await #expect(throws: DesktopExecutionError.targetChanged) {
+    await #expect(throws: DesktopExecutionError.actionNotGranted) {
         _ = try await controller.execute(
             .insertText("safe text"),
             expectedBundleIdentifier: "com.example.Editor",

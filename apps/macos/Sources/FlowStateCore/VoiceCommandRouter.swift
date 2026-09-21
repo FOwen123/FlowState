@@ -22,6 +22,8 @@ public enum VoiceCommand: Equatable, Sendable {
 
 /// Exact local commands only. Ambiguous or negated requests never become input events.
 public enum VoiceCommandRouter {
+    public static let controlTextInputMessage = "Use the Dictation shortcut to enter text."
+
     public static func resolve(_ transcript: String, mode: VoiceMode) -> VoiceCommand {
         let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return .unknown }
@@ -33,8 +35,10 @@ public enum VoiceCommandRouter {
         if mode == .dictation { return .dictate(text) }
         let literalPrefixes = ["type ", "dictate ", "write "]
         for prefix in literalPrefixes where command.hasPrefix(prefix) {
-            let literal = String(text.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
-            return literal.isEmpty ? .unknown : .dictate(literal)
+            // Generic keyboard writing belongs exclusively to the Dictation
+            // shortcut. Keep this an unknown control request so it cannot
+            // reach any desktop executor or managed plan.
+            return .unknown
         }
         for prefix in ["research "] where command.hasPrefix(prefix) {
             let query = String(text.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -46,14 +50,6 @@ public enum VoiceCommandRouter {
         case "undo": return .undo
         case "scroll down": return .scroll(-3)
         case "scroll up": return .scroll(3)
-        case "open brave", "switch to brave", "switch brave", "open browser", "switch to browser":
-            return .openApp("com.brave.Browser")
-        case "open safari", "switch to safari", "switch safari":
-            return .openApp("com.apple.Safari")
-        case "open finder", "switch to finder", "switch finder":
-            return .openApp("com.apple.finder")
-        case "open spotify", "switch to spotify", "switch spotify":
-            return .openApp("com.spotify.client")
         case "focus text field": return .focus(role: "AXTextField", label: nil)
         case "focus text area": return .focus(role: "AXTextArea", label: nil)
         case "focus button": return .focus(role: "AXButton", label: nil)
@@ -81,6 +77,15 @@ public enum VoiceCommandRouter {
             }
             return .unknown
         }
+    }
+
+    public static func isGenericTextInputRequest(_ transcript: String) -> Bool {
+        let command = normalized(transcript)
+        return ["type ", "dictate ", "write "].contains(where: command.hasPrefix)
+    }
+
+    public static func controlTextInputMessage(for transcript: String) -> String? {
+        isGenericTextInputRequest(transcript) ? controlTextInputMessage : nil
     }
 
     private static func normalized(_ value: String) -> String {

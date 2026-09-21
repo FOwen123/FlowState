@@ -2,35 +2,23 @@ import Foundation
 import Testing
 @testable import FlowStateCore
 
-@Test("push to talk and toggle activation are explicit")
+@Test("hold activation is explicit")
 func activationModesAreExplicit() async {
-    let push = SpeechSessionCoordinator(settings: SpeechSettings(activation: .pushToTalk))
-    #expect(await push.phase == .idle)
-    await push.pushToTalkDown()
-    #expect(await push.phase == .listening)
-    await push.pushToTalkUp()
-    #expect(await push.phase == .stopping)
-
-    let toggle = SpeechSessionCoordinator(settings: SpeechSettings(activation: .toggle))
-    await toggle.toggle()
-    #expect(await toggle.phase == .listening)
-    await toggle.toggle()
-    #expect(await toggle.phase == .stopping)
+    let session = SpeechSessionCoordinator(purpose: .control)
+    #expect(await session.phase == .idle)
+    await session.pushToTalkDown(purpose: .control)
+    #expect(await session.phase == .listening)
+    await session.pushToTalkUp(purpose: .control)
+    #expect(await session.phase == .stopping)
 }
 
-@Test("stop is handled locally and command words stay dictation in dictation mode")
+@Test("stop is handled locally in control mode")
 func localStopAndDictationMode() async {
-    let coordinator = SpeechSessionCoordinator(settings: SpeechSettings(mode: .command))
+    let coordinator = SpeechSessionCoordinator(purpose: .control)
     await coordinator.pushToTalkDown()
     let stop = await coordinator.consume(transcript: "Stop", isFinal: true)
     #expect(stop == .stop)
     #expect(await coordinator.phase == .idle)
-
-    let dictation = SpeechSessionCoordinator(settings: SpeechSettings(mode: .dictation))
-    await dictation.pushToTalkDown()
-    let result = await dictation.consume(transcript: "scroll down", isFinal: true)
-    #expect(result == .dictate("scroll down"))
-    #expect(await dictation.phase == .idle)
 }
 
 @Test("an empty terminal endpoint ends the session without dispatching a command")
@@ -66,25 +54,13 @@ func partialUtteranceIDDoesNotDeduplicateFinal() async {
     ) == .scroll(-3))
 }
 
-@Test("wake phrase opens a listening session without executing its text")
-func wakePhraseActivation() async {
-    let coordinator = SpeechSessionCoordinator(
-        settings: SpeechSettings(activation: .wakePhrase, wakePhrase: "Hey Flow State")
-    )
-    #expect(await coordinator.detectWakePhrase("hey flow state") == true)
-    #expect(await coordinator.phase == .listening)
-    #expect(await coordinator.detectWakePhrase("open brave") == false)
-}
-
 @Test("speech activation settings persist as user configuration")
 func speechSettingsRoundTrip() {
     let defaults = UserDefaults(suiteName: "flowstate-speech-\(UUID().uuidString)")!
     let settings = SpeechSettings(
         language: .english,
-        mode: .dictation,
-        activation: .wakePhrase,
-        wakePhrase: "嘿 Flow State",
-        pushToTalkKey: "⌥ Space"
+        dictationShortcut: .controlOptionSpace,
+        controlShortcut: .optionSpace
     )
     SpeechSettingsStore.save(settings, defaults: defaults)
     #expect(SpeechSettingsStore.load(defaults: defaults) == settings)
@@ -104,10 +80,8 @@ func legacySpeechSettingsMigrateToEnglish() throws {
     """.utf8)
     let settings = try JSONDecoder().decode(SpeechSettings.self, from: data)
     #expect(settings.language == .english)
-    #expect(settings.mode == .command)
-    #expect(settings.activation == .toggle)
-    #expect(settings.wakePhrase == "嘿 Flow State")
-    #expect(settings.shortcut == .controlShiftSpace)
+    #expect(settings.controlShortcut == .optionSpace)
+    #expect(settings.dictationShortcut == .controlOptionSpace)
 }
 
 @Test("desktop execution rejects stale, expired, and unapproved actions")
@@ -116,7 +90,7 @@ func desktopExecutionGrantValidation() async throws {
     let controller = DesktopAutomationController(driver: driver)
     let grant = DesktopExecutionGrant(
         allowedBundleIdentifiers: ["com.example.Reader"],
-        allowedActions: [.scroll, .insertText],
+        allowedActions: [.scroll],
         generation: 1,
         expiresAt: Date().addingTimeInterval(60)
     )
@@ -182,8 +156,8 @@ func expirationIsCheckedAtEffectBoundary() async throws {
     #expect(await driver.effectCount() == 0)
 }
 
-@Test("physical takeover pauses automation and resume reobserves")
-func physicalTakeoverAndResume() async throws {
+@Test("physical input leaves automation active and the next action reobserves")
+func physicalInputContinuesWithReobserve() async throws {
     let driver = RecordingDesktopDriver()
     let controller = DesktopAutomationController(driver: driver)
     let grant = DesktopExecutionGrant(
@@ -194,14 +168,8 @@ func physicalTakeoverAndResume() async throws {
     )
     try await controller.begin(grant: grant)
     await controller.notePhysicalTakeover()
-    #expect(await controller.state == .pausedForUser)
-    await #expect(throws: DesktopExecutionError.pausedForTakeover) {
-        _ = try await controller.execute(
-            .press,
-            expectedBundleIdentifier: "com.example.Reader"
-        )
-    }
-    _ = try await controller.resume()
+    #expect(await controller.state == .ready)
+    _ = try await controller.execute(.press, expectedBundleIdentifier: "com.example.Reader")
     #expect(await controller.state == .ready)
 }
 
@@ -233,8 +201,8 @@ func executionReservesBeforeObservation() async throws {
     _ = try? await second.value
 }
 
-@Test("cancelling a resume while observing cannot install a new grant")
-func cancellationDuringResumeDoesNotRevive() async throws {
+@Test("cancelling while observing cannot install a new grant")
+func cancellationDuringObservationDoesNotRevive() async throws {
     let driver = ObservationGateDriver()
     let controller = DesktopAutomationController(driver: driver)
     let grant = DesktopExecutionGrant(
@@ -244,21 +212,19 @@ func cancellationDuringResumeDoesNotRevive() async throws {
         expiresAt: Date().addingTimeInterval(60)
     )
     try await controller.begin(grant: grant)
-    await controller.notePhysicalTakeover()
-
-    let resume = Task { try await controller.resume() }
+    let execution = Task { try await controller.execute(.press, expectedBundleIdentifier: "com.example.Reader") }
     await driver.waitForFirstObservation()
     await controller.cancel()
     await driver.releaseObservation()
 
     await #expect(throws: DesktopExecutionError.staleGeneration) {
-        _ = try await resume.value
+        _ = try await execution.value
     }
     #expect(await controller.state == .cancelled)
 }
 
-@Test("cancelled work cannot become valid again after a takeover resume")
-func cancellationSurvivesResume() async throws {
+@Test("cancelled work cannot become valid again after physical input")
+func cancellationSurvivesPhysicalInput() async throws {
     let driver = GatedDesktopDriver()
     let controller = DesktopAutomationController(driver: driver)
     let grant = DesktopExecutionGrant(
@@ -273,15 +239,15 @@ func cancellationSurvivesResume() async throws {
     }
     await driver.waitForPerform()
     await controller.notePhysicalTakeover()
-    _ = try await controller.resume()
+    await controller.cancel()
     await driver.releasePerform()
     await #expect(throws: DesktopExecutionError.staleGeneration) {
         _ = try await task.value
     }
-    #expect(await controller.state == .ready)
+    #expect(await controller.state == .cancelled)
 }
 
-@Test("text undo only succeeds when the focused value has not changed")
+@Test("control execution rejects generic insertion before undo")
 func verifiedTextUndo() async throws {
     let driver = RecordingDesktopDriver(initialValue: "before", bundleIdentifier: "com.example.Editor")
     let controller = DesktopAutomationController(driver: driver)
@@ -292,24 +258,13 @@ func verifiedTextUndo() async throws {
         expiresAt: Date().addingTimeInterval(60)
     )
     try await controller.begin(grant: grant)
-    let record = try await controller.execute(
-        .insertText("after"),
-        expectedBundleIdentifier: "com.example.Editor"
-    )
-    try await controller.undo(record)
-    #expect(await driver.currentValue() == "before")
-
-    let second = try await controller.execute(
-        .insertText("new"),
-        expectedBundleIdentifier: "com.example.Editor"
-    )
-    await driver.setValue("user changed")
-    await #expect(throws: DesktopExecutionError.interveningEdit) {
-        try await controller.undo(second)
+    await #expect(throws: DesktopExecutionError.actionNotGranted) {
+        _ = try await controller.execute(.insertText("after"), expectedBundleIdentifier: "com.example.Editor")
     }
+    #expect(await driver.currentValue() == "before")
 }
 
-@Test("cancelling undo while observing cannot restore the value")
+@Test("generic insertion is rejected before a cancellable undo")
 func cancellationDuringUndoDoesNotRestore() async throws {
     let driver = GatedUndoDriver()
     let controller = DesktopAutomationController(driver: driver)
@@ -320,22 +275,10 @@ func cancellationDuringUndoDoesNotRestore() async throws {
         expiresAt: Date().addingTimeInterval(60)
     )
     try await controller.begin(grant: grant)
-    let record = try await controller.execute(
-        .insertText("after"),
-        expectedBundleIdentifier: "com.example.Editor"
-    )
-    await driver.blockNextObservation()
-
-    let undo = Task { try await controller.undo(record) }
-    await driver.waitForBlockedObservation()
-    await controller.cancel()
-    await driver.releaseObservation()
-
-    await #expect(throws: DesktopExecutionError.staleGeneration) {
-        try await undo.value
+    await #expect(throws: DesktopExecutionError.actionNotGranted) {
+        _ = try await controller.execute(.insertText("after"), expectedBundleIdentifier: "com.example.Editor")
     }
     #expect(await driver.restoreCount() == 0)
-    #expect(await controller.state == .cancelled)
 }
 
 @Test("a cancelled driver error does not restore ready state")
