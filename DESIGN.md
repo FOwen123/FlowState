@@ -333,3 +333,5 @@ This supersedes earlier native floating-control color, glass, waveform, and tran
 The listening waveform fills the available row with 25 tapered white bars and a 30px height, beside the existing 44px cancel hit target. Animate smoothly at up to 60fps only while listening; Reduce Motion and inactive states remain static. This remains an activity indicator, not a microphone level meter.
 
 Feedback height changes use one native 350ms ease-in/ease-out window animation, anchored at the bottom. Disable automatic hosting-view window sizing to prevent a second resize. Repeated updates to the same destination do not restart motion; Reduce Motion uses immediate resizing.
+
+During feedback expansion, lay out the hosted content once at its destination size inside a bottom-aligned clipping container. Animate only the outer window; do not resize SwiftUI content on each animation frame, which makes the controls dip before rising.

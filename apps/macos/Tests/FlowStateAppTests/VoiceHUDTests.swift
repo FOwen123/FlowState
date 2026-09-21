@@ -112,13 +112,28 @@ import Testing
     defer { controller.hide() }
     let panel = try #require(NSApplication.shared.windows.first { !existing.contains($0.windowNumber) && $0.isVisible })
     let initial = panel.frame
+    func cancelBottomInset() throws -> CGFloat {
+        let host = try #require(panel.contentView)
+        host.layoutSubtreeIfNeeded()
+        let raster = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: raster)
+        let scale = CGFloat(raster.pixelsWide) / host.bounds.width
+        let rows = (0..<raster.pixelsHigh).filter { y in
+            (Int(245 * scale)..<Int(257 * scale)).contains { x in
+                guard let pixel = raster.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { return false }
+                return min(pixel.redComponent, pixel.greenComponent, pixel.blueComponent) > 0.8
+            }
+        }
+        return CGFloat(raster.pixelsHigh - (try #require(rows.last))) / scale
+    }
+    let cancelInset = try cancelBottomInset()
     controller.show(status: "No speech detected. Try again.", transcript: "", isListening: false, onStop: {})
     #expect(abs(panel.frame.height - initial.height) < 1)
-    try await Task.sleep(for: .milliseconds(150))
-    let intermediate = panel.frame
-    try await Task.sleep(for: .milliseconds(350))
-    #expect(intermediate.height >= initial.height)
-    #expect(intermediate.height <= panel.frame.height)
+    for _ in 0..<40 {
+        try await Task.sleep(for: .milliseconds(12))
+        #expect(abs(panel.frame.minY - initial.minY) < 1)
+        #expect(abs(try cancelBottomInset() - cancelInset) < 2)
+    }
     #expect(panel.frame.height > initial.height)
     #expect(panel.frame.minY == initial.minY)
     #expect(panel.frame.midX == initial.midX)

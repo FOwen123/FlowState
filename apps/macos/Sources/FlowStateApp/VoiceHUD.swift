@@ -8,6 +8,7 @@ final class VoiceHUDController {
     private let model = VoiceHUDModel()
     private var panel: VoiceHUDPanel?
     private var destinationFrame: NSRect?
+    private var hostedContent: NSHostingView<VoiceHUDView>?
 
     func show(
         status: String,
@@ -30,10 +31,12 @@ final class VoiceHUDController {
         model.currentStep = currentStep
 
         let panel = makePanelIfNeeded()
-        if let host = panel.contentView as? NSHostingView<VoiceHUDView> {
-            host.rootView = VoiceHUDView(model: model)
+        if panel.contentView != nil {
             let measured = NSHostingView(rootView: VoiceHUDView(model: model))
-            position(panel, size: measured.fittingSize)
+            let size = measured.fittingSize
+            hostedContent?.setFrameSize(size)
+            hostedContent?.layoutSubtreeIfNeeded()
+            position(panel, size: size)
         }
         panel.orderFrontRegardless()
     }
@@ -63,7 +66,16 @@ final class VoiceHUDController {
         panel.hasShadow = true
         let host = NSHostingView(rootView: VoiceHUDView(model: model))
         host.sizingOptions = []
-        panel.contentView = host
+        // Keep SwiftUI at its destination size. Resizing it on every window
+        // animation frame makes its asynchronous layout dip below the anchor.
+        let container = NSView()
+        container.wantsLayer = true
+        container.layer?.masksToBounds = true
+        container.layer?.cornerRadius = 20
+        host.autoresizingMask = []
+        container.addSubview(host)
+        hostedContent = host
+        panel.contentView = container
         self.panel = panel
         return panel
     }
