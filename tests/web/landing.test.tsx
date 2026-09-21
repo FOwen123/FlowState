@@ -7,7 +7,7 @@ it("opens the real workspace and does not invent a Mac download", () => {
   const open = vi.fn();
   render(<Landing onOpen={open} />);
   expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
-    "Your Mac,in your words.",
+    "Control your Mac.With your voice.",
   );
   expect(
     screen
@@ -19,7 +19,14 @@ it("opens the real workspace and does not invent a Mac download", () => {
 });
 it("keeps the preview honest and explains cloud privacy", () => {
   render(<Landing onOpen={() => {}} />);
-  expect(screen.getByText(/Illustrative workflow/)).toBeTruthy();
+  expect(
+    screen.getByRole("img", { name: "Voice command preview" }),
+  ).toBeTruthy();
+  expect(
+    screen
+      .getByRole("button", { name: "Stop preview" })
+      .hasAttribute("disabled"),
+  ).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Privacy" }));
   expect(
     screen.getByRole("dialog", { name: "Your data and control" }),
@@ -39,4 +46,12 @@ it("closes privacy with Escape and returns focus to its trigger", () => {
   fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(document.activeElement).toBe(trigger);
+});
+
+it("advertises only the supported English release", () => {
+  const { container } = render(<Landing onOpen={() => {}} />);
+  expect(container.textContent).not.toMatch(/繁體|Chinese/);
+  expect(
+    screen.getByText("For macOS · English", { exact: false }),
+  ).toBeTruthy();
 });

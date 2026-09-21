@@ -1,33 +1,27 @@
-import { useState, useRef, useLayoutEffect } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 export function WaveMark() {
-  return (
-    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
-      <path
-        d="M5 17V13M10 22V8M15 26V4M20 21V9M25 17V13"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
+  return <span className="brand-mark" aria-hidden="true" />;
 }
+
 export function Landing({ onOpen }: { onOpen: () => void }) {
   const [privacy, setPrivacy] = useState(false);
   const privacyTrigger = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);
+
   useLayoutEffect(() => {
     if (!privacy && wasOpen.current) privacyTrigger.current?.focus();
     wasOpen.current = privacy;
   }, [privacy]);
+
   function closePrivacy() {
     setPrivacy(false);
   }
+
   return (
-    <div className="landing">
+    <div className="landing" id="top">
       <header className="landing-nav" inert={privacy}>
-        <a className="brand" href="#">
+        <a className="brand" href="#top">
           <WaveMark />
           Flow State
         </a>
@@ -43,68 +37,105 @@ export function Landing({ onOpen }: { onOpen: () => void }) {
           </a>
         </nav>
       </header>
+
       <main className="landing-main" inert={privacy}>
         <section className="landing-hero">
           <div className="hero-copy">
-            <p className="eyebrow">● &nbsp; VOICE CONTROL FOR EVERYDAY LIFE</p>
+            <p className="eyebrow">
+              <span className="eyebrow-dot" aria-hidden="true" />
+              VOICE CONTROL FOR EVERYDAY LIFE
+            </p>
             <h1>
-              Your Mac,
+              Control your Mac.
               <br />
-              in your words.
+              With your voice.
             </h1>
             <p className="hero-description">
-              Move between apps, dictate in English,
-              <br className="wide-only" /> and carry a task through with less
-              reaching
-              <br className="wide-only" /> for the mouse and keyboard.
+              Flow State turns your voice into action. Open apps, write text,
+              and move through tasks in English.
             </p>
-            <div className="hero-actions">
-              <button disabled aria-describedby="download-status">
-                Download for Mac
-              </button>
-              <button className="text-button" onClick={onOpen}>
-                Open workspace
-              </button>
-            </div>
-            <p id="download-status" className="small-muted">
-              For macOS · English
-              <br />
-              In development. Download available at release.
-            </p>
-          </div>
-          <div
-            className="workflow-preview"
-            aria-label="Illustrative workflow preview"
-          >
-            <div className="preview-titlebar">
-              <span aria-hidden="true">● ● ●</span>
-              <span>FLOW STATE · DESIGN PREVIEW</span>
-            </div>
-            <div className="preview-content">
-              <p className="small-muted">One request. A few careful steps.</p>
-              <h2>“Research this article and draft an email for me.”</h2>
-              <p className="muted">
-                Read this article, research the context, and draft an email.
-              </p>
-              <p className="preview-steps">
-                ✓ Article read <span>◌ Finding sources</span> ○ Email draft
-              </p>
-              <p className="small-muted">
-                ◇ Current article only · Sending needs your approval
-              </p>
-              <div className="preview-hud">
-                <span aria-hidden="true" className="progress-ring">
-                  ◌
-                </span>
-                <div>
-                  <strong>Researching related sources</strong>
-                  <p>Illustrative workflow · No task is running</p>
-                </div>
-                <span className="preview-stop">Stop</span>
+            <div className="download-action">
+              <div className="hero-actions">
+                <button
+                  type="button"
+                  className="download-button"
+                  disabled
+                  aria-describedby="download-status"
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Download for Mac
+                </button>
+                <button
+                  type="button"
+                  className="text-button workspace-button"
+                  aria-label="Open workspace"
+                  onClick={onOpen}
+                >
+                  Explore the app ↓
+                </button>
               </div>
+              <p id="download-status" className="small-muted">
+                For macOS · English
+                <br />
+                In development. Download available at release.
+              </p>
             </div>
+          </div>
+
+          <div
+            className="transcript-strip"
+            role="img"
+            aria-label="Voice command preview"
+          >
+            <svg
+              className="waveform"
+              width="48"
+              height="26"
+              viewBox="0 0 48 26"
+              aria-hidden="true"
+            >
+              <path
+                d="M4 11v4M11 7v12M18 3v20M25 6v14M32 1v24M39 8v10M46 11v4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span className="transcript">Open Brave.</span>
+            <button
+              type="button"
+              className="preview-stop"
+              aria-label="Stop preview"
+              title="Stop preview (design only)"
+              disabled
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                aria-hidden="true"
+              >
+                <rect x="2" y="2" width="10" height="10" rx="2" />
+              </svg>
+            </button>
           </div>
         </section>
+
         <section id="why" className="origin">
           <div>
             <h2>
@@ -116,40 +147,43 @@ export function Landing({ onOpen }: { onOpen: () => void }) {
           </div>
           <blockquote>
             “Typing and scrolling started to hurt my hands.
-            <br />I wanted to keep building, reading, and following an idea
+            <br />
+            I wanted to keep building, reading, and following an idea
             <br className="wide-only" /> without every step needing a keyboard
             or mouse.
             <br />
             That's why I'm building Flow State.”
           </blockquote>
         </section>
+
         <section id="how" className="principles" aria-label="Product direction">
           <article>
             <h3>Say it your way</h3>
             <p>
-              English dictation and commands.
+              Speak naturally in English.
               <br />
-              Commands and dictation stay distinct.
+              Switch between commands and dictation.
             </p>
           </article>
           <article>
-            <h3>Carry the task through</h3>
+            <h3>Prepare your next message</h3>
             <p>
-              Read, research, attach a file, draft a reply.
+              Draft a message for Gmail in Brave.
               <br />
-              See each step before the next one starts.
+              Review it yourself before sending.
             </p>
           </article>
           <article>
             <h3>Take over at any time</h3>
             <p>
-              Local stop and explicit resume.
+              Say “stop” to cancel. Use your mouse to pause.
               <br />
-              Desktop controls are being developed and tested.
+              Resume when you're ready.
             </p>
           </article>
         </section>
       </main>
+
       <footer className="landing-footer" inert={privacy}>
         <span>Flow State · Built for a little less hand work.</span>
         <div>
@@ -161,6 +195,7 @@ export function Landing({ onOpen }: { onOpen: () => void }) {
             Follow development ↗
           </a>
           <button
+            type="button"
             className="text-button"
             ref={privacyTrigger}
             onClick={() => setPrivacy(true)}
@@ -169,6 +204,7 @@ export function Landing({ onOpen }: { onOpen: () => void }) {
           </button>
         </div>
       </footer>
+
       {privacy && (
         <section
           className="privacy-dialog"
@@ -195,7 +231,7 @@ export function Landing({ onOpen }: { onOpen: () => void }) {
             Do not enter passwords, private links or confidential content. You
             can inspect and forget explicit memory in your workspace.
           </p>
-          <button autoFocus onClick={closePrivacy}>
+          <button type="button" autoFocus onClick={closePrivacy}>
             Close
           </button>
         </section>

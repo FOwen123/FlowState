@@ -6,11 +6,11 @@ This document defines the intended visual system for the native Mac controller a
 
 ## Brand mark
 
-Use `assets/brand/flowstate-logo.png`, the circular flowing-line mark, for the landing page, settings headers, and menu-bar identity. Paper uses the original image with an inverted light treatment on dark surfaces; preserve its aspect ratio. The HUD waveform is an activity indicator, not the logo. The design-system board includes the canonical asset reference.
+Use `assets/brand/exports/flowstate-logo.png`, the circular flowing-line mark, for the landing page, settings headers, and menu-bar identity. Paper uses the original image with an inverted light treatment on dark surfaces; preserve its aspect ratio. The HUD waveform is an activity indicator, not the logo. The design-system board includes the canonical asset reference.
 
 ## Shared landing page theme — September 21, 2026
 
-The landing page now adopts the approved app theme, superseding the earlier instruction to preserve the monochrome website. Retain the short layout and brand typography. Use the shared dark canvas `--color-app-canvas`, restrained glass product vignette, deep emerald wordmark symbol and accents, and a pill-shaped download action with deep emerald text on `--color-app-selected`. Keep body copy white or muted gray. Show the approved compact HUD B in the product vignette and label it as a design preview. Preserve the release-availability disclosure. Shared app color tokens intentionally power both surfaces; the older pure-black web token block below is a legacy reference where these rules override it.
+The landing page uses “14 · Hero motion / Woodland blur” for its hero: full-width woodland imagery, centered product copy and a compact voice-strip preview. A subtle background pan stops under Reduce Motion. Keep the remaining page short and retain the brand typography. This supersedes the earlier monochrome and split-vignette hero directions. Use the shared dark canvas `--color-app-canvas`, a restrained glass voice strip, deep emerald wordmark symbol and accents, and a pill-shaped download action with deep emerald text on `--color-app-selected`. Keep body copy white or muted gray. Show the approved compact HUD B as a non-interactive interface preview in the hero. Preserve the release-availability disclosure. Shared app color tokens intentionally power both surfaces; the older pure-black web token block below is a legacy reference where these rules override it.
 
 ## Approved native app override — September 21, 2026
 

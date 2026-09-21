@@ -140,3 +140,9 @@ The user explicitly chose shortcut-based finishing instead of a Finish button. M
 Independent review caught the app calling the push-to-talk-only completion method for toggle sessions. The app now calls an idempotent coordinator finish operation shared by activation modes. Tests cover all three activation modes, repeated finish calls and final-command preservation.
 
 A rapid-toggle regression now prevents restarting while the prior final result is pending. The app also blocks a new capture until finalization completes, while keeping Stop available from the HUD and menu.
+
+### Woodland landing hero
+
+The landing hero follows Paper’s “14 · Hero motion / Woodland blur”: woodland imagery, centered English product copy and a compact illustrative voice strip. The background does not intercept input and its pan animation stops under Reduce Motion. The disabled download still states that a release is pending.
+
+Checks passed: 26 web component tests, TypeScript checking, formatting, and three Chromium browser checks covering desktop/mobile layout, workspace entry, privacy focus/Escape and reduced motion. A new viewport-position assertion reproduced a Privacy dialog regression caused by the background stacking selector; excluding the dialog restored its fixed positioning. Desktop and mobile screenshots were reviewed. No development server, release build or deployment was performed.

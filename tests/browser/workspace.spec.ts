@@ -22,7 +22,10 @@ test("review, cancel, confirm, English-only UI and mobile layout", async ({
     '<html><head></head><body><div id="root"></div></body></html>',
   );
   await page.addStyleTag({
-    content: await readFile("apps/web/src/style.css", "utf8"),
+    content: (await readFile("apps/web/src/style.css", "utf8")).replaceAll(
+      "/flowstate-logo.png",
+      `data:image/png;base64,${(await readFile("apps/web/public/flowstate-logo.png")).toString("base64")}`,
+    ),
   });
   await page.addScriptTag({ content: bundle.outputFiles[0].text });
   await page.getByLabel("Recipient", { exact: true }).fill("test@example.com");
@@ -65,7 +68,7 @@ test("actual app starts without keys and makes no provider calls", async ({
   await page.setContent('<div id="root"></div>');
   await page.addScriptTag({ content: bundle.outputFiles[0].text });
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Your Mac,in your words.",
+    "Control your Mac.With your voice.",
   );
   await page.getByRole("button", { name: "Open workspace" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
@@ -93,9 +96,41 @@ test("Paper landing remains usable on desktop and mobile", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1068 });
   await page.setContent('<div id="root"></div>');
   await page.addStyleTag({
-    content: await readFile("apps/web/src/style.css", "utf8"),
+    content: (await readFile("apps/web/src/style.css", "utf8"))
+      .replaceAll(
+        "/flowstate-logo.png",
+        `data:image/png;base64,${(await readFile("apps/web/public/flowstate-logo.png")).toString("base64")}`,
+      )
+      .replaceAll(
+        "../../../design/hero-motion/scenery-balanced.png",
+        `data:image/png;base64,${(await readFile("design/hero-motion/scenery-balanced.png")).toString("base64")}`,
+      ),
   });
   await page.addScriptTag({ content: bundle.outputFiles[0].text });
+  const heroStyles = await page.locator(".landing").evaluate((landing) => {
+    const hero = landing.querySelector<HTMLElement>(".landing-hero");
+    const hud = landing.querySelector<HTMLElement>(".transcript-strip");
+    const woodland = getComputedStyle(landing, "::before");
+    return {
+      backgroundImage: woodland.backgroundImage,
+      pointerEvents: woodland.pointerEvents,
+      animationName: woodland.animationName,
+      heroMinHeight: hero ? getComputedStyle(hero).minHeight : "",
+      hudBottom: hud ? getComputedStyle(hud).bottom : "",
+    };
+  });
+  expect(heroStyles.backgroundImage).not.toBe("none");
+  expect(heroStyles.pointerEvents).toBe("none");
+  expect(heroStyles.heroMinHeight).toBe("804px");
+  expect(heroStyles.hudBottom).toBe("130px");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(
+    await page
+      .locator(".landing")
+      .evaluate(
+        (landing) => getComputedStyle(landing, "::before").animationName,
+      ),
+  ).toBe("none");
   await expect(
     page.getByRole("button", { name: "Download for Mac" }),
   ).toBeDisabled();
@@ -105,6 +140,18 @@ test("Paper landing remains usable on desktop and mobile", async ({ page }) => {
   });
   await page.getByRole("button", { name: "Privacy", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
+  const dialogLayout = await page.getByRole("dialog").evaluate((dialog) => {
+    const bounds = dialog.getBoundingClientRect();
+    return {
+      position: getComputedStyle(dialog).position,
+      top: bounds.top,
+      bottom: bounds.bottom,
+      viewportHeight: window.innerHeight,
+    };
+  });
+  expect(dialogLayout.position).toBe("fixed");
+  expect(dialogLayout.top).toBeGreaterThanOrEqual(0);
+  expect(dialogLayout.bottom).toBeLessThanOrEqual(dialogLayout.viewportHeight);
   await page.keyboard.press("Escape");
   await expect(
     page.getByRole("button", { name: "Privacy", exact: true }),
