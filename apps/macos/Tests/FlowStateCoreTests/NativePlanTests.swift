@@ -153,6 +153,129 @@ func focusSelectAndPressPlansDecode() throws {
     #expect(response.actions[2].desktopAction == .press(key: "Tab", modifiers: "Shift"))
 }
 
+@Test("a labeled click maps to a generic native Accessibility action")
+func labeledClickPlanDecodes() throws {
+    let response = try NativePlanResponse.decode(data("""
+    {
+      "planId": "plan-click",
+      "status": "ready",
+      "fingerprint": "fp-click",
+      "actions": [{
+        "kind": "click",
+        "targetBundleIdentifier": "com.apple.PhotoBooth",
+        "parameters": {"label": "Take Photo"},
+        "capability": "app.control",
+        "executor": "desktop",
+        "requiresApproval": true,
+        "route": "nativeAccessibility"
+      }],
+      "capabilities": ["app.control"]
+    }
+    """))
+
+    #expect(response.actions[0].desktopAction == .click(label: "Take Photo"))
+}
+
+@Test("a visual click retains bounded geometry for the approved capture")
+func visualClickPlanDecodes() throws {
+    let response = try NativePlanResponse.decode(data("""
+    {
+      "planId": "plan-visual-click",
+      "status": "ready",
+      "fingerprint": "fp-visual-click",
+      "actions": [{
+        "kind": "click",
+        "targetBundleIdentifier": "com.example.Canvas",
+        "parameters": {"label": "Visible control"},
+        "capability": "app.control",
+        "executor": "desktop",
+        "requiresApproval": true,
+        "route": "visualComputerUse",
+        "visualTarget": {
+          "observationId": "00000000-0000-0000-0000-000000000042",
+          "displayId": "7",
+          "windowId": "42",
+          "x": 0,
+          "y": 0,
+          "width": 0.1,
+          "height": 0.13333333333333333,
+          "observedAt": 1800000000000
+        }
+      }],
+      "capabilities": ["app.control"]
+    }
+    """))
+
+    let target = try response.actions[0].validatedVisualTarget()
+    #expect(response.actions[0].route == .visualComputerUse)
+    #expect(target.displayID == 7)
+    #expect(target.windowID == 42)
+    #expect(target.bounds == CGRect(x: 0, y: 0, width: 0.1, height: 0.13333333333333333))
+
+    let capture = CaptureObservation(
+        id: UUID(uuidString: "00000000-0000-0000-0000-000000000042")!,
+        bundleIdentifier: "com.example.Canvas",
+        windowID: 42,
+        displayID: 7,
+        capturedAt: Date(timeIntervalSince1970: 1_800_000_000),
+        windowFrame: CGRect(x: 100, y: 200, width: 400, height: 300),
+        scale: 2,
+        security: .clear
+    )
+    #expect(try target.screenPoint(in: capture) == CGPoint(x: 120, y: 220))
+}
+
+@Test("visual target coordinates must remain inside the exact captured window")
+func visualClickRejectsCoordinatesOutsideCapture() {
+    #expect(throws: NativePlanDecodingError.self) {
+        _ = try NativePlanResponse.decode(data("""
+        {
+          "planId": "plan-visual-click-bounds",
+          "status": "ready",
+          "fingerprint": "fp-visual-click-bounds",
+          "actions": [{
+            "kind": "click",
+            "targetBundleIdentifier": "com.example.Canvas",
+            "parameters": {"label": "Visible control"},
+            "capability": "app.control",
+            "executor": "desktop",
+            "requiresApproval": true,
+            "route": "visualComputerUse",
+            "visualTarget": {
+              "observationId": "00000000-0000-0000-0000-000000000042",
+              "displayId": "7", "windowId": "42", "x": 0.99, "y": 0.1,
+              "width": 0.02, "height": 0.2, "observedAt": 1800000000000
+            }
+          }],
+          "capabilities": ["app.control"]
+        }
+        """))
+    }
+}
+
+@Test("labeled clicks cannot bypass confirmation")
+func labeledClickRequiresApproval() {
+    #expect(throws: NativePlanDecodingError.self) {
+        _ = try NativePlanResponse.decode(data("""
+        {
+          "planId": "plan-click-unapproved",
+          "status": "ready",
+          "fingerprint": "fp-click-unapproved",
+          "actions": [{
+            "kind": "click",
+            "targetBundleIdentifier": "com.example.Canvas",
+            "parameters": {"label": "Delete"},
+            "capability": "app.control",
+            "executor": "desktop",
+            "requiresApproval": false,
+            "route": "nativeAccessibility"
+          }],
+          "capabilities": ["app.control"]
+        }
+        """))
+    }
+}
+
 @Test("native plan accepts an app.open capability only for open application")
 func appOpenCapabilityIsScoped() throws {
     let response = try NativePlanResponse.decode(data("""

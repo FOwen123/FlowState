@@ -42,11 +42,12 @@ func intentRoutingExcludesStructuredServiceActions() {
     )
 
     let actions = intentSupportedActionNames(for: grant)
-    #expect(Set(actions) == Set(["openApplication", "scroll", "focus", "select", "press"]))
+    #expect(Set(actions) == Set(["openApplication", "scroll", "focus", "select", "press", "click"]))
     #expect(!actions.contains("openURL"))
     #expect(!actions.contains("draftMessage"))
     #expect(intentSupportedTools(["nativeAccessibility", "structuredIntegration"]) == ["nativeAccessibility"])
     #expect(intentSupportedTools(["structuredIntegration"]).isEmpty)
+    #expect(intentSupportedTools(["visualComputerUse"]).isEmpty)
 }
 
 @Test func planApplicationCandidatesEncodeOnlyTheBackendRegistryContract() throws {
@@ -92,10 +93,11 @@ func intentRoutingExcludesStructuredServiceActions() {
 }
 
 @Test func visualIntentIncludesWindowGeometry() throws {
-    let observation = CloudIntentObservation(id: "o", displayId: "1", windowId: "2", observedAt: 1000,
+    let observation = CloudIntentObservation(id: "o", bundleIdentifier: "com.example.Reader", displayId: "1", windowId: "2", observedAt: 1000,
         geometry: .init(x: 10, y: 20, width: 800, height: 600, scale: 2), imageDataUrl: "data:image/png;base64,AAAA")
     let object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(observation)) as? [String: Any])
     let geometry = try #require(object["geometry"] as? [String: Double])
     #expect(geometry["scale"] == 2)
     #expect(geometry["width"] == 800)
+    #expect(object["bundleIdentifier"] as? String == "com.example.Reader")
 }

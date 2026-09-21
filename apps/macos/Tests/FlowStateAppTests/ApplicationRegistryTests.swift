@@ -3,7 +3,7 @@ import FlowStateCloud
 import Testing
 @testable import FlowStateApp
 
-private let registryActions: Set<DesktopActionKind> = [.openApplication, .scroll, .focus, .select, .press]
+private let registryActions: Set<DesktopActionKind> = [.openApplication, .scroll, .focus, .select, .press, .click]
 
 @Test("installed app names derive only safe generic-suffix aliases")
 func applicationRegistryDerivesGenericSuffixAliases() {
@@ -145,14 +145,14 @@ func registeredApplicationCommandClarification() {
     }
 }
 
-@Test("unknown applications receive only the launch capability")
+@Test("unknown applications receive launch and generic accessible click capabilities")
 func applicationRegistryCapabilitiesFailClosed() {
     let actions = ApplicationRegistry.nativeSupportedActions(
         for: "com.example.Unknown",
         integrations: ["launchServices"]
     )
 
-    #expect(actions == [.openApplication])
+    #expect(actions == [.openApplication, .click])
     #expect(!actions.contains(.insertText))
 }
 

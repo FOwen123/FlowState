@@ -77,20 +77,6 @@ describe("multi-step control plan contracts", () => {
             body: "The project page is ready.",
           },
         },
-        {
-          kind: "scroll",
-          targetBundleIdentifier: "com.example.Reader",
-          parameters: { lines: 2 },
-          visualTarget: {
-            displayId: "display-1",
-            windowId: "window-1",
-            x: 10,
-            y: 20,
-            width: 800,
-            height: 600,
-            observedAt: Date.now(),
-          },
-        },
       ],
       explanation: "Scroll, prepare a message, and verify the current view.",
       clarificationNeeded: false,
@@ -113,10 +99,336 @@ describe("multi-step control plan contracts", () => {
       verifier: { kind: "externalEffectReconciled" },
       reversal: { supported: false, kind: "reconcile" },
     });
-    expect(plan.actions[2]).toMatchObject({
-      route: "visualComputerUse",
-      preconditions: { requiresFreshObservation: true },
+  });
+
+  it("supports an app-agnostic labeled click on the native route", () => {
+    const plan = normalizeModelPlan(
+      {
+        actions: [
+          {
+            kind: "click",
+            targetBundleIdentifier: "com.apple.PhotoBooth",
+            parameters: { label: "Take Photo" },
+          },
+        ],
+        explanation: "Click the labeled control.",
+        clarificationNeeded: false,
+      },
+      {
+        supportedTools: ["nativeAccessibility"],
+        integrations: [],
+        applicationCandidates: [
+          {
+            bundleIdentifier: "com.apple.PhotoBooth",
+            displayName: "Photo Booth",
+            normalizedNames: ["photo booth"],
+            supportedActions: ["openApplication", "click"],
+            integrations: [],
+          },
+        ],
+      },
+    );
+
+    expect(plan.actions[0]).toMatchObject({
+      kind: "click",
+      parameters: { label: "Take Photo" },
+      capability: "app.control",
+      executor: "desktop",
+      requiresApproval: true,
+      route: "nativeAccessibility",
+      riskClass: "confirm",
+      preconditions: {
+        targetBundleIdentifier: "com.apple.PhotoBooth",
+        requiresFreshObservation: false,
+      },
+      verifier: { kind: "boundedAction" },
     });
+  });
+
+  it("routes the same labeled click through visual computer use when advertised", () => {
+    const observedAt = Date.now();
+    const observation = {
+      id: "observation-1",
+      bundleIdentifier: "com.apple.PhotoBooth",
+      displayId: "display-1",
+      windowId: "window-1",
+      observedAt,
+      geometry: { x: 0, y: 0, width: 1200, height: 900, scale: 1 },
+      imageDataUrl: "data:image/png;base64,AAAA",
+    };
+    const plan = normalizeModelPlan(
+      {
+        actions: [
+          {
+            kind: "click",
+            targetBundleIdentifier: "com.apple.PhotoBooth",
+            parameters: { label: "Take Photo" },
+            visualTarget: {
+              observationId: observation.id,
+              displayId: "display-1",
+              windowId: "window-1",
+              x: 0.01,
+              y: 0.02,
+              width: 0.67,
+              height: 0.66,
+              observedAt,
+            },
+          },
+        ],
+        explanation: "Click the labeled control in the fresh view.",
+        clarificationNeeded: false,
+      },
+      {
+        supportedTools: ["visualComputerUse"],
+        integrations: [],
+        visualObservation: observation,
+        applicationCandidates: [
+          {
+            bundleIdentifier: "com.apple.PhotoBooth",
+            displayName: "Photo Booth",
+            normalizedNames: ["photo booth"],
+            supportedActions: ["openApplication", "click"],
+            integrations: [],
+          },
+        ],
+      },
+    );
+
+    expect(plan.actions[0]).toMatchObject({
+      kind: "click",
+      route: "visualComputerUse",
+      requiresApproval: true,
+      riskClass: "confirm",
+      preconditions: { requiresFreshObservation: true },
+      verifier: { kind: "visualObservation" },
+      visualTarget: expect.objectContaining({ observationId: observation.id, observedAt }),
+    });
+  });
+
+  it("allows at most one visual action for one observation", () => {
+    const visualTarget = {
+      observationId: "observation-1",
+      displayId: "display-1",
+      windowId: "window-1",
+      x: 0.01,
+      y: 0.02,
+      width: 0.67,
+      height: 0.66,
+      observedAt: Date.now(),
+    };
+
+    expect(() =>
+      normalizeModelPlan(
+        {
+          actions: [
+            {
+              kind: "click",
+              targetBundleIdentifier: "com.apple.PhotoBooth",
+              parameters: { label: "Take Photo" },
+              visualTarget,
+            },
+            {
+              kind: "click",
+              targetBundleIdentifier: "com.apple.PhotoBooth",
+              parameters: { label: "Shutter" },
+              visualTarget,
+            },
+          ],
+          explanation: "Use one fresh observation per visual action.",
+          clarificationNeeded: false,
+        },
+      {
+        supportedTools: ["visualComputerUse"],
+        integrations: [],
+        visualObservation: {
+          id: "observation-1",
+          bundleIdentifier: "com.apple.PhotoBooth",
+          displayId: "display-1",
+          windowId: "window-1",
+          observedAt: visualTarget.observedAt,
+          geometry: { x: 0, y: 0, width: 1200, height: 900, scale: 1 },
+          imageDataUrl: "data:image/png;base64,AAAA",
+        },
+          applicationCandidates: [
+            {
+              bundleIdentifier: "com.apple.PhotoBooth",
+              displayName: "Photo Booth",
+              normalizedNames: ["photo booth"],
+              supportedActions: ["openApplication", "click", "press"],
+              integrations: [],
+            },
+          ],
+        },
+      ),
+    ).toThrow("one visual action per observation");
+  });
+
+  it("binds a visual target to the supplied observation metadata", () => {
+    const observedAt = Date.now();
+    const availability: PlanAvailability = {
+      supportedTools: ["visualComputerUse"],
+      integrations: [],
+      visualObservation: {
+        id: "observation-1",
+        bundleIdentifier: "com.apple.PhotoBooth",
+        displayId: "display-1",
+        windowId: "window-1",
+        observedAt,
+        geometry: { x: 0, y: 0, width: 1200, height: 900, scale: 1 },
+        imageDataUrl: "data:image/png;base64,AAAA",
+      },
+    };
+    expect(() =>
+      normalizeModelPlan(
+        {
+          actions: [
+            {
+              kind: "click",
+              targetBundleIdentifier: "com.example.Reader",
+              parameters: { label: "Continue" },
+              visualTarget: {
+                observationId: "different-observation",
+                displayId: "display-1",
+                windowId: "window-1",
+                x: 0.1,
+                y: 0.2,
+                width: 0.1,
+                height: 0.1,
+                observedAt,
+              },
+            },
+          ],
+          explanation: "Click the current control.",
+          clarificationNeeded: false,
+        },
+        availability,
+      ),
+    ).toThrow("observation");
+  });
+
+  it("rejects visual actions without an advertised observation", () => {
+    expect(() =>
+      normalizeModelPlan({
+        actions: [
+          {
+            kind: "click",
+            targetBundleIdentifier: "com.example.Reader",
+            parameters: { label: "Continue" },
+            visualTarget: {
+              observationId: "observation-1",
+              displayId: "display-1",
+              windowId: "window-1",
+              x: 0.1,
+              y: 0.2,
+              width: 0.1,
+              height: 0.1,
+              observedAt: Date.now(),
+            },
+          },
+        ],
+        explanation: "Click the current control.",
+        clarificationNeeded: false,
+      }),
+    ).toThrow("visual observation is required");
+  });
+
+  it("rejects a visual action after an earlier plan step", () => {
+    const observedAt = Date.now();
+    const observation = {
+      id: "observation-1",
+      bundleIdentifier: "com.example.Reader",
+      displayId: "display-1",
+      windowId: "window-1",
+      observedAt,
+      geometry: { x: 0, y: 0, width: 1200, height: 900, scale: 1 },
+      imageDataUrl: "data:image/png;base64,AAAA",
+    };
+    expect(() =>
+      normalizeModelPlan(
+        {
+          actions: [
+            {
+              kind: "openApplication",
+              targetBundleIdentifier: "com.example.Reader",
+              parameters: {},
+            },
+            {
+              kind: "click",
+              targetBundleIdentifier: "com.example.Reader",
+              parameters: { label: "Continue" },
+              visualTarget: {
+                observationId: observation.id,
+                displayId: observation.displayId,
+                windowId: observation.windowId,
+                x: 0.1,
+                y: 0.2,
+                width: 0.1,
+                height: 0.1,
+                observedAt,
+              },
+            },
+          ],
+          explanation: "Open and click.",
+          clarificationNeeded: false,
+        },
+        {
+          supportedTools: ["nativeAccessibility", "visualComputerUse"],
+          integrations: [],
+          visualObservation: observation,
+          applicationCandidates: [
+            {
+              bundleIdentifier: "com.example.Reader",
+              displayName: "Reader",
+              normalizedNames: ["reader"],
+              supportedActions: ["openApplication", "click"],
+              integrations: [],
+            },
+          ],
+        },
+      ),
+    ).toThrow("visual action must be the first step");
+  });
+
+  it("rejects visual target coordinates outside normalized window bounds", () => {
+    const observedAt = Date.now();
+    expect(() =>
+      normalizeModelPlan(
+        {
+          actions: [
+            {
+              kind: "click",
+              targetBundleIdentifier: "com.example.Reader",
+              parameters: { label: "Continue" },
+              visualTarget: {
+                observationId: "observation-1",
+                displayId: "display-1",
+                windowId: "window-1",
+                x: 0.9,
+                y: 0.2,
+                width: 0.2,
+                height: 0.1,
+                observedAt,
+              },
+            },
+          ],
+          explanation: "Click the current control.",
+          clarificationNeeded: false,
+        },
+        {
+          supportedTools: ["visualComputerUse"],
+          integrations: [],
+          visualObservation: {
+            id: "observation-1",
+            bundleIdentifier: "com.apple.PhotoBooth",
+            displayId: "display-1",
+            windowId: "window-1",
+            observedAt,
+            geometry: { x: 0, y: 0, width: 1200, height: 900, scale: 1 },
+            imageDataUrl: "data:image/png;base64,AAAA",
+          },
+        },
+      ),
+    ).toThrow("visual target");
   });
 
   it("uses the dedicated app.open grant for opening an application", () => {
@@ -187,21 +499,22 @@ describe("multi-step control plan contracts", () => {
         {
           actions: [
             {
-              kind: "scroll",
+              kind: "click",
               targetBundleIdentifier: "com.example.Reader",
-              parameters: { lines: -2 },
+              parameters: { label: "Continue" },
               visualTarget: {
+                observationId: "observation-1",
                 displayId: "display-1",
                 windowId: "window-1",
                 x: 0,
                 y: 0,
-                width: 800,
-                height: 600,
+                width: 1,
+                height: 1,
                 observedAt: Date.now(),
               },
             },
           ],
-          explanation: "Scroll in the current view.",
+          explanation: "Click in the current view.",
           clarificationNeeded: false,
         },
         {

@@ -4,6 +4,16 @@ import ImageIO
 import Testing
 @testable import FlowStateCore
 
+@Test("visual verification detects a changed window image")
+func visualVerificationDetectsChangedPixels() {
+    let before = CapturedImage(image: makeTestImage(color: .black))
+    let same = CapturedImage(image: makeTestImage(color: .black))
+    let after = CapturedImage(image: makeTestImage(color: .white))
+
+    #expect(!before.visuallyDiffers(from: same))
+    #expect(before.visuallyDiffers(from: after))
+}
+
 @Test("capture is denied while no task is active")
 func captureIsDeniedWhileIdle() async {
     let controller = ScreenCaptureController(provider: ImmediateCaptureProvider())
@@ -631,7 +641,7 @@ private actor LateResultCaptureProvider: ScreenCaptureProvider {
     }
 }
 
-private func makeTestImage() -> CGImage {
+private func makeTestImage(color: CGColor = .clear) -> CGImage {
     let colorSpace = CGColorSpaceCreateDeviceRGB()
     let context = CGContext(
         data: nil,
@@ -642,6 +652,8 @@ private func makeTestImage() -> CGImage {
         space: colorSpace,
         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
     )!
+    context.setFillColor(color)
+    context.fill(CGRect(x: 0, y: 0, width: 1, height: 1))
     return context.makeImage()!
 }
 

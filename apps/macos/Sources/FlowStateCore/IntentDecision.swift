@@ -246,7 +246,7 @@ public struct IntentDecisionAction: Codable, Equatable, Sendable {
     private static func defaultCapability(for kind: NativePlanActionKind) -> String {
         switch kind {
         case .openApplication: "app.open"
-        case .scroll, .focus, .select: "app.control"
+        case .scroll, .focus, .select, .click: "app.control"
         case .press, .insertText: "app.input"
         case .openURL: "app.control"
         case .attachFile: "file.upload"
@@ -256,7 +256,7 @@ public struct IntentDecisionAction: Codable, Equatable, Sendable {
     }
 
     private static func defaultRequiresApproval(kind: NativePlanActionKind, parameters: [String: NativePlanJSONValue]) -> Bool {
-        if kind == .openURL || kind == .attachFile || kind == .sendEmail || kind == .draftMessage { return true }
+        if kind == .click || kind == .openURL || kind == .attachFile || kind == .sendEmail || kind == .draftMessage { return true }
         guard kind == .insertText || kind == .press else { return false }
         if kind == .insertText { return true }
         let key = parameters["key"]?.stringValue

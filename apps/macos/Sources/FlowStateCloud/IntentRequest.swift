@@ -70,6 +70,7 @@ public struct CloudIntentContext: Codable, ConvexEncodable, Sendable {
 
 public struct CloudIntentObservation: Codable, ConvexEncodable, Sendable {
     public let id: String
+    public let bundleIdentifier: String
     public let displayId: String
     public let windowId: String
     public let observedAt: Double
@@ -81,8 +82,8 @@ public struct CloudIntentObservation: Codable, ConvexEncodable, Sendable {
     }
     public let geometry: Geometry
     public let imageDataUrl: String
-    public init(id: String, displayId: String, windowId: String, observedAt: Double, geometry: Geometry, imageDataUrl: String) {
-        self.id = id; self.displayId = displayId; self.windowId = windowId
+    public init(id: String, bundleIdentifier: String, displayId: String, windowId: String, observedAt: Double, geometry: Geometry, imageDataUrl: String) {
+        self.id = id; self.bundleIdentifier = bundleIdentifier; self.displayId = displayId; self.windowId = windowId
         self.observedAt = observedAt; self.geometry = geometry; self.imageDataUrl = imageDataUrl
     }
 }

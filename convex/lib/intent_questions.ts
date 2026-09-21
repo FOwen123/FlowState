@@ -20,6 +20,8 @@ const actionSemantics: Record<string, string> = {
   focus: "Focus a supplied editable or control target by verified role or label.",
   select:
     "Select a named list item without activating it; choose is not enough when activation is ambiguous.",
+  click:
+    "Click a supplied labeled control; use a fresh visual observation when native Accessibility cannot expose it.",
   press:
     "Press only an allowlisted navigation key or reviewed shortcut: ArrowUp, ArrowDown, ArrowLeft, ArrowRight, PageUp, PageDown, Home, End, Tab, Escape, Enter, or Command+A/C/V.",
 };

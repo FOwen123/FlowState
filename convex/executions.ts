@@ -15,11 +15,13 @@ function planActions(plan: {
   supportedToolsJson?: string;
   integrationsJson?: string;
   applicationCandidatesJson?: string;
+  visualObservationJson?: string;
 }): PlannedAction[] {
   const availability = parsePlanAvailability(
     plan.supportedToolsJson,
     plan.integrationsJson,
     plan.applicationCandidatesJson,
+    plan.visualObservationJson,
   );
   return normalizeStoredActions(
     JSON.parse(plan.actionsJson ?? "[]") as unknown,
@@ -161,6 +163,7 @@ export const claimStep = mutation({
         observedAt === undefined ||
         !Number.isFinite(observedAt) ||
         observedAt < Date.now() - 30_000 ||
+        observedAt > Date.now() + 5_000 ||
         (action.visualTarget !== undefined &&
           observedAt <= action.visualTarget.observedAt)
       ) {

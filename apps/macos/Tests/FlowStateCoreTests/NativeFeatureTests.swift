@@ -133,6 +133,9 @@ func secureAccessibilityBoundary() {
     #expect(!AXDesktopDriver.canReadValue(role: nil, subrole: nil))
     #expect(!AXDesktopDriver.canReadValue(role: "AXSecureTextField", subrole: nil))
     #expect(!AXDesktopDriver.canReadValue(role: "AXTextField", subrole: "AXSecureTextField"))
+    #expect(AXDesktopDriver.isPressableControlEnabled(nil))
+    #expect(AXDesktopDriver.isPressableControlEnabled(true))
+    #expect(!AXDesktopDriver.isPressableControlEnabled(false))
 }
 
 @Test("an expired grant is rejected immediately before a native effect")

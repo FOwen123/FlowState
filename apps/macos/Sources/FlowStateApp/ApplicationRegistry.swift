@@ -224,7 +224,7 @@ struct ApplicationRegistry: Sendable {
 
     static func nativeSupportedActions(for bundleIdentifier: String, integrations: Set<String>) -> Set<DesktopActionKind> {
         guard integrations.contains("browser") || nativeControlBundles.contains(bundleIdentifier) else {
-            return [.openApplication]
+            return [.openApplication, .click]
         }
         return Set(DesktopActionKind.allCases)
     }

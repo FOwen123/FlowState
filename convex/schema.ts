@@ -172,6 +172,7 @@ export default defineSchema({
     supportedToolsJson: v.optional(v.string()),
     integrationsJson: v.optional(v.string()),
     applicationCandidatesJson: v.optional(v.string()),
+    visualObservationJson: v.optional(v.string()),
     planFingerprint: v.optional(v.string()),
     cancellationGeneration: v.number(),
     expiresAt: v.number(),

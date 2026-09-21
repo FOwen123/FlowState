@@ -61,6 +61,7 @@ private actor IntentFixtureDriver: DesktopDriver {
     case .focus: kind = .focus
     case .select: kind = .select
     case .press: kind = .press
+    case .click: kind = .click
     case .openURL, .attachFile, .sendEmail, .draftMessage:
         preconditionFailure("structured service actions are not native desktop controls")
     case .insertText: preconditionFailure("generic text is not a supported control parameter")

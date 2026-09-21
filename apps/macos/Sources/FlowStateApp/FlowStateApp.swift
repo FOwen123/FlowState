@@ -62,6 +62,9 @@ final class FlowStateAppModel: ObservableObject {
             preferences?.set(allowCloudScreenContext, forKey: "FlowState.allowCloudScreenContext")
             if !allowCloudScreenContext {
                 intentTask?.cancel()
+                cloudPreparationTask?.cancel()
+                cloudPreparationTask = nil
+                cloudPreparationGeneration &+= 1
                 cloudSession?.cancelIntent()
                 pendingIntent = nil; pendingIntentSummary = nil
                 revokeTask()
@@ -180,7 +183,7 @@ final class FlowStateAppModel: ObservableObject {
     private var dictationRecoveryExpiryTask: Task<Void, Never>?
     private var grant: CaptureGrant?
     private var lastVerifiedAction: VerifiedDesktopAction?
-    private var cloudPlanTarget: (id: String, observation: DesktopObservation, epoch: UInt64)?
+    private var cloudPlanTarget: (id: String, observation: DesktopObservation, epoch: UInt64, screen: CapturedImage?)?
     private var cloudPlanRegistrySnapshot = Set<String>()
     private var cloudExecutionStartedPlanID: String?
     private var cloudNextPlanStep = 0
@@ -725,6 +728,14 @@ final class FlowStateAppModel: ObservableObject {
                 }
                 let target = inputBundleIdentifier
                 let epoch = inputEpoch.current
+                var screen: CapturedImage?
+                if target == observation.bundleIdentifier,
+                   let captureGrant = await prepareAutomaticObservation(bundle: observation.bundleIdentifier) {
+                    screen = try? await controller.capture(
+                        bundleIdentifier: observation.bundleIdentifier,
+                        grant: captureGrant
+                    )
+                }
                 let registry = ApplicationRegistry.installed(defaults: preferences ?? .standard)
                 let candidates = cloudApplicationCandidates(for: registry, command: command, targetBundleIdentifier: target)
                 cloudPlanRegistrySnapshot = Set(candidates.map(\.bundleIdentifier))
@@ -733,6 +744,34 @@ final class FlowStateAppModel: ObservableObject {
                 if !integrations.isEmpty {
                     supportedTools.append(NativePlanRoute.structuredIntegration.rawValue)
                 }
+                if screen != nil {
+                    supportedTools.append(NativePlanRoute.visualComputerUse.rawValue)
+                }
+                let cloudObservation: CloudIntentObservation?
+                if let screen,
+                   allowCloudScreenContext,
+                   target == screen.observation.bundleIdentifier {
+                    let metadata = screen.observation
+                    cloudObservation = CloudIntentObservation(
+                        id: metadata.id.uuidString,
+                        bundleIdentifier: metadata.bundleIdentifier,
+                        displayId: String(metadata.displayID),
+                        windowId: String(metadata.windowID),
+                        observedAt: metadata.capturedAt.timeIntervalSince1970 * 1_000,
+                        geometry: .init(
+                            x: metadata.windowFrame.minX,
+                            y: metadata.windowFrame.minY,
+                            width: metadata.windowFrame.width,
+                            height: metadata.windowFrame.height,
+                            scale: metadata.scale
+                        ),
+                        imageDataUrl: try screen.pngDataURL(uploadApproved: true)
+                    )
+                } else {
+                    cloudObservation = nil
+                    screen = nil
+                }
+                guard !Task.isCancelled, cloudPreparationGeneration == preparationGeneration else { return }
                 contextRevision += 1
                 try await cloudSession.preparePlan(
                     command: command,
@@ -742,6 +781,7 @@ final class FlowStateAppModel: ObservableObject {
                     supportedTools: supportedTools,
                     integrations: integrations,
                     applicationCandidates: candidates,
+                    observation: cloudObservation,
                     recentInteraction: controlConversation.recentInteraction
                 )
                 guard !Task.isCancelled, cloudPreparationGeneration == preparationGeneration else { return }
@@ -750,7 +790,7 @@ final class FlowStateAppModel: ObservableObject {
                     throw CloudSessionError.reviewChanged
                 }
                 try await expandCloudGrant(for: proposal, epoch: epoch, registry: registry)
-                cloudPlanTarget = (proposal.id, observation, epoch)
+                cloudPlanTarget = (proposal.id, observation, epoch, screen)
                 cloudStatus = automaticPlanPrefixCount(proposal.actions) > 0
                     ? "Running reversible reviewed steps"
                     : "Review the proposed actions in Cloud account"
@@ -783,6 +823,7 @@ final class FlowStateAppModel: ObservableObject {
         let entries = Dictionary(uniqueKeysWithValues: registry.entries.map { ($0.bundleIdentifier, $0) })
         let nativeActions = plan.actions.filter { $0.route == .nativeAccessibility }
         let structuredActions = plan.actions.filter { $0.route == .structuredIntegration }
+        let visualActions = plan.actions.filter { $0.route == .visualComputerUse }
         guard !plan.actions.isEmpty,
               structuredActions.allSatisfy({
                   isSupportedNativePlanAction($0)
@@ -794,7 +835,15 @@ final class FlowStateAppModel: ObservableObject {
                         let desktopAction = action.desktopAction else { return false }
                   return entry.supports(desktopAction.kind)
               }),
-              plan.actions.allSatisfy({ $0.route != .visualComputerUse }) else {
+              visualActions.count <= 1,
+              visualActions.allSatisfy({ action in
+                  guard let target = action.targetBundleIdentifier,
+                        let entry = entries[target],
+                        let desktopAction = action.desktopAction else { return false }
+                  return action.kind == .click
+                      && isSupportedNativePlanAction(action)
+                      && entry.supports(desktopAction.kind)
+              }) else {
             throw CloudSessionError.reviewChanged
         }
         let targets = Set(plan.actions.compactMap(\.targetBundleIdentifier))
@@ -873,7 +922,7 @@ final class FlowStateAppModel: ObservableObject {
                 for index in cloudNextPlanStep..<plan.actions.count {
                     let action = plan.actions[index]
                     guard inputEpoch.isCurrent(epoch), session.isCurrent(plan) else { throw CancellationError() }
-                    guard action.isCurrent(), action.route != .freshVisual else { throw CloudSessionError.reviewChanged }
+                    guard action.isCurrent() else { throw CloudSessionError.reviewChanged }
                     currentPlanStep = L10n.planSummary(action.parameters, appName: action.targetBundleIdentifier.map(L10n.appName) ?? "Selected app")
                     voiceStatus = currentPlanStep ?? "Running the reviewed step"
                     if action.requiresApproval, approvalForStep != index {
@@ -887,7 +936,19 @@ final class FlowStateAppModel: ObservableObject {
                         approvalForStep = nil
                     }
                     if index > 0 { speakMilestone("Continuing the reviewed task") }
-                    try await session.claimStep(plan,ordinal:index)
+                    if action.route == .visualComputerUse {
+                        guard index == 0, let screen = prepared.screen else {
+                            throw CloudSessionError.reviewChanged
+                        }
+                        try await revalidateScreen(screen.observation)
+                        try await session.claimStep(
+                            plan,
+                            ordinal: index,
+                            observationObservedAt: Date()
+                        )
+                    } else {
+                        try await session.claimStep(plan,ordinal:index)
+                    }
                     reserved = index
                     guard inputEpoch.isCurrent(epoch), session.isCurrent(plan) else { throw CancellationError() }
                     if action.route == .structuredIntegration {
@@ -958,6 +1019,15 @@ final class FlowStateAppModel: ObservableObject {
                             }
                             structuredReservation = nil
                         } catch { throw error }
+                    } else if action.route == .visualComputerUse {
+                        guard let screen = prepared.screen else { throw CloudSessionError.reviewChanged }
+                        let (result, nextObservation) = try await executeVisualPlanStep(
+                            action,
+                            screen: screen,
+                            epoch: epoch
+                        )
+                        expectedObservation = nextObservation
+                        lastVerifiedAction = result.undoSupport == .restoreText ? result : nil
                     } else {
                         let (result, nextObservation) = try await executePlanStep(action, expectedObservation: expectedObservation)
                         expectedObservation = nextObservation
@@ -1241,6 +1311,45 @@ final class FlowStateAppModel: ObservableObject {
         let result = try await desktopController.execute(desktopAction,
             expectedBundleIdentifier: target,
             expectedObservation: action.kind == .openApplication ? nil : expectedObservation)
+        let nextObservation = try await desktopController.observeCurrent()
+        return (result, nextObservation)
+    }
+
+    private func executeVisualPlanStep(
+        _ action: NativePlanAction,
+        screen: CapturedImage,
+        epoch: UInt64
+    ) async throws -> (VerifiedDesktopAction, DesktopObservation) {
+        guard action.route == .visualComputerUse,
+              action.kind == .click,
+              let targetBundleIdentifier = action.targetBundleIdentifier,
+              let captureGrant = captureGrantForCloud(bundleIdentifier: targetBundleIdentifier),
+              inputEpoch.isCurrent(epoch) else {
+            throw DesktopExecutionError.actionNotGranted
+        }
+        let target = try action.validatedVisualTarget()
+        let captureController = controller
+        let before = screen
+        let result = try await desktopController.executeVisualClick(
+            target: target,
+            capture: before.observation,
+            expectedBundleIdentifier: targetBundleIdentifier,
+            revalidate: {
+                _ = try await captureController.revalidate(
+                    before.observation,
+                    grant: captureGrant
+                )
+            },
+            verify: {
+                try await Task.sleep(for: .milliseconds(150))
+                let after = try await captureController.capture(
+                    bundleIdentifier: targetBundleIdentifier,
+                    grant: captureGrant,
+                    windowID: before.observation.windowID
+                )
+                return before.visuallyDiffers(from: after)
+            }
+        )
         let nextObservation = try await desktopController.observeCurrent()
         return (result, nextObservation)
     }

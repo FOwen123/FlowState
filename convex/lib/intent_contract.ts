@@ -10,6 +10,7 @@ export const ACTION_KINDS = [
   "focus",
   "select",
   "press",
+  "click",
 ] as const;
 
 export type IntentActionKind = (typeof ACTION_KINDS)[number];
@@ -483,6 +484,8 @@ export function requiredCapability(action: IntentActionKind): string {
       return "app.control";
     case "press":
       return "app.input";
+    case "click":
+      return "app.control";
   }
 }
 

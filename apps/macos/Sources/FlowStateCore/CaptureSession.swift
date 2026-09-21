@@ -117,6 +117,14 @@ public final class CapturedImage: @unchecked Sendable {
         self.capturedAt = observation.capturedAt
         self.observation = observation
     }
+
+    public func visuallyDiffers(from other: CapturedImage) -> Bool {
+        guard image.width == other.image.width,
+              image.height == other.image.height,
+              let left = image.dataProvider?.data,
+              let right = other.image.dataProvider?.data else { return true }
+        return left != right
+    }
 }
 
 struct CaptureRequest: Equatable, Sendable {

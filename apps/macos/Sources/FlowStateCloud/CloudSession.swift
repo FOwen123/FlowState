@@ -104,6 +104,8 @@ private func externalEffectCanonicalAction(_ action: NativePlanAction) -> Data {
         fields += [field("parameters", "select"), field("label", label)]
     case let .press(key, modifiers):
         fields += [field("parameters", "press"), field("key", key), optionalField("modifiers", modifiers)]
+    case let .click(label):
+        fields += [field("parameters", "click"), field("label", label)]
     case let .openURL(url):
         fields += [field("parameters", "openURL"), field("url", url)]
     case let .attachFile(fileID):
@@ -298,25 +300,40 @@ public final class CloudSession: ObservableObject {
         supportedTools: [String] = [NativePlanRoute.nativeAccessibility.rawValue],
         integrations: [String] = [],
         applicationCandidates: [CloudApplicationCandidate] = [],
+        observation: CloudIntentObservation? = nil,
         recentInteraction: String? = nil
     ) async throws {
         guard signedIn else { throw CloudSessionError.signInRequired }
         guard !planning else { throw CloudSessionError.busy }
         guard contextRevision >= 0,
               !supportedTools.isEmpty,
-              supportedTools.allSatisfy({ NativePlanRoute(rawValue: $0) != nil && $0 != NativePlanRoute.visualComputerUse.rawValue }),
+              supportedTools.allSatisfy({ NativePlanRoute(rawValue: $0) != nil }),
               Set(supportedTools).count == supportedTools.count,
               Set(integrations).count == integrations.count,
               applicationCandidates.count <= 99,
               Set(applicationCandidates.map(\.bundleIdentifier)).count == applicationCandidates.count,
-              supportedTools.contains(NativePlanRoute.structuredIntegration.rawValue) == !integrations.isEmpty else {
+              supportedTools.contains(NativePlanRoute.structuredIntegration.rawValue) == !integrations.isEmpty,
+              supportedTools.contains(NativePlanRoute.visualComputerUse.rawValue) == (observation != nil),
+              observation?.bundleIdentifier == nil || observation?.bundleIdentifier == targetBundleIdentifier else {
             throw CloudSessionError.reviewChanged
         }
         planning = true; defer { planning = false }
         planGeneration &+= 1; let token = planGeneration
         proposal = nil
         try await registerDevice()
-        guard token == planGeneration else { throw CancellationError() }
+        guard token == planGeneration, !Task.isCancelled else { throw CancellationError() }
+        if observation != nil {
+            let expiry = Date().addingTimeInterval(CaptureGrant.defaultDuration).timeIntervalSince1970 * 1_000
+            for capability in ["app.observe", "app.upload"] {
+                let _: CloudMutationReceipt = try await client.mutation("grants:grant", with: [
+                    "deviceId": deviceID,
+                    "capability": capability,
+                    "target": targetBundleIdentifier,
+                    "expiresAt": expiry,
+                ])
+                guard token == planGeneration, !Task.isCancelled else { throw CancellationError() }
+            }
+        }
         let context = plannerCommandContext(command: command, activeApplication: targetBundleIdentifier, recentInteraction: recentInteraction)
         let args: [String: ConvexEncodable?] = [
             "deviceId": deviceID,
@@ -326,14 +343,19 @@ public final class CloudSession: ObservableObject {
             "supportedTools": supportedTools.map { $0 as ConvexEncodable? },
             "integrations": integrations.map { $0 as ConvexEncodable? },
             "applicationCandidates": applicationCandidates.map { $0 as ConvexEncodable? },
+            "observation": observation,
         ]
+        guard token == planGeneration, !Task.isCancelled else { throw CancellationError() }
         let created: CreatedPlan = try await client.mutation("plans:createActionPlan", with: args)
         guard token == planGeneration else {
             let _: CloudMutationReceipt? = try? await client.mutation("plans:cancelActionPlan", with:["planId":created.planId])
             throw CancellationError()
         }
         activePlanID = created.planId
-        let resolution: CloudPlanResolution = try await client.action("plans:resolveActionPlan", with:["planId":created.planId])
+        let resolution: CloudPlanResolution = try await client.action("plans:resolveActionPlan", with: [
+            "planId": created.planId,
+            "screenshot": observation?.imageDataUrl,
+        ])
         let metadata = try await planMetadata(id:created.planId, fingerprint:resolution.fingerprint, token:token)
         guard token == planGeneration, signedIn else { throw CancellationError() }
         if metadata.error == "clarification_required" {
@@ -446,7 +468,7 @@ public final class CloudSession: ObservableObject {
         guard isCurrent(plan) else { throw CancellationError() }
     }
 
-    public func claimStep(_ plan:CloudProposal, ordinal:Int) async throws {
+    public func claimStep(_ plan:CloudProposal, ordinal:Int, observationObservedAt: Date? = nil) async throws {
         guard isCurrent(plan), plan.actions.indices.contains(ordinal), plan.actions[ordinal].isCurrent() else { throw CancellationError() }
         let token = planGeneration
         try checkPlan(token: token, expiresAt: plan.expiresAt)
@@ -457,6 +479,9 @@ public final class CloudSession: ObservableObject {
         ]
         if let contextRevision = plan.contextRevision {
             args["contextRevision"] = Double(contextRevision)
+        }
+        if let observationObservedAt {
+            args["observationObservedAt"] = observationObservedAt.timeIntervalSince1970 * 1_000
         }
         let _: CloudMutationReceipt = try await client.mutation("executions:claimStep", with: args)
         try checkPlan(token: token, expiresAt: plan.expiresAt)
@@ -655,7 +680,14 @@ public func isSupportedNativePlanAction(_ action: NativePlanAction) -> Bool {
               let desktopAction = action.desktopAction else { return false }
         return desktopAction.kind != .insertText
     case .visualComputerUse:
-        return false
+        guard action.executor == "desktop",
+              action.kind == .click,
+              action.targetBundleIdentifier != nil,
+              action.desktopAction?.kind == .click,
+              action.preconditions.requiresFreshObservation,
+              action.verifier.kind == .visualObservation,
+              (try? action.validatedVisualTarget()) != nil else { return false }
+        return true
     }
 }
 

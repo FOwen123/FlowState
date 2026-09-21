@@ -42,6 +42,8 @@ enum L10n {
             return "Select \(label) in \(appName)"
         case let .press(key, modifiers):
             return "Press \(modifiers.map { $0 + "–" } ?? "")\(key) in \(appName)"
+        case let .click(label):
+            return "Click \(label) in \(appName)"
         case let .openURL(url):
             return "Open URL \(url)"
         case let .attachFile(fileID):
@@ -60,6 +62,7 @@ enum L10n {
         case .focus: text("Focus")
         case .select: text("Select")
         case .press: text("Press")
+        case .click: text("Click")
         case .insertText: text("Insert text")
         }
     }

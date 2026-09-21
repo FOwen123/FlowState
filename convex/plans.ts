@@ -52,6 +52,7 @@ type StoredPlan = {
   supportedToolsJson?: string;
   integrationsJson?: string;
   applicationCandidatesJson?: string;
+  visualObservationJson?: string;
   planFingerprint?: string;
   cancellationGeneration: number;
   expiresAt: number;
@@ -163,12 +164,50 @@ function parseApplicationCandidates(value: unknown): string {
   return serialized;
 }
 
-function planningAvailability(plan: Pick<StoredPlan, "supportedToolsJson" | "integrationsJson" | "applicationCandidatesJson">): PlanAvailability | undefined {
+async function hasActiveScreenObservationGrants(
+  ctx: MutationCtx,
+  ownerKey: string,
+  deviceId: string,
+  targetBundleIdentifier: string,
+  now: number,
+): Promise<boolean> {
+  const grants = await ctx.db
+    .query("grants")
+    .withIndex("by_owner_device", (q) =>
+      q.eq("ownerKey", ownerKey).eq("deviceId", deviceId),
+    )
+    .collect();
+  return ["app.observe", "app.upload"].every((capability) =>
+    grants.some(
+      (grant) =>
+        grant.capability === capability &&
+        grant.revokedAt === undefined &&
+        grant.expiresAt > now &&
+        (grant.target === undefined || grant.target === targetBundleIdentifier),
+    ),
+  );
+}
+
+function planningAvailability(plan: Pick<StoredPlan, "supportedToolsJson" | "integrationsJson" | "applicationCandidatesJson" | "visualObservationJson">): PlanAvailability | undefined {
   return parsePlanAvailability(
     plan.supportedToolsJson,
     plan.integrationsJson,
     plan.applicationCandidatesJson ?? "[]",
+    plan.visualObservationJson,
   );
+}
+
+function withoutVisualObservationImage(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value) as unknown;
+  } catch {
+    throw new Error("visual observation is invalid");
+  }
+  if (!isRecord(parsed)) throw new Error("visual observation is invalid");
+  delete parsed.imageDataUrl;
+  return JSON.stringify(parsed);
 }
 
 function rejectLegacyActions(actionsJson: string | undefined): void {
@@ -224,6 +263,23 @@ export const createActionPlan = mutationGeneric({
         }),
       ),
     ),
+    observation: v.optional(
+      v.object({
+        id: v.string(),
+        bundleIdentifier: v.string(),
+        displayId: v.string(),
+        windowId: v.string(),
+        observedAt: v.number(),
+        geometry: v.object({
+          x: v.number(),
+          y: v.number(),
+          width: v.number(),
+          height: v.number(),
+          scale: v.number(),
+        }),
+        imageDataUrl: v.string(),
+      }),
+    ),
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
@@ -237,6 +293,8 @@ export const createActionPlan = mutationGeneric({
     const command = requireCommand(args.command);
     const supportedTools = parseAdvertisedList(args.supportedTools, "supportedTools", 3);
     const integrations = parseAdvertisedList(args.integrations, "integrations", 32);
+    const visualObservationJson =
+      args.observation === undefined ? undefined : JSON.stringify(args.observation);
     let applicationCandidatesJson: string | undefined;
     if (args.applicationCandidates !== undefined) {
       try {
@@ -245,18 +303,22 @@ export const createActionPlan = mutationGeneric({
         throw new Error(error instanceof Error ? error.message : "application candidates are invalid");
       }
     }
+    let availability: PlanAvailability | undefined;
     if (supportedTools !== undefined) {
       try {
-        parsePlanAvailability(
+        availability = parsePlanAvailability(
           JSON.stringify(supportedTools),
           JSON.stringify(integrations ?? []),
           applicationCandidatesJson,
+          visualObservationJson,
         );
       } catch (error) {
         throw new Error(error instanceof Error ? error.message : "plan availability is invalid");
       }
     } else if (integrations !== undefined) {
       throw new Error("supportedTools is required when integrations are advertised");
+    } else if (args.observation !== undefined) {
+      throw new Error("supportedTools is required when an observation is supplied");
     }
     if (
       args.contextRevision !== undefined &&
@@ -265,6 +327,19 @@ export const createActionPlan = mutationGeneric({
       throw new Error("contextRevision must be a non-negative integer");
     }
     const timestamp = Date.now();
+    const observedBundleIdentifier = availability?.visualObservation?.bundleIdentifier;
+    if (
+      observedBundleIdentifier !== undefined &&
+      !(await hasActiveScreenObservationGrants(
+        ctx,
+        identity.tokenIdentifier,
+        deviceId,
+        observedBundleIdentifier,
+        timestamp,
+      ))
+    ) {
+      throw new Error("missing active screen observation grants");
+    }
     const expiresAt = args.expiresAt ?? timestamp + 10 * 60 * 1_000;
     if (!Number.isFinite(expiresAt) || expiresAt <= timestamp || expiresAt > timestamp + 60 * 60 * 1_000) {
       throw new Error("plan expiry must be within one hour");
@@ -307,6 +382,9 @@ export const createActionPlan = mutationGeneric({
       ...(applicationCandidatesJson === undefined
         ? {}
         : { applicationCandidatesJson }),
+      ...(visualObservationJson === undefined
+        ? {}
+        : { visualObservationJson: withoutVisualObservationImage(visualObservationJson) }),
       status: "queued",
       cancellationGeneration: 0,
       expiresAt,
@@ -334,6 +412,7 @@ export const getActionPlan = queryGeneric({
       plan.supportedToolsJson,
       plan.integrationsJson,
       plan.applicationCandidatesJson,
+      plan.visualObservationJson,
     );
     return {
       id: String(plan._id),
@@ -361,7 +440,6 @@ export const resolveActionPlan = actionGeneric({
   args: { planId: v.id("actionPlans"), screenshot: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
-    if (args.screenshot !== undefined) throw new Error("Use the authorized intent observation path for screenshots.");
     const claim = await ctx.runMutation(internalClaimPlan, {
       planId: args.planId,
       ownerKey: identity.tokenIdentifier,
@@ -374,11 +452,28 @@ export const resolveActionPlan = actionGeneric({
       throw new Error(`action plan is ${plan.status}`);
     }
     try {
-      const availability = parsePlanAvailability(
+      let availability = parsePlanAvailability(
         plan.supportedToolsJson,
         plan.integrationsJson,
         plan.applicationCandidatesJson ?? "[]",
+        plan.visualObservationJson,
       );
+      if (availability?.visualObservation !== undefined) {
+        if (args.screenshot === undefined) {
+          throw new Error("visual planning requires the transient screenshot");
+        }
+        availability = parsePlanAvailability(
+          plan.supportedToolsJson,
+          plan.integrationsJson,
+          plan.applicationCandidatesJson ?? "[]",
+          JSON.stringify({
+            ...availability.visualObservation,
+            imageDataUrl: args.screenshot,
+          }),
+        );
+      } else if (args.screenshot !== undefined) {
+        throw new Error("screenshot is not authorized for this plan");
+      }
       let normalized = await resolveJevSingleAction(plan.command, availability);
       console.info("intent_route", normalized === null ? "llm_planner" : "jev_single_action");
       if (normalized === null) {
@@ -438,6 +533,7 @@ export const approveActionPlan = mutationGeneric({
       plan.supportedToolsJson,
       plan.integrationsJson,
       plan.applicationCandidatesJson,
+      plan.visualObservationJson,
     );
     const actions =
       plan.actionsJson === undefined
@@ -480,6 +576,7 @@ export const cancelActionPlan = mutationGeneric({
       status,
       cancellationGeneration: plan.cancellationGeneration + 1,
       errorCode: "cancelled",
+      visualObservationJson: undefined,
       updatedAt: Date.now(),
     });
     return { planId: args.planId, status };
@@ -498,9 +595,63 @@ export const claimPlan = internalMutationGeneric({
       .first();
     if (device === null || device.revokedAt !== undefined) throw new Error("device has been revoked");
     if (plan.status !== "queued") return { claim: false, plan };
+    let observedBundleIdentifier: string | undefined;
+    try {
+      observedBundleIdentifier = planningAvailability(plan)?.visualObservation?.bundleIdentifier;
+    } catch {
+      await ctx.db.patch(plan._id, {
+        status: "failed",
+        errorCode: "visual_observation_invalid",
+        visualObservationJson: undefined,
+        updatedAt: Date.now(),
+      });
+      return {
+        claim: false,
+        plan: {
+          ...plan,
+          status: "failed",
+          errorCode: "visual_observation_invalid",
+          visualObservationJson: undefined,
+        },
+      };
+    }
+    if (
+      observedBundleIdentifier !== undefined &&
+      !(await hasActiveScreenObservationGrants(
+        ctx,
+        plan.ownerKey,
+        plan.deviceId,
+        observedBundleIdentifier,
+        Date.now(),
+      ))
+    ) {
+      await ctx.db.patch(plan._id, {
+        status: "failed",
+        errorCode: "screen_observation_grant_expired",
+        visualObservationJson: undefined,
+        updatedAt: Date.now(),
+      });
+      return {
+        claim: false,
+        plan: {
+          ...plan,
+          status: "failed",
+          errorCode: "screen_observation_grant_expired",
+          visualObservationJson: undefined,
+        },
+      };
+    }
     if (plan.expiresAt <= Date.now()) {
-      await ctx.db.patch(plan._id, { status: "failed", errorCode: "expired", updatedAt: Date.now() });
-      return { claim: false, plan: { ...plan, status: "failed", errorCode: "expired" } };
+      await ctx.db.patch(plan._id, {
+        status: "failed",
+        errorCode: "expired",
+        visualObservationJson: undefined,
+        updatedAt: Date.now(),
+      });
+      return {
+        claim: false,
+        plan: { ...plan, status: "failed", errorCode: "expired", visualObservationJson: undefined },
+      };
     }
     const cancellationGeneration = plan.cancellationGeneration + 1;
     const updatedAt = Date.now();
@@ -577,6 +728,7 @@ export const savePlan = internalMutationGeneric({
       capabilitiesJson: JSON.stringify(normalized.capabilities),
       planFingerprint: normalized.fingerprint,
       errorCode: normalized.clarificationNeeded ? "clarification_required" : undefined,
+      visualObservationJson: withoutVisualObservationImage(plan.visualObservationJson),
       updatedAt: Date.now(),
     });
     return null;
@@ -610,6 +762,7 @@ export const markPlan = internalMutationGeneric({
     await ctx.db.patch(args.planId, {
       status: args.status,
       ...(args.errorCode === undefined ? {} : { errorCode: args.errorCode }),
+      visualObservationJson: undefined,
       updatedAt: Date.now(),
     });
     return null;

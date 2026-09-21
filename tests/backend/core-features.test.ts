@@ -524,11 +524,11 @@ describe("typed action-plan contracts", () => {
   });
 });
 
-it("legacy planning cannot bypass the authorized screenshot intent path", async () => {
+it("planning rejects a screenshot that is not bound to a visual observation", async () => {
   const t = convexTest(schema, modules); const user = t.withIdentity(ownerA);
   await user.mutation(api.workflows.registerDevice, { deviceId: "legacy-screen" });
   const { planId } = await user.mutation(api.plans.createActionPlan, { deviceId: "legacy-screen", command: "scroll down", locale: "en" });
-  await expect(user.action(api.plans.resolveActionPlan, { planId, screenshot: "data:image/png;base64,AAAA" })).rejects.toThrow("authorized intent");
+  await expect(user.action(api.plans.resolveActionPlan, { planId, screenshot: "data:image/png;base64,AAAA" })).rejects.toThrow("not authorized");
 });
 
 it("returns a specific clarification without approving or exposing a partial workflow", async () => {

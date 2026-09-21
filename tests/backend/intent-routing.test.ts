@@ -338,6 +338,7 @@ const answer = (choice: string) => ({
       "focus",
       "select",
       "press",
+      "click",
     ]);
     const questions = buildIntentQuestions(request);
     expect(Object.keys(questions)).toEqual([
@@ -440,6 +441,54 @@ const answer = (choice: string) => ({
         parameters: { key: "A", modifiers: "Command" },
       }),
     ).toMatchObject({ parameters: { key: "A", modifiers: "Command" } });
+  });
+
+  it("accepts a bounded labeled click as a general control action", () => {
+    const clickRequest: IntentRouteRequest = {
+      ...request,
+      utterance: "Click the Take Photo button",
+      supportedActions: ["click"],
+      supportedCapabilities: ["app.control"],
+      context: {
+        ...request.context,
+        focusedAppBundleIdentifier: "com.apple.PhotoBooth",
+        targetCandidates: [
+          {
+            id: "take-photo",
+            label: "Take Photo",
+            bundleIdentifier: "com.apple.PhotoBooth",
+            kind: "control",
+            supportedActions: ["click"],
+          },
+        ],
+      },
+    };
+
+    expect(
+      buildActionProposal(clickRequest, "click", "take-photo", {
+        label: "Take Photo",
+      }),
+    ).toMatchObject({
+      kind: "click",
+      targetBundleIdentifier: "com.apple.PhotoBooth",
+      parameters: { label: "Take Photo" },
+      capability: "app.control",
+      executor: "desktop",
+      requiresApproval: true,
+    });
+    expect(
+      parseFallbackDecision({
+        intent: "action",
+        actionKind: "click",
+        targetId: "take-photo",
+        parameters: { label: "Take Photo" },
+      }),
+    ).toMatchObject({
+      intent: "action",
+      actionKind: "click",
+      targetId: "take-photo",
+      parameters: { label: "Take Photo" },
+    });
   });
 
   it("rejects fallback fields that can smuggle arbitrary execution parameters", () => {
@@ -657,7 +706,7 @@ describe("intent fixture coverage", () => {
         byGroup.set(groupId, split);
       }
     }
-    expect(first.development).toHaveLength(160);
+    expect(first.development).toHaveLength(164);
     expect(first.calibration).toHaveLength(80);
     expect(first.holdout).toHaveLength(80);
 

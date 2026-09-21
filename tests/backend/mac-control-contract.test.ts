@@ -59,6 +59,7 @@ describe("Mac Control contract", () => {
       "focus",
       "select",
       "press",
+      "click",
     ]);
     expect(() =>
       validateIntentRouteRequest({

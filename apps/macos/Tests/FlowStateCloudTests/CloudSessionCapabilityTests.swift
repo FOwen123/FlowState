@@ -74,6 +74,31 @@ func structuredNativeSupportIsFailClosed() {
     #expect(!isSupportedNativePlanAction(visual))
 }
 
+@Test("visual support accepts only a bound desktop click")
+func visualSupportRequiresBoundDesktopClick() {
+    let visual = NativePlanAction(
+        kind: .click,
+        targetBundleIdentifier: "com.example.Canvas",
+        parameters: .click(label: "Visible control"),
+        capability: "app.control",
+        requiresApproval: true,
+        visualTarget: .object([
+            "observationId": .string("00000000-0000-0000-0000-000000000042"),
+            "displayId": .string("7"),
+            "windowId": .string("42"),
+            "x": .number(0.1),
+            "y": .number(0.2),
+            "width": .number(0.3),
+            "height": .number(0.2),
+            "observedAt": .number(1_800_000_000_000),
+        ]),
+        route: .visualComputerUse,
+        risk: .confirm
+    )
+
+    #expect(isSupportedNativePlanAction(visual))
+}
+
 @Test("structured draft support rejects an unapproved reversible draft")
 func structuredDraftRequiresCanonicalApproval() {
     let draft = NativePlanAction(

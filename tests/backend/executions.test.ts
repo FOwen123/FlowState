@@ -166,14 +166,14 @@ it("requires a fresh observation for visual steps and allows only one active vis
   });
   const observedAt = Date.now();
   const visualAction = {
-    kind: "scroll",
+    kind: "click",
     targetBundleIdentifier: "com.example.Reader",
-    parameters: { lines: -2 },
+    parameters: { label: "Continue" },
     capability: "app.control",
     executor: "desktop",
-    requiresApproval: false,
+    requiresApproval: true,
     route: "visualComputerUse",
-    riskClass: "reversible",
+    riskClass: "confirm",
     preconditions: {
       targetBundleIdentifier: "com.example.Reader",
       requiresFreshObservation: true,
@@ -181,12 +181,13 @@ it("requires a fresh observation for visual steps and allows only one active vis
     verifier: { kind: "visualObservation" },
     reversal: { kind: "none", supported: false },
     visualTarget: {
+      observationId: "observation-1",
       displayId: "display-1",
       windowId: "window-1",
       x: 0,
       y: 0,
-      width: 800,
-      height: 600,
+      width: 1,
+      height: 1,
       observedAt,
     },
   };
@@ -203,10 +204,26 @@ it("requires a fresh observation for visual steps and allows only one active vis
       updatedAt: Date.now(),
       planFingerprint: "visual-one",
       actionsJson: JSON.stringify([visualAction]),
+      supportedToolsJson: JSON.stringify(["visualComputerUse"]),
+      integrationsJson: "[]",
+      visualObservationJson: JSON.stringify({
+        id: "observation-1",
+        bundleIdentifier: "com.example.Reader",
+        displayId: "display-1",
+        windowId: "window-1",
+        observedAt,
+        geometry: { x: 0, y: 0, width: 800, height: 600, scale: 1 },
+      }),
     }),
   );
   await user.mutation(anyApi.executions.start, {
     planId,
+    fingerprint: "visual-one",
+  });
+  await user.mutation(anyApi.executions.approveStep, {
+    planId,
+    ordinal: 0,
+    generation: 1,
     fingerprint: "visual-one",
   });
   await expect(
@@ -222,6 +239,14 @@ it("requires a fresh observation for visual steps and allows only one active vis
       ordinal: 0,
       generation: 1,
       observationObservedAt: observedAt,
+    }),
+  ).rejects.toThrow("fresh observation");
+  await expect(
+    user.mutation(anyApi.executions.claimStep, {
+      planId,
+      ordinal: 0,
+      generation: 1,
+      observationObservedAt: Date.now() + 60_000,
     }),
   ).rejects.toThrow("fresh observation");
   await expect(
@@ -246,6 +271,16 @@ it("requires a fresh observation for visual steps and allows only one active vis
       updatedAt: Date.now(),
       planFingerprint: "visual-two",
       actionsJson: JSON.stringify([visualAction]),
+      supportedToolsJson: JSON.stringify(["visualComputerUse"]),
+      integrationsJson: "[]",
+      visualObservationJson: JSON.stringify({
+        id: "observation-1",
+        bundleIdentifier: "com.example.Reader",
+        displayId: "display-1",
+        windowId: "window-1",
+        observedAt,
+        geometry: { x: 0, y: 0, width: 800, height: 600, scale: 1 },
+      }),
     }),
   );
   await expect(

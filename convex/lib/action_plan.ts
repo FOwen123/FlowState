@@ -6,12 +6,14 @@ export type ActionKind =
   | "focus"
   | "select"
   | "press"
+  | "click"
   | "openURL"
   | "attachFile"
   | "sendEmail"
   | "draftMessage";
 
 export type VisualTarget = {
+  observationId: string;
   displayId: string;
   windowId: string;
   x: number;
@@ -19,6 +21,22 @@ export type VisualTarget = {
   width: number;
   height: number;
   observedAt: number;
+};
+
+export type VisualObservation = {
+  id: string;
+  bundleIdentifier: string;
+  displayId: string;
+  windowId: string;
+  observedAt: number;
+  geometry: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    scale: number;
+  };
+  imageDataUrl?: string;
 };
 
 export type ActionRoute =
@@ -73,6 +91,7 @@ export type PlanAvailability = {
   integrations: readonly string[];
   supportedActions?: readonly ActionKind[];
   applicationCandidates?: readonly ApplicationRegistryCandidate[];
+  visualObservation?: VisualObservation;
 };
 
 const actionRoutes = new Set<ActionRoute>([
@@ -81,6 +100,7 @@ const actionRoutes = new Set<ActionRoute>([
   "visualComputerUse",
 ]);
 const integrationIdPattern = /^[A-Za-z0-9._:-]{1,128}$/;
+const observationIdPattern = /^[A-Za-z0-9._:-]{1,128}$/;
 
 function parseAdvertisedJson(
   value: string | undefined,
@@ -118,11 +138,13 @@ export function parsePlanAvailability(
   supportedToolsJson: string | undefined,
   integrationsJson: string | undefined,
   applicationCandidatesJson?: string,
+  visualObservationJson?: string,
 ): PlanAvailability | undefined {
   if (
     supportedToolsJson === undefined &&
     integrationsJson === undefined &&
-    applicationCandidatesJson === undefined
+    applicationCandidatesJson === undefined &&
+    visualObservationJson === undefined
   ) {
     return undefined;
   }
@@ -152,10 +174,24 @@ export function parsePlanAvailability(
     }
     applicationCandidates = normalizeApplicationRegistryCandidates(parsedCandidates);
   }
+  let visualObservation: VisualObservation | undefined;
+  if (visualObservationJson !== undefined) {
+    let parsedObservation: unknown;
+    try {
+      parsedObservation = JSON.parse(visualObservationJson) as unknown;
+    } catch {
+      throw new Error("visual observation is invalid");
+    }
+    visualObservation = parseVisualObservation(parsedObservation);
+    if (!supportedTools.includes("visualComputerUse")) {
+      throw new Error("visual observation requires visualComputerUse");
+    }
+  }
   return {
     supportedTools: supportedTools as ActionRoute[],
     integrations,
     applicationCandidates,
+    ...(visualObservation === undefined ? {} : { visualObservation }),
   };
 }
 
@@ -187,6 +223,7 @@ function riskClassFor(
   ) {
     return "confirm";
   }
+  if (actionKind === "click") return "confirm";
   return "reversible";
 }
 
@@ -211,6 +248,7 @@ const actionKinds = new Set<ActionKind>([
   "focus",
   "select",
   "press",
+  "click",
   "openURL",
   "attachFile",
   "sendEmail",
@@ -327,18 +365,107 @@ function normalizedBundleIdentifier(value: unknown): string | undefined {
   return bundle;
 }
 
+function parseVisualObservation(value: unknown): VisualObservation {
+  if (!isRecord(value)) throw new Error("visual observation must be an object");
+  exactKeys(value, ["id", "bundleIdentifier", "displayId", "windowId", "observedAt", "geometry", "imageDataUrl"]);
+  const id = asBoundedText(value.id, "visual observation id", 128);
+  if (!observationIdPattern.test(id)) throw new Error("visual observation id is invalid");
+  const bundleIdentifier = normalizedBundleIdentifier(value.bundleIdentifier);
+  if (bundleIdentifier === undefined) throw new Error("visual observation bundle identifier is required");
+  const displayId = asBoundedText(value.displayId, "visual observation displayId", 200);
+  const windowId = asBoundedText(value.windowId, "visual observation windowId", 200);
+  const observedAt = value.observedAt;
+  if (
+    typeof observedAt !== "number" ||
+    !Number.isFinite(observedAt) ||
+    observedAt < Date.now() - 30_000 ||
+    observedAt > Date.now() + 5_000
+  ) {
+    throw new Error("visual observation timestamp is invalid");
+  }
+  if (!isRecord(value.geometry)) throw new Error("visual observation geometry is required");
+  exactKeys(value.geometry, ["x", "y", "width", "height", "scale"]);
+  const geometry = value.geometry;
+  for (const key of ["x", "y", "width", "height", "scale"] as const) {
+    if (typeof geometry[key] !== "number" || !Number.isFinite(geometry[key])) {
+      throw new Error("visual observation geometry is invalid");
+    }
+  }
+  const bounds = {
+    x: geometry.x as number,
+    y: geometry.y as number,
+    width: geometry.width as number,
+    height: geometry.height as number,
+    scale: geometry.scale as number,
+  };
+  if (bounds.width <= 0 || bounds.height <= 0 || bounds.scale <= 0 || bounds.scale > 8) {
+    throw new Error("visual observation geometry is invalid");
+  }
+  let imageDataUrl: string | undefined;
+  if (value.imageDataUrl !== undefined) {
+    if (typeof value.imageDataUrl !== "string" || value.imageDataUrl.length > 2_000_000) {
+      throw new Error("visual observation image exceeds the 2MB limit");
+    }
+    if (!/^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(value.imageDataUrl)) {
+      throw new Error("visual observation image must be a PNG or JPEG data URL");
+    }
+    imageDataUrl = value.imageDataUrl;
+  }
+  return {
+    id,
+    bundleIdentifier,
+    displayId,
+    windowId,
+    observedAt,
+    geometry: bounds,
+    ...(imageDataUrl === undefined ? {} : { imageDataUrl }),
+  };
+}
+
 function parseVisualTarget(value: unknown): VisualTarget | undefined {
   if (value === undefined) return undefined;
   if (!isRecord(value)) throw new Error("visualTarget must be an object");
-  exactKeys(value, ["displayId", "windowId", "x", "y", "width", "height", "observedAt"]);
+  exactKeys(value, ["observationId", "displayId", "windowId", "x", "y", "width", "height", "observedAt"]);
+  const observationId = stringParam(value, "observationId", 128);
+  if (!observationIdPattern.test(observationId)) throw new Error("visualTarget observationId is invalid");
   const displayId = stringParam(value, "displayId", 200);
   const windowId = stringParam(value, "windowId", 200);
-  const x = numberParam(value, "x", -100_000, 100_000);
-  const y = numberParam(value, "y", -100_000, 100_000);
-  const width = numberParam(value, "width", 1, 100_000);
-  const height = numberParam(value, "height", 1, 100_000);
+  const x = numberParam(value, "x", 0, 1);
+  const y = numberParam(value, "y", 0, 1);
+  const width = numberParam(value, "width", Number.MIN_VALUE, 1);
+  const height = numberParam(value, "height", Number.MIN_VALUE, 1);
   const observedAt = numberParam(value, "observedAt", 0, Date.now() + 60_000);
-  return { displayId, windowId, x, y, width, height, observedAt };
+  return { observationId, displayId, windowId, x, y, width, height, observedAt };
+}
+
+function enforceVisualObservation(
+  target: VisualTarget,
+  availability: PlanAvailability | undefined,
+  targetBundleIdentifier: string | undefined,
+): void {
+  const observation = availability?.visualObservation;
+  if (observation === undefined) {
+    throw new Error("visual observation is required");
+  }
+  if (
+    targetBundleIdentifier !== observation.bundleIdentifier ||
+    target.observationId !== observation.id ||
+    target.displayId !== observation.displayId ||
+    target.windowId !== observation.windowId ||
+    target.observedAt !== observation.observedAt
+  ) {
+    throw new Error("visual target does not match the supplied observation");
+  }
+  if (
+    target.x < 0 ||
+    target.y < 0 ||
+    target.width <= 0 ||
+    target.height <= 0 ||
+    target.x + target.width > 1 ||
+    target.y + target.height > 1
+  ) {
+    throw new Error("visual target is outside the supplied observation");
+  }
 }
 
 function enforceAvailability(
@@ -359,6 +486,9 @@ function enforceAvailability(
   }
   if (route === "structuredIntegration" && availability.integrations.length === 0) {
     throw new Error("structured integration is not advertised");
+  }
+  if (route === "visualComputerUse" && availability.visualObservation === undefined) {
+    throw new Error("visual observation is required");
   }
   if (
     availability.applicationCandidates !== undefined &&
@@ -451,6 +581,13 @@ function normalizeAction(
       capability = "app.input";
       executor = "desktop";
       break;
+    case "click":
+      exactKeys(parameters, ["label"]);
+      normalized = { label: stringParam(parameters, "label", 300) };
+      capability = "app.control";
+      executor = "desktop";
+      requiresApproval = true;
+      break;
     case "openURL":
       exactKeys(parameters, ["url"]);
       {
@@ -510,11 +647,17 @@ function normalizeAction(
     value.visualTarget === undefined
       ? undefined
       : parseVisualTarget(value.visualTarget);
+  if (visualTarget !== undefined && actionKind !== "click") {
+    throw new Error("visual computer use supports click only");
+  }
   const route = selectActionRoute(actionKind, {
     nativeAccessibility: visualTarget === undefined,
     visualComputerUse: visualTarget !== undefined,
   });
   enforceAvailability(actionKind, route, availability, targetBundleIdentifier);
+  if (visualTarget !== undefined) {
+    enforceVisualObservation(visualTarget, availability, targetBundleIdentifier);
+  }
   return {
     kind: actionKind,
     ...(targetBundleIdentifier === undefined ? {} : { targetBundleIdentifier }),
@@ -588,6 +731,22 @@ export function normalizeModelPlan(
   const actions = value.actions.map((action) =>
     normalizeAction(action, availability),
   );
+  const visualObservationKeys = new Set<string>();
+  for (const action of actions) {
+    if (action.route !== "visualComputerUse" || action.visualTarget === undefined) {
+      continue;
+    }
+    const target = action.visualTarget;
+    const observationKey = `${target.observationId}\u0000${target.displayId}\u0000${target.windowId}\u0000${target.observedAt}`;
+    if (visualObservationKeys.has(observationKey)) {
+      throw new Error("one visual action per observation");
+    }
+    visualObservationKeys.add(observationKey);
+  }
+  const visualActionIndex = actions.findIndex((action) => action.route === "visualComputerUse");
+  if (visualActionIndex > 0) {
+    throw new Error("visual action must be the first step");
+  }
   const explanation = asBoundedText(value.explanation ?? "", "planner explanation", 2_000);
   const clarificationNeeded = value.clarificationNeeded === true;
   if (value.clarificationNeeded !== undefined && typeof value.clarificationNeeded !== "boolean") {

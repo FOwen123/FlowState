@@ -24,6 +24,45 @@ describe("complete workflow planning", () => {
     expect(request.instructions).toContain("search query");
     expect(request.instructions).toContain("clarificationNeeded");
   });
+
+  it("describes the general labeled click and visual observation boundary", () => {
+    const observation = {
+      id: "observation-1",
+      bundleIdentifier: "com.apple.PhotoBooth",
+      displayId: "display-1",
+      windowId: "window-1",
+      observedAt: Date.now(),
+      geometry: { x: 12, y: 24, width: 1200, height: 900, scale: 2 },
+      imageDataUrl: "data:image/png;base64,AAAA",
+    };
+    const request = buildPlannerRequest("Click the Take Photo button", {
+      supportedTools: ["visualComputerUse"],
+      integrations: [],
+      visualObservation: observation,
+      applicationCandidates: [
+        {
+          bundleIdentifier: "com.apple.PhotoBooth",
+          displayName: "Photo Booth",
+          normalizedNames: ["photo booth"],
+          supportedActions: ["openApplication", "click"],
+          integrations: [],
+        },
+      ],
+    });
+
+    expect(request.instructions).toContain("click {label: string}");
+    expect(request.instructions).toContain("one visual action per fresh observation");
+    expect(request.instructions).toContain("visualComputerUse");
+    expect(request.instructions).toContain("normalized window-relative");
+    const plannerInput = JSON.stringify(request.input);
+    expect(plannerInput).toContain("observation-1");
+    expect(plannerInput).toContain("data:image/png;base64,AAAA");
+    expect(plannerInput).toContain('\\"scale\\":2');
+    expect(request.input[0]?.content).toContainEqual({
+      type: "input_image",
+      image_url: "data:image/png;base64,AAAA",
+    });
+  });
 });
 
 it("accepts a clarification with no executable partial workflow", () => {
@@ -248,4 +287,103 @@ it("a compound request reaches the planner intact after Jev selects workflow", a
   ]);
   expect(fetch).toHaveBeenCalledTimes(2);
   expect(String(fetch.mock.calls[1][1]?.body)).toContain(command);
+});
+
+it("supplies the current visual observation to the planner and clears the image after saving", async () => {
+  const observedAt = Date.now();
+  const jev = mockJev("workflow", "unmatched");
+  const fetch = vi.fn(async (url: unknown, init: RequestInit | undefined) => {
+    if (String(url).includes("typesafe")) return jev(url, init);
+    return new Response(
+      JSON.stringify({
+        id: "visual-plan",
+        output_text: JSON.stringify({
+          actions: [
+            {
+              kind: "click",
+              targetBundleIdentifier: "com.example.Reader",
+              parameters: { label: "Continue" },
+              visualTarget: {
+                observationId: "observation-1",
+                displayId: "display-1",
+                windowId: "window-1",
+                x: 0.1,
+                y: 0.2,
+                width: 0.1,
+                height: 0.1,
+                observedAt,
+              },
+            },
+          ],
+          explanation: "Click the labeled control.",
+          clarificationNeeded: false,
+        }),
+      }),
+    );
+  });
+  vi.stubGlobal("fetch", fetch);
+  vi.stubEnv("OPENAI_API_KEY", "synthetic");
+  vi.stubEnv("FLOWSTATE_PLANNER_MODEL", "synthetic");
+  const t = convexTest(schema, modules).withIdentity({
+    tokenIdentifier: "test|visual-plan",
+    subject: "visual-plan",
+  });
+  await t.mutation(anyApi.workflows.registerDevice, { deviceId: "visual-plan-device" });
+  const visualRequest = {
+    deviceId: "visual-plan-device",
+    locale: "en" as const,
+    command: "Click Continue",
+    supportedTools: ["visualComputerUse"],
+    integrations: [],
+    applicationCandidates: [
+      {
+        bundleIdentifier: "com.example.Reader",
+        displayName: "Reader",
+        normalizedNames: ["reader"],
+        supportedActions: ["openApplication", "click"],
+        integrations: [],
+      },
+    ],
+    observation: {
+      id: "observation-1",
+      bundleIdentifier: "com.example.Reader",
+      displayId: "display-1",
+      windowId: "window-1",
+      observedAt,
+      geometry: { x: 0, y: 0, width: 1200, height: 900, scale: 1 },
+      imageDataUrl: "data:image/png;base64,AAAA",
+    },
+  };
+  await expect(
+    t.mutation(anyApi.plans.createActionPlan, visualRequest),
+  ).rejects.toThrow("missing active screen observation grants");
+  for (const capability of ["app.observe", "app.upload"]) {
+    await t.mutation(anyApi.grants.grant, {
+      deviceId: "visual-plan-device",
+      capability,
+      target: "com.example.Reader",
+      expiresAt: Date.now() + 60_000,
+    });
+  }
+  const { planId } = await t.mutation(anyApi.plans.createActionPlan, {
+    ...visualRequest,
+  });
+  const queued = await t.run((ctx) => ctx.db.get(planId));
+  expect(JSON.stringify(queued)).not.toContain("imageDataUrl");
+  const plan = await t.action(anyApi.plans.resolveActionPlan, {
+    planId,
+    screenshot: visualRequest.observation.imageDataUrl,
+  });
+  expect(plan.actions).toMatchObject([
+    { kind: "click", route: "visualComputerUse", visualTarget: { observationId: "observation-1" } },
+  ]);
+  const requestBody = JSON.parse(String(fetch.mock.calls[1]?.[1]?.body)) as {
+    input: Array<{ content: Array<{ type: string; text?: string; image_url?: string }> }>;
+  };
+  expect(requestBody.input[0]?.content).toContainEqual({
+    type: "input_image",
+    image_url: "data:image/png;base64,AAAA",
+  });
+  const stored = await t.run((ctx) => ctx.db.get(planId));
+  expect(JSON.stringify(stored)).not.toContain("imageDataUrl");
 });

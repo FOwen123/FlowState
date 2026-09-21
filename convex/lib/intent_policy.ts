@@ -329,6 +329,7 @@ function fallbackParameters(
     scroll: ["direction", "amount"],
     focus: ["role", "label"],
     select: ["label"],
+    click: ["label"],
     press: ["key", "modifiers"],
   };
   const allowed = new Set(allowedByAction[actionKind]);
@@ -443,14 +444,14 @@ export function buildActionProposal(
   }
   if (actionKind === "openApplication" && candidate.kind !== "app") return null;
   if (
-    (actionKind === "focus" || actionKind === "select") &&
+    (actionKind === "focus" || actionKind === "select" || actionKind === "click") &&
     candidate.kind !== "control"
   )
     return null;
   const targetBundleIdentifier =
     candidate.bundleIdentifier ?? request.context.focusedAppBundleIdentifier;
   if (
-    ["scroll", "focus", "select", "press"].includes(actionKind) &&
+    ["scroll", "focus", "select", "press", "click"].includes(actionKind) &&
     targetBundleIdentifier !== request.context.focusedAppBundleIdentifier
   )
     return null;
@@ -489,6 +490,10 @@ export function buildActionProposal(
     }
     case "select":
       parameters = { label: fallback?.label ?? candidate.label };
+      break;
+    case "click":
+      parameters = { label: fallback?.label ?? candidate.label };
+      requiresApproval = true;
       break;
     case "press": {
       const requestedKey = fallback?.key ?? keyFromUtterance(request.utterance);
@@ -536,6 +541,7 @@ function deterministicRisk(
   if (action === "press" && (parameters.key === "Enter" || parameters.modifiers !== undefined)) {
     return "confirm";
   }
+  if (action === "click") return "confirm";
   return "reversible";
 }
 
@@ -554,6 +560,8 @@ function requiredSlotsComplete(
     case "focus":
       return request.context.focusedRole !== undefined;
     case "select":
+      return candidate.kind === "control" && candidate.label.trim().length > 0;
+    case "click":
       return candidate.kind === "control" && candidate.label.trim().length > 0;
     case "press":
       return keyFromUtterance(request.utterance) !== null;

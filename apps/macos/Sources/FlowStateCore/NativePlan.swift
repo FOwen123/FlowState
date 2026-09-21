@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 public enum NativePlanDecodingError: Error, Equatable, LocalizedError, Sendable {
@@ -30,6 +31,7 @@ public enum NativePlanActionKind: String, Codable, Equatable, Sendable {
     case focus
     case select
     case press
+    case click
     case openURL
     case attachFile
     case sendEmail
@@ -63,11 +65,57 @@ public enum NativePlanParameters: Equatable, Sendable {
     case focus(role: String, label: String?)
     case select(label: String)
     case press(key: String, modifiers: String?)
+    case click(label: String)
     case openURL(url: String)
     case attachFile(fileID: String)
     case sendEmail(recipient: String, subject: String, body: String)
     case draftMessage(recipient: String, subject: String, body: String)
     case insertText(text: String, replaceSelection: Bool)
+}
+
+public struct NativePlanVisualTarget: Equatable, Sendable {
+    public let observationID: UUID
+    public let displayID: UInt32
+    public let windowID: UInt32
+    public let bounds: CGRect
+    public let observedAt: Date
+
+    init(json: NativePlanJSONValue) throws {
+        guard case let .object(value) = json,
+              Set(value.keys) == ["observationId", "displayId", "windowId", "x", "y", "width", "height", "observedAt"],
+              case let .string(observation) = value["observationId"], let observationID = UUID(uuidString: observation),
+              case let .string(display) = value["displayId"], let displayID = UInt32(display),
+              case let .string(window) = value["windowId"], let windowID = UInt32(window),
+              case let .number(x) = value["x"], case let .number(y) = value["y"],
+              case let .number(width) = value["width"], case let .number(height) = value["height"],
+              case let .number(observedAt) = value["observedAt"],
+              x.isFinite, y.isFinite, width.isFinite, height.isFinite, observedAt.isFinite,
+              x >= 0, y >= 0, width > 0, height > 0,
+              x + width <= 1, y + height <= 1,
+              observedAt > 0 else {
+            throw NativePlanDecodingError.unsupportedVisualTarget
+        }
+        self.observationID = observationID
+        self.displayID = displayID
+        self.windowID = windowID
+        bounds = CGRect(x: x, y: y, width: width, height: height)
+        self.observedAt = Date(timeIntervalSince1970: observedAt / 1_000)
+    }
+
+    public func screenPoint(in observation: CaptureObservation) throws -> CGPoint {
+        guard observation.id == observationID,
+              observation.windowID == windowID,
+              observation.displayID == displayID,
+              abs(observation.capturedAt.timeIntervalSince(observedAt)) < 0.001,
+              observation.scale > 0,
+              !bounds.isEmpty else {
+            throw NativePlanDecodingError.unsupportedVisualTarget
+        }
+        return CGPoint(
+            x: observation.windowFrame.minX + bounds.midX * observation.windowFrame.width,
+            y: observation.windowFrame.minY + bounds.midY * observation.windowFrame.height
+        )
+    }
 }
 
 public struct NativePlanPreconditions: Codable, Equatable, Sendable {
@@ -230,9 +278,18 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
             .some(.select(label: label))
         case let .press(key, modifiers):
             .some(.press(key: key, modifiers: modifiers))
+        case let .click(label):
+            .some(.click(label: label))
         case .openURL, .attachFile, .sendEmail, .draftMessage, .insertText:
             nil
         }
+    }
+
+    public func validatedVisualTarget() throws -> NativePlanVisualTarget {
+        guard route == .visualComputerUse, let visualTarget else {
+            throw NativePlanDecodingError.unsupportedVisualTarget
+        }
+        return try NativePlanVisualTarget(json: visualTarget)
     }
 
     public var summary: String {
@@ -251,6 +308,8 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         case let .press(key, modifiers):
             return modifiers.map { "Press \($0)-\(key) in \(app)" }
                 ?? "Press \(key) in \(app)"
+        case let .click(label):
+            return "Click \(label) in \(app)"
         case let .openURL(url):
             return "Open URL \(url)"
         case let .attachFile(fileID):
@@ -325,6 +384,10 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         case modifiers
     }
 
+    private enum ClickCodingKeys: String, CodingKey, CaseIterable {
+        case label
+    }
+
     private enum OpenURLCodingKeys: String, CodingKey, CaseIterable {
         case url
     }
@@ -369,7 +432,7 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         let allowedCapabilities: Set<String> = switch kind {
         case .openApplication:
             ["app.control", "app.open"]
-        case .scroll, .focus, .select:
+        case .scroll, .focus, .select, .click:
             ["app.control"]
         case .press, .insertText:
             ["app.input"]
@@ -466,6 +529,9 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         if route == .visualComputerUse && visualTarget == nil {
             throw NativePlanDecodingError.unsupportedVisualTarget
         }
+        if route == .visualComputerUse, let visualTarget {
+            _ = try NativePlanVisualTarget(json: visualTarget)
+        }
 
         let parametersDecoder = try container.superDecoder(forKey: .parameters)
         let parameters: NativePlanParameters
@@ -536,6 +602,19 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
                 throw NativePlanDecodingError.invalidParameters("press modifiers are not on the native allowlist.")
             }
             parameters = .press(key: key, modifiers: modifiers)
+        case .click:
+            let allParameters = try parametersDecoder.container(keyedBy: NativePlanCodingKey.self)
+            try rejectUnknownKeys(
+                allParameters.allKeys,
+                allowed: ClickCodingKeys.allCases.map(\.stringValue)
+            )
+            let parametersContainer = try parametersDecoder.container(keyedBy: ClickCodingKeys.self)
+            let label = try parametersContainer.decode(String.self, forKey: .label)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !label.isEmpty, label.count <= 300 else {
+                throw NativePlanDecodingError.invalidParameters("click label must be between 1 and 300 characters.")
+            }
+            parameters = .click(label: label)
         case .openURL:
             let allParameters = try parametersDecoder.container(keyedBy: NativePlanCodingKey.self)
             try rejectUnknownKeys(allParameters.allKeys, allowed: ["url"])
@@ -593,7 +672,7 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
         }
 
         let expectedApproval: Bool = switch parameters {
-        case .insertText: true
+        case .click, .insertText: true
         case let .press(key, modifiers): key == "Enter" || modifiers != nil
         case .attachFile, .sendEmail: true
         case .openURL: false
@@ -657,6 +736,9 @@ public struct NativePlanAction: Codable, Equatable, Sendable, CustomStringConver
             var parametersContainer = container.nestedContainer(keyedBy: PressCodingKeys.self, forKey: .parameters)
             try parametersContainer.encode(key, forKey: .key)
             try parametersContainer.encodeIfPresent(modifiers, forKey: .modifiers)
+        case let .click(label):
+            var parametersContainer = container.nestedContainer(keyedBy: ClickCodingKeys.self, forKey: .parameters)
+            try parametersContainer.encode(label, forKey: .label)
         case let .openURL(url):
             var parametersContainer = container.nestedContainer(keyedBy: OpenURLCodingKeys.self, forKey: .parameters)
             try parametersContainer.encode(url, forKey: .url)

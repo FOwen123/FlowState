@@ -9,12 +9,13 @@ public enum DesktopActionKind: String, CaseIterable, Codable, Sendable {
     case focus
     case select
     case press
+    case click
     case insertText
 
     /// Generic text insertion is retained as a decoding compatibility case,
     /// but it is no longer a control grant or an executable action.
     public static var allCases: [DesktopActionKind] {
-        [.openApplication, .scroll, .focus, .select, .press]
+        [.openApplication, .scroll, .focus, .select, .press, .click]
     }
 }
 
@@ -27,6 +28,7 @@ public enum DesktopAction: Equatable, Codable, Sendable {
     case selectTarget(label: String)
     case press
     case keyPress(key: String, modifiers: String?)
+    case clickTarget(label: String)
     case insertText(String)
 
     public static func focus(role: String?, label: String?) -> Self {
@@ -41,8 +43,13 @@ public enum DesktopAction: Equatable, Codable, Sendable {
         .keyPress(key: key, modifiers: modifiers)
     }
 
+    public static func click(label: String) -> Self {
+        .clickTarget(label: label)
+    }
+
     var movesKeyboardFocus: Bool {
         if case .keyPress("Tab", _) = self { return true }
+        if case .clickTarget = self { return true }
         return false
     }
 
@@ -53,6 +60,7 @@ public enum DesktopAction: Equatable, Codable, Sendable {
         case .focus, .focusTarget: .focus
         case .select, .selectTarget: .select
         case .press, .keyPress: .press
+        case .clickTarget: .click
         case .insertText: .insertText
         }
     }
@@ -61,6 +69,42 @@ public enum DesktopAction: Equatable, Codable, Sendable {
 public enum DesktopUndoSupport: String, Codable, Equatable, Sendable {
     case none
     case restoreText
+}
+
+public struct VisualComputerUseExecutor: Sendable {
+    public init() {}
+
+    @discardableResult
+    public func click(
+        target: NativePlanVisualTarget,
+        in observation: CaptureObservation,
+        authorize: @escaping @Sendable () async -> Bool
+    ) async throws -> CGPoint {
+        guard AXIsProcessTrusted() else { throw DesktopExecutionError.accessibilityDenied }
+        let point = try target.screenPoint(in: observation)
+        guard await authorize(),
+              NSWorkspace.shared.frontmostApplication?.bundleIdentifier == observation.bundleIdentifier,
+              let source = CGEventSource(stateID: .combinedSessionState),
+              let down = CGEvent(
+                mouseEventSource: source,
+                mouseType: .leftMouseDown,
+                mouseCursorPosition: point,
+                mouseButton: .left
+              ),
+              let up = CGEvent(
+                mouseEventSource: source,
+                mouseType: .leftMouseUp,
+                mouseCursorPosition: point,
+                mouseButton: .left
+              ) else {
+            throw DesktopExecutionError.targetChanged
+        }
+        AXDesktopDriver.tagAutomationEvent(down)
+        AXDesktopDriver.tagAutomationEvent(up)
+        down.post(tap: .cghidEventTap)
+        up.post(tap: .cghidEventTap)
+        return point
+    }
 }
 
 public struct DesktopExecutionGrant: Codable, Equatable, Sendable {
@@ -532,6 +576,78 @@ public actor DesktopAutomationController {
         }
     }
 
+    public func executeVisualClick(
+        target: NativePlanVisualTarget,
+        capture: CaptureObservation,
+        expectedBundleIdentifier: String,
+        revalidate: @escaping @Sendable () async throws -> Void,
+        verify: @escaping @Sendable () async throws -> Bool
+    ) async throws -> VerifiedDesktopAction {
+        guard stateValue == .ready else {
+            if stateValue == .pausedForUser { throw DesktopExecutionError.pausedForTakeover }
+            if stateValue == .reconciliationRequired { throw DesktopExecutionError.reconciliationRequired }
+            throw DesktopExecutionError.notStarted
+        }
+        guard activeOperation == nil, let grant,
+              grant.generation == generation, grant.expiresAt > Date(),
+              grant.allows(.click(label: "visual target"), bundleIdentifier: expectedBundleIdentifier),
+              capture.bundleIdentifier == expectedBundleIdentifier else {
+            throw DesktopExecutionError.actionNotGranted
+        }
+
+        let token = OperationToken(id: UUID(), generation: generation)
+        activeOperation = token
+        stateValue = .running
+        var effectAttempted = false
+        do {
+            let before = try await driver.observe()
+            guard before.bundleIdentifier == expectedBundleIdentifier,
+                  isCurrent(token, state: .running) else {
+                throw DesktopExecutionError.targetChanged
+            }
+            let authorization: @Sendable () async -> Bool = { [self] in
+                guard await isCurrent(token, state: .running) else { return false }
+                do {
+                    try await revalidate()
+                    return await isCurrent(token, state: .running)
+                } catch {
+                    return false
+                }
+            }
+            _ = try await VisualComputerUseExecutor().click(
+                target: target,
+                in: capture,
+                authorize: authorization
+            )
+            effectAttempted = true
+            guard isCurrent(token, state: .running), try await verify() else {
+                throw DesktopExecutionError.dispatchUncertain
+            }
+            let after = try await driver.observe()
+            guard isCurrent(token, state: .running),
+                  after.bundleIdentifier == expectedBundleIdentifier else {
+                throw DesktopExecutionError.dispatchUncertain
+            }
+            activeOperation = nil
+            stateValue = .ready
+            return VerifiedDesktopAction(
+                action: .click(label: "visual target"),
+                targetBundleIdentifier: expectedBundleIdentifier,
+                focusedElementID: before.focusedElementID,
+                valueBefore: before.value,
+                valueAfter: after.value,
+                undoSupport: .none,
+                generation: token.generation
+            )
+        } catch {
+            if activeOperation == token {
+                activeOperation = nil
+                stateValue = effectAttempted ? .reconciliationRequired : .ready
+            }
+            throw error
+        }
+    }
+
     public func undo(_ record: VerifiedDesktopAction) async throws {
         guard record.undoSupport == .restoreText else {
             throw DesktopExecutionError.undoUnsupported
@@ -630,6 +746,10 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
         guard role != nil else { return false }
         guard role != "AXSecureTextField" else { return false }
         return !isSecureTextField(role: role, subrole: subrole)
+    }
+
+    static func isPressableControlEnabled(_ enabled: Bool?) -> Bool {
+        enabled != false
     }
 
     public func observe() async throws -> DesktopObservation {
@@ -758,7 +878,7 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
                 return DesktopActionResult(verified:false, effectAttempted: true)
             }
             return try await scrollWebContent(in: window, lines: lines, expectedFocus: expectedObservation.focusedElementID, authorize: authorize)
-        case .focus, .focusTarget, .select, .selectTarget, .press, .keyPress, .insertText:
+        case .focus, .focusTarget, .select, .selectTarget, .press, .keyPress, .clickTarget, .insertText:
             guard action.kind != .insertText else { throw DesktopExecutionError.actionNotGranted }
             guard AXIsProcessTrusted() else { throw DesktopExecutionError.accessibilityDenied }
             let focused = try focusedElement(matching: expectedObservation)
@@ -893,6 +1013,33 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
                     throw DesktopExecutionError.dispatchUncertain
                 }
                 return DesktopActionResult(verified: false, effectAttempted: true)
+            case let .clickTarget(label):
+                guard let target = NSWorkspace.shared.frontmostApplication,
+                      target.bundleIdentifier == expectedObservation.bundleIdentifier else {
+                    throw DesktopExecutionError.targetChanged
+                }
+                let applicationElement = AXUIElementCreateApplication(target.processIdentifier)
+                guard let windowValue = copyAttribute(applicationElement, kAXFocusedWindowAttribute as CFString),
+                      CFGetTypeID(windowValue) == AXUIElementGetTypeID(),
+                      uniquelyPressableElement(labeled: label, in: windowValue as! AXUIElement) != nil else {
+                    return DesktopActionResult(verified: false)
+                }
+                guard await authorize(),
+                      NSWorkspace.shared.frontmostApplication?.processIdentifier == target.processIdentifier,
+                      sameObservationContext(try await observe(), expectedObservation),
+                      let currentWindow = copyAttribute(applicationElement, kAXFocusedWindowAttribute as CFString),
+                      CFEqual(currentWindow, windowValue),
+                      let control = uniquelyPressableElement(
+                        labeled: label,
+                        in: currentWindow as! AXUIElement
+                      ) else {
+                    throw DesktopExecutionError.targetChanged
+                }
+                let status = AXUIElementPerformAction(control, kAXPressAction as CFString)
+                return DesktopActionResult(
+                    verified: status == .success,
+                    effectAttempted: status == .success
+                )
             case let .insertText(text):
                 let role = copyAttribute(focused, kAXRoleAttribute as CFString) as? String
                 let subrole = copyAttribute(focused, kAXSubroleAttribute as CFString) as? String
@@ -1177,6 +1324,33 @@ public final class AXDesktopDriver: @unchecked Sendable, DesktopDriver {
         guard AXUIElementCopyActionNames(element, &values) == .success,
               let values else { return [] }
         return (values as NSArray).compactMap { $0 as? String }
+    }
+
+    private func uniquelyPressableElement(labeled label: String, in root: AXUIElement) -> AXUIElement? {
+        let expected = label.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        var queue = [root]
+        var matches: [AXUIElement] = []
+        var index = 0
+        while index < queue.count, index < 4_096 {
+            let element = queue[index]
+            index += 1
+            let actual = accessibleLabel(element)?
+                .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let enabled = (copyAttribute(element, kAXEnabledAttribute as CFString) as? NSNumber)?.boolValue
+            if actual == expected,
+               Self.isPressableControlEnabled(enabled),
+               actionNames(for: element).contains(kAXPressAction as String) {
+                matches.append(element)
+                if matches.count > 1 { return nil }
+            }
+            if let children = copyAttribute(element, kAXChildrenAttribute as CFString) as? [AXUIElement] {
+                queue.append(contentsOf: children)
+            }
+        }
+        guard index == queue.count else { return nil }
+        return matches.first
     }
 
     private func frame(of element: AXUIElement) -> CGRect? {
