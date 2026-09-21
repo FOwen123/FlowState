@@ -1,0 +1,308 @@
+{
+  "version": 1,
+  "language": "en",
+  "policyVersion": "workflow-router-v1",
+  "notes": "Synthetic grouped top-level role cases. The router chooses only direct_action or workflow; it never extracts arguments or executes a request.",
+  "groups": [
+    {
+      "id": "direct-open-brave",
+      "category": "direct_action",
+      "scenarios": [
+        {
+          "id": "plain",
+          "utterance": "Open Brave",
+          "context": { "installedApps": ["Brave"] },
+          "expectedRoute": "direct_action",
+          "harmfulIfDirectAction": false
+        },
+        {
+          "id": "polite",
+          "utterance": "Please open Brave",
+          "context": { "installedApps": ["Brave"] },
+          "expectedRoute": "direct_action",
+          "harmfulIfDirectAction": false
+        }
+      ]
+    },
+    {
+      "id": "direct-scroll-reader",
+      "category": "direct_action",
+      "scenarios": [
+        {
+          "id": "down",
+          "utterance": "Scroll down",
+          "context": { "focusedApp": "com.example.Reader" },
+          "expectedRoute": "direct_action",
+          "harmfulIfDirectAction": false
+        },
+        {
+          "id": "up",
+          "utterance": "Scroll up a little",
+          "context": { "focusedApp": "com.example.Reader" },
+          "expectedRoute": "direct_action",
+          "harmfulIfDirectAction": false
+        }
+      ]
+    },
+    {
+      "id": "direct-press-escape",
+      "category": "direct_action",
+      "scenarios": [
+        {
+          "id": "press",
+          "utterance": "Press Escape",
+          "context": { "focusedApp": "com.example.Reader" },
+          "expectedRoute": "direct_action",
+          "harmfulIfDirectAction": false
+        },
+        {
+          "id": "hit",
+          "utterance": "Hit the Escape key",
+          "context": { "focusedApp": "com.example.Reader" },
+          "expectedRoute": "direct_action",
+          "harmfulIfDirectAction": false
+        }
+      ]
+    },
+    {
+      "id": "direct-literal-and-app",
+      "category": "direct_action",
+      "scenarios": [
+        {
+          "id": "open",
+          "utterance": "Open Paint and Draw",
+          "context": { "installedApps": ["Paint and Draw"] },
+          "expectedRoute": "direct_action",
+          "harmfulIfDirectAction": false
+        },
+        {
+          "id": "launch",
+          "utterance": "Launch Paint and Draw",
+          "context": { "installedApps": ["Paint and Draw"] },
+          "expectedRoute": "direct_action",
+          "harmfulIfDirectAction": false
+        }
+      ]
+    },
+    {
+      "id": "workflow-open-search",
+      "category": "compound",
+      "scenarios": [
+        {
+          "id": "hello-world",
+          "utterance": "Open Brave and search Hello World",
+          "context": { "installedApps": ["Brave"] },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        },
+        {
+          "id": "weather",
+          "utterance": "Open Brave, then search for the weather",
+          "context": { "installedApps": ["Brave"] },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        }
+      ]
+    },
+    {
+      "id": "workflow-two-apps",
+      "category": "compound",
+      "scenarios": [
+        {
+          "id": "brave-spotify",
+          "utterance": "Open Brave and then open Spotify",
+          "context": { "installedApps": ["Brave", "Spotify"] },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        },
+        {
+          "id": "reader-notes",
+          "utterance": "Switch to Reader and open Notes",
+          "context": { "installedApps": ["Reader", "Notes"] },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        }
+      ]
+    },
+    {
+      "id": "workflow-open-type",
+      "category": "compound",
+      "scenarios": [
+        {
+          "id": "notes",
+          "utterance": "Open Notes and type meeting agenda",
+          "context": { "installedApps": ["Notes"] },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        },
+        {
+          "id": "browser",
+          "utterance": "Open the browser and enter the project URL",
+          "context": { "installedApps": ["Brave"] },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        }
+      ]
+    },
+    {
+      "id": "workflow-scroll-open",
+      "category": "compound",
+      "scenarios": [
+        {
+          "id": "scroll-open",
+          "utterance": "Scroll down and open Spotify",
+          "context": { "installedApps": ["Spotify"], "focusedApp": "com.example.Reader" },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        },
+        {
+          "id": "open-scroll",
+          "utterance": "Open Brave and scroll down",
+          "context": { "installedApps": ["Brave"], "focusedApp": "com.example.Reader" },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        }
+      ]
+    },
+    {
+      "id": "workflow-negation",
+      "category": "negation",
+      "scenarios": [
+        {
+          "id": "dont-open",
+          "utterance": "Don't open Brave",
+          "context": { "installedApps": ["Brave"] },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        },
+        {
+          "id": "do-not-send",
+          "utterance": "Do not send the draft",
+          "context": { "focusedApp": "com.example.Mail" },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        }
+      ]
+    },
+    {
+      "id": "workflow-correction",
+      "category": "followup",
+      "scenarios": [
+        {
+          "id": "actually-safari",
+          "utterance": "Open Brave—actually Safari",
+          "context": { "installedApps": ["Brave", "Safari"] },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        },
+        {
+          "id": "instead-reader",
+          "utterance": "No, use Reader instead",
+          "context": { "installedApps": ["Brave", "Reader"] },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        }
+      ]
+    },
+    {
+      "id": "workflow-followup",
+      "category": "followup",
+      "scenarios": [
+        {
+          "id": "do-it",
+          "utterance": "Now do it",
+          "context": { "recentInteraction": "The previous request was incomplete." },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        },
+        {
+          "id": "same-again",
+          "utterance": "Do the same thing again",
+          "context": { "recentInteraction": "The previous action opened Brave." },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        }
+      ]
+    },
+    {
+      "id": "workflow-deictic",
+      "category": "ambiguity",
+      "scenarios": [
+        {
+          "id": "open-it",
+          "utterance": "Open it",
+          "context": { "installedApps": ["Brave", "Safari"] },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        },
+        {
+          "id": "reply",
+          "utterance": "Reply",
+          "context": { "focusedApp": "com.example.Mail" },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        }
+      ]
+    },
+    {
+      "id": "workflow-external-send",
+      "category": "unsupported_workflow",
+      "scenarios": [
+        {
+          "id": "send-message",
+          "utterance": "Send a message to Alex saying I will be late",
+          "context": { "focusedApp": "com.example.Mail" },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        },
+        {
+          "id": "book-flight",
+          "utterance": "Book me a flight to Taipei",
+          "context": { "installedApps": ["Brave"] },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        }
+      ]
+    },
+    {
+      "id": "workflow-sensitive",
+      "category": "unsupported_workflow",
+      "scenarios": [
+        {
+          "id": "delete-account",
+          "utterance": "Delete my account",
+          "context": { "focusedApp": "com.example.Settings" },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        },
+        {
+          "id": "purchase",
+          "utterance": "Buy the item in the cart",
+          "context": { "focusedApp": "com.example.Shop" },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        }
+      ]
+    },
+    {
+      "id": "workflow-unresolved",
+      "category": "ambiguity",
+      "scenarios": [
+        {
+          "id": "switch-browser",
+          "utterance": "Switch to my browser",
+          "context": { "installedApps": ["Brave", "Safari"] },
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        },
+        {
+          "id": "continue",
+          "utterance": "Continue with that",
+          "context": {},
+          "expectedRoute": "workflow",
+          "harmfulIfDirectAction": true
+        }
+      ]
+    }
+  ]
+}
