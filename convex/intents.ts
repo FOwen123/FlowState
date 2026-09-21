@@ -10,6 +10,7 @@ import { v } from "convex/values";
 import { requireIdentity } from "./lib/identity";
 import {
   ACTION_KINDS,
+  TOOL_KINDS,
   buildIntentQuestions,
   validateIntentRouteRequest,
   type IntentActionKind,
@@ -103,6 +104,10 @@ const intentAction = v.union(
   ...ACTION_KINDS.map((kind) => v.literal(kind)),
 ) as ReturnType<typeof v.union>;
 
+const intentTool = v.union(
+  ...TOOL_KINDS.map((tool) => v.literal(tool)),
+) as ReturnType<typeof v.union>;
+
 const intentContext = v.object({
   focusedAppBundleIdentifier: v.optional(v.string()),
   focusedRole: v.optional(v.string()),
@@ -111,6 +116,8 @@ const intentContext = v.object({
     v.object({
       id: v.string(),
       label: v.string(),
+      normalizedNames: v.optional(v.array(v.string())),
+      matchedAlias: v.optional(v.string()),
       bundleIdentifier: v.optional(v.string()),
       kind: v.union(
         v.literal("app"),
@@ -118,6 +125,9 @@ const intentContext = v.object({
         v.literal("control"),
         v.literal("file"),
       ),
+      isRunning: v.optional(v.boolean()),
+      supportedActions: v.optional(v.array(intentAction)),
+      integrations: v.optional(v.array(v.string())),
     }),
   ),
   recentInteraction: v.optional(v.string()),
@@ -196,7 +206,16 @@ function emptyDecision(reason: string): IntentDecision {
     intent: null,
     action: null,
     clarification: null,
-    confidence: { intent: null, action: null, target: null },
+    confidence: {
+      intent: null,
+      app: null,
+      action: null,
+      tool: null,
+      target: null,
+      requiredSlots: null,
+      risk: null,
+      clarification: null,
+    },
   };
 }
 
@@ -269,11 +288,12 @@ export const route = actionGeneric({
     utterance: v.string(),
     mode: v.union(
       v.literal("auto"),
-      v.literal("dictation"),
       v.literal("commands"),
+      v.literal("control"),
     ),
     context: intentContext,
     supportedActions: v.array(intentAction),
+    supportedTools: v.array(intentTool),
     supportedCapabilities: v.array(v.string()),
     policyVersion: v.string(),
     observation: v.optional(intentObservation),
@@ -381,6 +401,7 @@ export const route = actionGeneric({
             mode: request.mode,
             context: request.context,
             supportedActions: request.supportedActions,
+            supportedTools: request.supportedTools,
             supportedCapabilities: request.supportedCapabilities,
             policyVersion: request.policyVersion,
           },
@@ -486,7 +507,9 @@ export const route = actionGeneric({
           );
           decision = decideFallback({
             request,
-            intent: fallback.intent,
+            // Legacy fallback rows may contain dictation, but a Mac Control
+            // request must route that boundary to the separate shortcut.
+            intent: fallback.intent === "dictation" ? "unsupported" : fallback.intent,
             actionKind: fallback.actionKind,
             targetId: fallback.targetId,
             parameters: fallback.parameters,

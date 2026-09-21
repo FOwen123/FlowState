@@ -1,0 +1,1246 @@
+{
+  "seed": 17,
+  "fixture": {
+    "path": "tests/fixtures/intent/en.json",
+    "version": 2,
+    "sha256": "c17562b8c3b270467985d561521773f0306f88b6d91aebc480d75449815016ee"
+  },
+  "versions": {
+    "promptVersion": "intent-questions-v3",
+    "candidateSetVersion": "fixture-candidates-v2"
+  },
+  "mode": "live",
+  "split": "holdout",
+  "pricing": {
+    "provider": "TypeSafe",
+    "model": "jev-1.13.0",
+    "inputUSDPerMillion": 0.042,
+    "outputUSDPerMillion": 0,
+    "source": "https://docs.typesafe.ai/models.md",
+    "version": "models.md-jev-1.13.0"
+  },
+  "budget": {
+    "maxCases": 20,
+    "maxCalls": 20,
+    "maxTokens": 30000
+  },
+  "calls": 16,
+  "tokens": 30366,
+  "stoppedReason": "max_tokens",
+  "rows": [
+    {
+      "id": "ambiguous-correction/variant-1",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "app": "focused",
+        "action": "none",
+        "tool": "none",
+        "target": "none",
+        "requiredSlots": "missing",
+        "risk": "unsupported",
+        "clarification": "needed"
+      },
+      "probabilities": {
+        "intent": 0.73,
+        "app": 0.67,
+        "action": 1,
+        "tool": 0.62,
+        "target": 0.98,
+        "requiredSlots": 0.99,
+        "risk": 0.88,
+        "clarification": 0.56
+      },
+      "topTwoMargin": {
+        "intent": 0.45999999999999996,
+        "app": 0.42000000000000004,
+        "action": 1,
+        "tool": 0.24,
+        "target": 0.96,
+        "requiredSlots": 0.98,
+        "risk": 0.81,
+        "clarification": 0.12000000000000005
+      },
+      "confidence": {
+        "intent": 0.59,
+        "app": 0.49,
+        "action": 1,
+        "tool": 0.23,
+        "target": 0.96,
+        "requiredSlots": 0.97,
+        "risk": 0.82,
+        "clarification": 0.33
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.control"],
+      "modelLatencyMs": 609.8365,
+      "latencyMs": 610.498833,
+      "usage": {
+        "input_tokens": 1590,
+        "output_tokens": 304,
+        "total_tokens": 1894
+      }
+    },
+    {
+      "id": "ambiguous-correction/variant-2",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "app": "focused",
+        "action": "none",
+        "tool": "nativeAccessibility",
+        "target": "none",
+        "requiredSlots": "missing",
+        "risk": "unsupported",
+        "clarification": "abstain"
+      },
+      "probabilities": {
+        "intent": 0.74,
+        "app": 0.59,
+        "action": 1,
+        "tool": 0.63,
+        "target": 0.97,
+        "requiredSlots": 0.94,
+        "risk": 0.6900000000000001,
+        "clarification": 0.53
+      },
+      "topTwoMargin": {
+        "intent": 0.48,
+        "app": 0.25999999999999995,
+        "action": 1,
+        "tool": 0.26,
+        "target": 0.94,
+        "requiredSlots": 0.8799999999999999,
+        "risk": 0.44000000000000006,
+        "clarification": 0.06000000000000005
+      },
+      "confidence": {
+        "intent": 0.6,
+        "app": 0.39,
+        "action": 0.99,
+        "tool": 0.26,
+        "target": 0.93,
+        "requiredSlots": 0.88,
+        "risk": 0.53,
+        "clarification": 0.29
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.control"],
+      "modelLatencyMs": 559.0680840000001,
+      "latencyMs": 559.249125,
+      "usage": {
+        "input_tokens": 1591,
+        "output_tokens": 311,
+        "total_tokens": 1902
+      }
+    },
+    {
+      "id": "ambiguous-correction/variant-3",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "app": "focused",
+        "action": "none",
+        "tool": "nativeAccessibility",
+        "target": "none",
+        "requiredSlots": "missing",
+        "risk": "unsupported",
+        "clarification": "needed"
+      },
+      "probabilities": {
+        "intent": 0.83,
+        "app": 0.66,
+        "action": 0.92,
+        "tool": 0.69,
+        "target": 0.96,
+        "requiredSlots": 0.95,
+        "risk": 0.75,
+        "clarification": 0.65
+      },
+      "topTwoMargin": {
+        "intent": 0.6799999999999999,
+        "app": 0.45000000000000007,
+        "action": 0.8400000000000001,
+        "tool": 0.37999999999999995,
+        "target": 0.9199999999999999,
+        "requiredSlots": 0.8999999999999999,
+        "risk": 0.62,
+        "clarification": 0.32
+      },
+      "confidence": {
+        "intent": 0.75,
+        "app": 0.49,
+        "action": 0.91,
+        "tool": 0.37,
+        "target": 0.92,
+        "requiredSlots": 0.9,
+        "risk": 0.63,
+        "clarification": 0.48
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.control"],
+      "modelLatencyMs": 268.86529100000007,
+      "latencyMs": 269.0741250000001,
+      "usage": {
+        "input_tokens": 1589,
+        "output_tokens": 309,
+        "total_tokens": 1898
+      }
+    },
+    {
+      "id": "ambiguous-correction/variant-4",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "app": "focused",
+        "action": "none",
+        "tool": "nativeAccessibility",
+        "target": "none",
+        "requiredSlots": "missing",
+        "risk": "unsupported",
+        "clarification": "needed"
+      },
+      "probabilities": {
+        "intent": 0.78,
+        "app": 0.73,
+        "action": 0.98,
+        "tool": 0.68,
+        "target": 0.97,
+        "requiredSlots": 0.94,
+        "risk": 0.59,
+        "clarification": 0.58
+      },
+      "topTwoMargin": {
+        "intent": 0.5700000000000001,
+        "app": 0.53,
+        "action": 0.96,
+        "tool": 0.36000000000000004,
+        "target": 0.94,
+        "requiredSlots": 0.8799999999999999,
+        "risk": 0.30999999999999994,
+        "clarification": 0.16999999999999998
+      },
+      "confidence": {
+        "intent": 0.67,
+        "app": 0.6,
+        "action": 0.97,
+        "tool": 0.36,
+        "target": 0.93,
+        "requiredSlots": 0.88,
+        "risk": 0.39,
+        "clarification": 0.37
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.control"],
+      "modelLatencyMs": 260.1279589999999,
+      "latencyMs": 260.376708,
+      "usage": {
+        "input_tokens": 1591,
+        "output_tokens": 309,
+        "total_tokens": 1900
+      }
+    },
+    {
+      "id": "ambiguous-window/variant-1",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "app": "none",
+        "action": "none",
+        "tool": "nativeAccessibility",
+        "target": "none",
+        "requiredSlots": "missing",
+        "risk": "reversible",
+        "clarification": "needed"
+      },
+      "probabilities": {
+        "intent": 0.79,
+        "app": 0.68,
+        "action": 0.94,
+        "tool": 0.76,
+        "target": 0.97,
+        "requiredSlots": 0.9,
+        "risk": 0.74,
+        "clarification": 0.7
+      },
+      "topTwoMargin": {
+        "intent": 0.5800000000000001,
+        "app": 0.51,
+        "action": 0.9099999999999999,
+        "tool": 0.52,
+        "target": 0.94,
+        "requiredSlots": 0.8,
+        "risk": 0.48,
+        "clarification": 0.45999999999999996
+      },
+      "confidence": {
+        "intent": 0.68,
+        "app": 0.52,
+        "action": 0.92,
+        "tool": 0.52,
+        "target": 0.94,
+        "requiredSlots": 0.8,
+        "risk": 0.61,
+        "clarification": 0.55
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.control"],
+      "modelLatencyMs": 252.13591699999984,
+      "latencyMs": 252.3219999999999,
+      "usage": {
+        "input_tokens": 1591,
+        "output_tokens": 311,
+        "total_tokens": 1902
+      }
+    },
+    {
+      "id": "ambiguous-window/variant-2",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "action",
+        "app": "focused",
+        "action": "none",
+        "tool": "nativeAccessibility",
+        "target": "none",
+        "requiredSlots": "missing",
+        "risk": "reversible",
+        "clarification": "notNeeded"
+      },
+      "probabilities": {
+        "intent": 0.56,
+        "app": 0.51,
+        "action": 0.74,
+        "tool": 0.93,
+        "target": 0.95,
+        "requiredSlots": 0.6,
+        "risk": 0.96,
+        "clarification": 0.59
+      },
+      "topTwoMargin": {
+        "intent": 0.12000000000000005,
+        "app": 0.26,
+        "action": 0.56,
+        "tool": 0.8600000000000001,
+        "target": 0.8999999999999999,
+        "requiredSlots": 0.19999999999999996,
+        "risk": 0.9199999999999999,
+        "clarification": 0.26999999999999996
+      },
+      "confidence": {
+        "intent": 0.34,
+        "app": 0.25,
+        "action": 0.69,
+        "tool": 0.85,
+        "target": 0.9,
+        "requiredSlots": 0.19,
+        "risk": 0.94,
+        "clarification": 0.39
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.control"],
+      "modelLatencyMs": 244.81283400000007,
+      "latencyMs": 244.95470899999987,
+      "usage": {
+        "input_tokens": 1591,
+        "output_tokens": 312,
+        "total_tokens": 1903
+      }
+    },
+    {
+      "id": "ambiguous-window/variant-3",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "app": "none",
+        "action": "none",
+        "tool": "nativeAccessibility",
+        "target": "none",
+        "requiredSlots": "missing",
+        "risk": "reversible",
+        "clarification": "needed"
+      },
+      "probabilities": {
+        "intent": 0.82,
+        "app": 0.45,
+        "action": 0.91,
+        "tool": 0.76,
+        "target": 0.97,
+        "requiredSlots": 0.88,
+        "risk": 0.71,
+        "clarification": 0.67
+      },
+      "topTwoMargin": {
+        "intent": 0.6399999999999999,
+        "app": 0.07,
+        "action": 0.86,
+        "tool": 0.52,
+        "target": 0.94,
+        "requiredSlots": 0.76,
+        "risk": 0.42,
+        "clarification": 0.43000000000000005
+      },
+      "confidence": {
+        "intent": 0.72,
+        "app": 0.18,
+        "action": 0.89,
+        "tool": 0.53,
+        "target": 0.94,
+        "requiredSlots": 0.76,
+        "risk": 0.57,
+        "clarification": 0.51
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.control"],
+      "modelLatencyMs": 235.34337499999992,
+      "latencyMs": 235.54649999999992,
+      "usage": {
+        "input_tokens": 1592,
+        "output_tokens": 311,
+        "total_tokens": 1903
+      }
+    },
+    {
+      "id": "ambiguous-window/variant-4",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "action",
+        "app": "focused",
+        "action": "none",
+        "tool": "nativeAccessibility",
+        "target": "none",
+        "requiredSlots": "missing",
+        "risk": "reversible",
+        "clarification": "notNeeded"
+      },
+      "probabilities": {
+        "intent": 0.61,
+        "app": 0.76,
+        "action": 0.61,
+        "tool": 0.95,
+        "target": 0.83,
+        "requiredSlots": 0.6,
+        "risk": 0.95,
+        "clarification": 0.73
+      },
+      "topTwoMargin": {
+        "intent": 0.21999999999999997,
+        "app": 0.6,
+        "action": 0.32999999999999996,
+        "tool": 0.8999999999999999,
+        "target": 0.6599999999999999,
+        "requiredSlots": 0.19999999999999996,
+        "risk": 0.8999999999999999,
+        "clarification": 0.5
+      },
+      "confidence": {
+        "intent": 0.41,
+        "app": 0.64,
+        "action": 0.54,
+        "tool": 0.9,
+        "target": 0.67,
+        "requiredSlots": 0.2,
+        "risk": 0.92,
+        "clarification": 0.59
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.control"],
+      "modelLatencyMs": 222.35483399999976,
+      "latencyMs": 222.50433399999974,
+      "usage": {
+        "input_tokens": 1592,
+        "output_tokens": 312,
+        "total_tokens": 1904
+      }
+    },
+    {
+      "id": "compound-crossapp/variant-1",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "app": "none",
+        "action": "none",
+        "tool": "nativeAccessibility",
+        "target": "none",
+        "requiredSlots": "missing",
+        "risk": "unsupported",
+        "clarification": "needed"
+      },
+      "probabilities": {
+        "intent": 0.79,
+        "app": 0.81,
+        "action": 0.85,
+        "tool": 0.62,
+        "target": 0.82,
+        "requiredSlots": 0.94,
+        "risk": 0.46,
+        "clarification": 0.64
+      },
+      "topTwoMargin": {
+        "intent": 0.6100000000000001,
+        "app": 0.6900000000000001,
+        "action": 0.74,
+        "tool": 0.24,
+        "target": 0.6399999999999999,
+        "requiredSlots": 0.8799999999999999,
+        "risk": 0.16000000000000003,
+        "clarification": 0.35000000000000003
+      },
+      "confidence": {
+        "intent": 0.69,
+        "app": 0.72,
+        "action": 0.81,
+        "tool": 0.25,
+        "target": 0.63,
+        "requiredSlots": 0.88,
+        "risk": 0.19,
+        "clarification": 0.46
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.control"],
+      "modelLatencyMs": 259.26087499999994,
+      "latencyMs": 259.435708,
+      "usage": {
+        "input_tokens": 1594,
+        "output_tokens": 309,
+        "total_tokens": 1903
+      }
+    },
+    {
+      "id": "compound-crossapp/variant-2",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "app": "none",
+        "action": "none",
+        "tool": "nativeAccessibility",
+        "target": "none",
+        "requiredSlots": "missing",
+        "risk": "reversible",
+        "clarification": "needed"
+      },
+      "probabilities": {
+        "intent": 0.9,
+        "app": 1,
+        "action": 0.74,
+        "tool": 0.55,
+        "target": 0.98,
+        "requiredSlots": 0.95,
+        "risk": 0.52,
+        "clarification": 0.79
+      },
+      "topTwoMargin": {
+        "intent": 0.8200000000000001,
+        "app": 1,
+        "action": 0.48,
+        "tool": 0.10000000000000003,
+        "target": 0.96,
+        "requiredSlots": 0.8999999999999999,
+        "risk": 0.07,
+        "clarification": 0.6100000000000001
+      },
+      "confidence": {
+        "intent": 0.85,
+        "app": 0.99,
+        "action": 0.69,
+        "tool": 0.1,
+        "target": 0.95,
+        "requiredSlots": 0.91,
+        "risk": 0.28,
+        "clarification": 0.68
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.control"],
+      "modelLatencyMs": 264.34241599999996,
+      "latencyMs": 264.4857079999997,
+      "usage": {
+        "input_tokens": 1595,
+        "output_tokens": 311,
+        "total_tokens": 1906
+      }
+    },
+    {
+      "id": "compound-crossapp/variant-3",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "app": "none",
+        "action": "none",
+        "tool": "nativeAccessibility",
+        "target": "none",
+        "requiredSlots": "missing",
+        "risk": "confirm",
+        "clarification": "needed"
+      },
+      "probabilities": {
+        "intent": 0.9,
+        "app": 0.97,
+        "action": 0.7,
+        "tool": 0.72,
+        "target": 0.94,
+        "requiredSlots": 0.81,
+        "risk": 0.73,
+        "clarification": 0.84
+      },
+      "topTwoMargin": {
+        "intent": 0.81,
+        "app": 0.95,
+        "action": 0.39999999999999997,
+        "tool": 0.43999999999999995,
+        "target": 0.8799999999999999,
+        "requiredSlots": 0.6200000000000001,
+        "risk": 0.59,
+        "clarification": 0.75
+      },
+      "confidence": {
+        "intent": 0.86,
+        "app": 0.96,
+        "action": 0.64,
+        "tool": 0.44,
+        "target": 0.88,
+        "requiredSlots": 0.61,
+        "risk": 0.6,
+        "clarification": 0.76
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.control"],
+      "modelLatencyMs": 266.5770829999997,
+      "latencyMs": 266.6975419999999,
+      "usage": {
+        "input_tokens": 1593,
+        "output_tokens": 309,
+        "total_tokens": 1902
+      }
+    },
+    {
+      "id": "compound-crossapp/variant-4",
+      "expected": {
+        "intent": "clarify",
+        "requiredClarification": true,
+        "arguments": {}
+      },
+      "actual": {
+        "intent": "clarify",
+        "app": "focused",
+        "action": "none",
+        "tool": "nativeAccessibility",
+        "target": "none",
+        "requiredSlots": "missing",
+        "risk": "unsupported",
+        "clarification": "needed"
+      },
+      "probabilities": {
+        "intent": 0.56,
+        "app": 0.84,
+        "action": 0.98,
+        "tool": 0.82,
+        "target": 0.7,
+        "requiredSlots": 0.93,
+        "risk": 0.46,
+        "clarification": 0.7
+      },
+      "topTwoMargin": {
+        "intent": 0.17000000000000004,
+        "app": 0.7,
+        "action": 0.96,
+        "tool": 0.6399999999999999,
+        "target": 0.39999999999999997,
+        "requiredSlots": 0.8600000000000001,
+        "risk": 0.12,
+        "clarification": 0.48
+      },
+      "confidence": {
+        "intent": 0.35,
+        "app": 0.75,
+        "action": 0.97,
+        "tool": 0.64,
+        "target": 0.39,
+        "requiredSlots": 0.87,
+        "risk": 0.19,
+        "clarification": 0.54
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.control"],
+      "modelLatencyMs": 234.18879199999992,
+      "latencyMs": 234.3591660000002,
+      "usage": {
+        "input_tokens": 1594,
+        "output_tokens": 309,
+        "total_tokens": 1903
+      }
+    },
+    {
+      "id": "correct-literal/variant-1",
+      "expected": {
+        "intent": "unsupported",
+        "requiredClarification": false
+      },
+      "actual": {
+        "intent": "clarify",
+        "app": "none",
+        "action": "none",
+        "tool": "nativeAccessibility",
+        "target": "none",
+        "requiredSlots": "missing",
+        "risk": "reversible",
+        "clarification": "notNeeded"
+      },
+      "probabilities": {
+        "intent": 0.62,
+        "app": 0.98,
+        "action": 0.69,
+        "tool": 0.75,
+        "target": 0.95,
+        "requiredSlots": 0.7,
+        "risk": 0.74,
+        "clarification": 0.48
+      },
+      "topTwoMargin": {
+        "intent": 0.4,
+        "app": 0.96,
+        "action": 0.37999999999999995,
+        "tool": 0.5,
+        "target": 0.8999999999999999,
+        "requiredSlots": 0.39999999999999997,
+        "risk": 0.55,
+        "clarification": 0.010000000000000009
+      },
+      "confidence": {
+        "intent": 0.42,
+        "app": 0.96,
+        "action": 0.62,
+        "tool": 0.49,
+        "target": 0.9,
+        "requiredSlots": 0.4,
+        "risk": 0.61,
+        "clarification": 0.22
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.input"],
+      "modelLatencyMs": 234.12854199999992,
+      "latencyMs": 234.25487500000008,
+      "usage": {
+        "input_tokens": 1579,
+        "output_tokens": 306,
+        "total_tokens": 1885
+      }
+    },
+    {
+      "id": "correct-literal/variant-2",
+      "expected": {
+        "intent": "unsupported",
+        "requiredClarification": false
+      },
+      "actual": {
+        "intent": "clarify",
+        "app": "focused",
+        "action": "none",
+        "tool": "nativeAccessibility",
+        "target": "none",
+        "requiredSlots": "missing",
+        "risk": "reversible",
+        "clarification": "notNeeded"
+      },
+      "probabilities": {
+        "intent": 0.67,
+        "app": 0.92,
+        "action": 0.65,
+        "tool": 0.95,
+        "target": 0.59,
+        "requiredSlots": 0.74,
+        "risk": 0.96,
+        "clarification": 0.58
+      },
+      "topTwoMargin": {
+        "intent": 0.39,
+        "app": 0.8400000000000001,
+        "action": 0.30000000000000004,
+        "tool": 0.8999999999999999,
+        "target": 0.18,
+        "requiredSlots": 0.48,
+        "risk": 0.9299999999999999,
+        "clarification": 0.18999999999999995
+      },
+      "confidence": {
+        "intent": 0.51,
+        "app": 0.84,
+        "action": 0.57,
+        "tool": 0.9,
+        "target": 0.18,
+        "requiredSlots": 0.48,
+        "risk": 0.95,
+        "clarification": 0.37
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.input"],
+      "modelLatencyMs": 294.21491700000024,
+      "latencyMs": 294.36783300000025,
+      "usage": {
+        "input_tokens": 1581,
+        "output_tokens": 306,
+        "total_tokens": 1887
+      }
+    },
+    {
+      "id": "correct-literal/variant-3",
+      "expected": {
+        "intent": "unsupported",
+        "requiredClarification": false
+      },
+      "actual": {
+        "intent": "action",
+        "app": "none",
+        "action": "openApplication",
+        "tool": "nativeAccessibility",
+        "target": "none",
+        "requiredSlots": "complete",
+        "risk": "reversible",
+        "clarification": "notNeeded"
+      },
+      "probabilities": {
+        "intent": 0.64,
+        "app": 0.98,
+        "action": 0.68,
+        "tool": 0.86,
+        "target": 0.96,
+        "requiredSlots": 0.51,
+        "risk": 0.73,
+        "clarification": 0.83
+      },
+      "topTwoMargin": {
+        "intent": 0.4,
+        "app": 0.96,
+        "action": 0.36000000000000004,
+        "tool": 0.72,
+        "target": 0.9199999999999999,
+        "requiredSlots": 0.020000000000000018,
+        "risk": 0.54,
+        "clarification": 0.71
+      },
+      "confidence": {
+        "intent": 0.46,
+        "app": 0.97,
+        "action": 0.61,
+        "tool": 0.72,
+        "target": 0.93,
+        "requiredSlots": 0.02,
+        "risk": 0.58,
+        "clarification": 0.74
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.input"],
+      "modelLatencyMs": 287.6037499999993,
+      "latencyMs": 287.96820899999966,
+      "usage": {
+        "input_tokens": 1580,
+        "output_tokens": 308,
+        "total_tokens": 1888
+      }
+    },
+    {
+      "id": "correct-literal/variant-4",
+      "expected": {
+        "intent": "unsupported",
+        "requiredClarification": false
+      },
+      "actual": {
+        "intent": "unsupported",
+        "app": "focused",
+        "action": "none",
+        "tool": "nativeAccessibility",
+        "target": "editor",
+        "requiredSlots": "complete",
+        "risk": "reversible",
+        "clarification": "notNeeded"
+      },
+      "probabilities": {
+        "intent": 0.93,
+        "app": 0.93,
+        "action": 0.86,
+        "tool": 0.94,
+        "target": 0.51,
+        "requiredSlots": 0.55,
+        "risk": 0.85,
+        "clarification": 0.89
+      },
+      "topTwoMargin": {
+        "intent": 0.88,
+        "app": 0.8600000000000001,
+        "action": 0.78,
+        "tool": 0.8799999999999999,
+        "target": 0.020000000000000018,
+        "requiredSlots": 0.10000000000000003,
+        "risk": 0.76,
+        "clarification": 0.8300000000000001
+      },
+      "confidence": {
+        "intent": 0.9,
+        "app": 0.86,
+        "action": 0.83,
+        "tool": 0.88,
+        "target": 0.02,
+        "requiredSlots": 0.09,
+        "risk": 0.78,
+        "clarification": 0.84
+      },
+      "model": "jev-1.13.0",
+      "promptVersion": "intent-questions-v3",
+      "candidateSetVersion": "fixture-candidates-v2",
+      "supportedActions": [
+        "openApplication",
+        "scroll",
+        "focus",
+        "select",
+        "press"
+      ],
+      "supportedTools": ["nativeAccessibility"],
+      "supportedCapabilities": ["app.input"],
+      "modelLatencyMs": 301.8563749999994,
+      "latencyMs": 302.1087499999994,
+      "usage": {
+        "input_tokens": 1581,
+        "output_tokens": 305,
+        "total_tokens": 1886
+      }
+    }
+  ],
+  "baseline": {
+    "samples": 20,
+    "exactChoiceCorrectness": 1,
+    "consequentialFalseExecution": 0,
+    "abstentionRate": 0.2,
+    "modelLatencyMs": null,
+    "endToEndLatencyMs": {
+      "p50": 0.0012919999999994047,
+      "p95": 0.011790999999995222,
+      "samples": 20
+    },
+    "tokens": 0,
+    "costUSD": 0
+  },
+  "jev": {
+    "samples": 20,
+    "attempted": 16,
+    "contractValid": 16,
+    "contractValidity": 1,
+    "exactChoiceCorrectness": 0,
+    "consequentialFalseExecution": 0,
+    "abstentionRate": 0.0625,
+    "modelLatencyMs": {
+      "p50": 260.1279589999999,
+      "p95": 609.8365,
+      "samples": 16
+    },
+    "endToEndLatencyMs": {
+      "p50": 260.376708,
+      "p95": 610.498833,
+      "samples": 16
+    },
+    "tokens": 30366,
+    "costUSD": 0.0010678080000000002
+  },
+  "questionMetrics": {
+    "intent": {
+      "samples": 20,
+      "predictions": 16,
+      "correct": 11,
+      "accuracy": 0.6875,
+      "latencyMs": {
+        "p50": 260.376708,
+        "p95": 610.498833,
+        "samples": 16
+      },
+      "note": "Measured against supplied predictions."
+    },
+    "app": {
+      "samples": 20,
+      "predictions": 16,
+      "correct": 7,
+      "accuracy": 0.4375,
+      "latencyMs": {
+        "p50": 260.376708,
+        "p95": 610.498833,
+        "samples": 16
+      },
+      "note": "Measured against supplied predictions."
+    },
+    "action": {
+      "samples": 20,
+      "predictions": 16,
+      "correct": 15,
+      "accuracy": 0.9375,
+      "latencyMs": {
+        "p50": 260.376708,
+        "p95": 610.498833,
+        "samples": 16
+      },
+      "note": "Measured against supplied predictions."
+    },
+    "tool": {
+      "samples": 20,
+      "predictions": 16,
+      "correct": 1,
+      "accuracy": 0.0625,
+      "latencyMs": {
+        "p50": 260.376708,
+        "p95": 610.498833,
+        "samples": 16
+      },
+      "note": "Measured against supplied predictions."
+    },
+    "target": {
+      "samples": 20,
+      "predictions": 16,
+      "correct": 15,
+      "accuracy": 0.9375,
+      "latencyMs": {
+        "p50": 260.376708,
+        "p95": 610.498833,
+        "samples": 16
+      },
+      "note": "Measured against supplied predictions."
+    },
+    "requiredSlots": {
+      "samples": 20,
+      "predictions": 16,
+      "correct": 14,
+      "accuracy": 0.875,
+      "latencyMs": {
+        "p50": 260.376708,
+        "p95": 610.498833,
+        "samples": 16
+      },
+      "note": "Measured against supplied predictions."
+    },
+    "risk": {
+      "samples": 20,
+      "predictions": 16,
+      "correct": 6,
+      "accuracy": 0.375,
+      "latencyMs": {
+        "p50": 260.376708,
+        "p95": 610.498833,
+        "samples": 16
+      },
+      "note": "Measured against supplied predictions."
+    },
+    "clarification": {
+      "samples": 20,
+      "predictions": 16,
+      "correct": 9,
+      "accuracy": 0.5625,
+      "latencyMs": {
+        "p50": 260.376708,
+        "p95": 610.498833,
+        "samples": 16
+      },
+      "note": "Measured against supplied predictions."
+    }
+  },
+  "comparisonGate": {
+    "status": "evaluated",
+    "accepted": false,
+    "reason": "correctness_below_deterministic_baseline",
+    "contractValid": true,
+    "noConsequentialFalseExecution": true,
+    "correctnessAtLeastBaseline": false,
+    "p95Faster": false
+  },
+  "providerFailures": [],
+  "automaticExecution": false,
+  "reference": "Historical v2 reports are retained as a non-equivalent reference; this gate compares v3 Jev with the deterministic in-process baseline.",
+  "note": "Live evaluation routes only; no desktop, email, file or deployment effects are performed."
+}

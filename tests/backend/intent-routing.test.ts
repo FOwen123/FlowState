@@ -22,8 +22,14 @@ import {
 } from "../../convex/lib/intent_policy";
 
 const questionChoices: Record<string, StrictTypeSafeQuestion> = {
-  intent: { choices: ["dictation", "action", "clarify", "unsupported"] },
-  action: { choices: ["none", "scroll", "insertText"] },
+  intent: { choices: ["action", "clarify", "unsupported"] },
+  app: { choices: ["none", "focused", "reader"] },
+  action: { choices: ["none", "scroll"] },
+  tool: { choices: ["none", "nativeAccessibility"] },
+  target: { choices: ["none", "reader"] },
+  requiredSlots: { choices: ["complete", "missing"] },
+  risk: { choices: ["reversible", "confirm", "unsupported"] },
+  clarification: { choices: ["notNeeded", "needed", "abstain"] },
 };
 
 function strictResponse(
@@ -33,10 +39,9 @@ function strictResponse(
       questionId: "intent",
       choice: "action",
       probabilities: {
-        dictation: 0.02,
         action: 0.94,
-        clarify: 0.03,
-        unsupported: 0.01,
+        clarify: 0.04,
+        unsupported: 0.02,
       },
       confidence: 0.94,
     },
@@ -44,8 +49,50 @@ function strictResponse(
       type: "choice",
       questionId: "action",
       choice: "scroll",
-      probabilities: { none: 0.01, scroll: 0.96, insertText: 0.03 },
+      probabilities: { none: 0.04, scroll: 0.96 },
       confidence: 0.96,
+    },
+    app: {
+      type: "choice",
+      questionId: "app",
+      choice: "focused",
+      probabilities: { none: 0.01, focused: 0.96, reader: 0.03 },
+      confidence: 0.96,
+    },
+    tool: {
+      type: "choice",
+      questionId: "tool",
+      choice: "nativeAccessibility",
+      probabilities: { none: 0.01, nativeAccessibility: 0.99 },
+      confidence: 0.99,
+    },
+    target: {
+      type: "choice",
+      questionId: "target",
+      choice: "reader",
+      probabilities: { none: 0.01, reader: 0.99 },
+      confidence: 0.99,
+    },
+    requiredSlots: {
+      type: "choice",
+      questionId: "requiredSlots",
+      choice: "complete",
+      probabilities: { complete: 0.99, missing: 0.01 },
+      confidence: 0.99,
+    },
+    risk: {
+      type: "choice",
+      questionId: "risk",
+      choice: "reversible",
+      probabilities: { reversible: 0.99, confirm: 0.005, unsupported: 0.005 },
+      confidence: 0.99,
+    },
+    clarification: {
+      type: "choice",
+      questionId: "clarification",
+      choice: "notNeeded",
+      probabilities: { notNeeded: 0.99, needed: 0.005, abstain: 0.005 },
+      confidence: 0.99,
     },
   },
 ): unknown {
@@ -60,7 +107,7 @@ describe("strict Jev response validation", () => {
     );
     expect(parsed.answers.intent.choice).toBe("action");
     expect(parsed.answers.intent.selectedProbability).toBe(0.94);
-    expect(parsed.answers.intent.topTwoMargin).toBeCloseTo(0.91);
+    expect(parsed.answers.intent.topTwoMargin).toBeCloseTo(0.90);
     expect(parsed.answers.action.confidence).toBe(0.96);
   });
 
@@ -108,7 +155,7 @@ describe("strict Jev response validation", () => {
     answer.choice = "dictation";
     expect(() =>
       parseStrictTypeSafeResponse(contradictory, questionChoices),
-    ).toThrow(/probabilit/);
+    ).toThrow(/choice/);
 
     const extraField = strictResponse();
     const answerWithExtra = (
@@ -122,7 +169,7 @@ describe("strict Jev response validation", () => {
 });
 
 describe("intent request contract and policy", () => {
-  const request: IntentRouteRequest = {
+const request: IntentRouteRequest = {
     deviceId: "device-intent-1",
     sessionId: "session-1",
     utteranceId: "utterance-1",
@@ -142,10 +189,18 @@ describe("intent request contract and policy", () => {
         },
       ],
     },
-    supportedActions: ["scroll", "insertText"],
+    supportedActions: ["scroll"],
+    supportedTools: ["nativeAccessibility"],
     supportedCapabilities: ["app.control"],
-    policyVersion: DEFAULT_INTENT_POLICY.version,
-  };
+  policyVersion: DEFAULT_INTENT_POLICY.version,
+};
+
+const answer = (choice: string) => ({
+  choice,
+  confidence: 0.99,
+  selectedProbability: 0.99,
+  topTwoMargin: 0.98,
+});
 
   it("never promotes app candidates to controls or guesses unnamed launch targets", () => {
     const broad: IntentRouteRequest = {
@@ -283,14 +338,19 @@ describe("intent request contract and policy", () => {
       "focus",
       "select",
       "press",
-      "insertText",
-      "openURL",
-      "attachFile",
-      "sendEmail",
     ]);
     const questions = buildIntentQuestions(request);
-    expect(Object.keys(questions)).toEqual(["intent", "action", "target"]);
-    expect(questions.action.choices).toEqual(["none", "scroll", "insertText"]);
+    expect(Object.keys(questions)).toEqual([
+      "intent",
+      "app",
+      "action",
+      "tool",
+      "target",
+      "requiredSlots",
+      "risk",
+      "clarification",
+    ]);
+    expect(questions.action.choices).toEqual(["none", "scroll"]);
   });
 
   it("shares the English-only ambiguity and control semantics with live evaluation", () => {
@@ -303,7 +363,7 @@ describe("intent request contract and policy", () => {
     expect(prompt).toContain("sole candidate");
     expect(prompt).toContain("without activating");
     expect(prompt).toContain("allowlisted");
-    expect(prompt).toContain("intent-questions-v2");
+    expect(prompt).toContain("intent-questions-v3");
   });
 
   it("abstains while the policy is unmeasured, even with a high-confidence proposal", () => {
@@ -342,39 +402,22 @@ describe("intent request contract and policy", () => {
     ).toMatchObject({ decision: "abstain", reason: "policy_unmeasured" });
   });
 
-  it("does not let model output override Commands only mode", () => {
+  it("keeps the Mac Control request free of a legacy dictation mode", () => {
     const commandRequest: IntentRouteRequest = {
       ...request,
       mode: "commands",
-      context: { ...request.context, editable: true },
-      supportedCapabilities: ["app.input"],
+      supportedCapabilities: ["app.control"],
     };
-    const grants = [
-      {
-        capability: "app.input",
-        target: "com.example.Reader",
-        expiresAt: Date.now() + 60_000,
-      },
-    ];
+    expect(() =>
+      validateIntentRouteRequest({ ...commandRequest, mode: "dictation" }),
+    ).toThrow("intent mode");
     expect(
-      decideIntent({
+      decideFallback({
         request: commandRequest,
-        grants,
-        policy: DEFAULT_INTENT_POLICY,
-        answers: {
-          intent: {
-            choice: "dictation",
-            confidence: 1,
-            selectedProbability: 1,
-            topTwoMargin: 1,
-          },
-        },
-      }).action,
-    ).toBeNull();
-    expect(
-      decideFallback({ request: commandRequest, grants, intent: "dictation" })
-        .action,
-    ).toBeNull();
+        grants: [],
+        intent: "unsupported",
+      }),
+    ).toMatchObject({ decision: "unsupported", action: null });
   });
 
   it("normalizes fallback key actions to the native key vocabulary", () => {
@@ -462,33 +505,70 @@ describe("intent request contract and policy", () => {
     ).toMatchObject({ decision: "clarify", action: null });
   });
 
-  it("preserves dictation text while replacing the current selection", () => {
-    const dictationRequest: IntentRouteRequest = {
+  it("does not propose an action absent from the selected app registry metadata", () => {
+    const advertised = {
       ...request,
-      utterance: "Type open Brave",
-      context: { ...request.context, editable: true },
-      supportedActions: ["insertText"],
-      supportedCapabilities: ["app.input"],
+      context: {
+        ...request.context,
+        targetCandidates: [
+          {
+            ...request.context.targetCandidates[0],
+            kind: "app" as const,
+            supportedActions: ["openApplication" as const],
+          },
+        ],
+      },
+    };
+    expect(buildActionProposal(advertised, "scroll", "reader")).toBeNull();
+  });
+
+  it("requires the advertised tool route before executing a Jev choice", () => {
+    const withoutNative = {
+      ...request,
+      supportedTools: ["structuredIntegration" as const],
     };
     expect(
-      decideFallback({
-        request: dictationRequest,
-        intent: "dictation",
+      decideIntent({
+        request: withoutNative,
+        answers: {
+          intent: answer("action"),
+          app: answer("focused"),
+          action: answer("scroll"),
+          tool: answer("nativeAccessibility"),
+          target: answer("reader"),
+          requiredSlots: answer("complete"),
+          risk: answer("reversible"),
+          clarification: answer("notNeeded"),
+        },
         grants: [
           {
-            capability: "app.input",
+            capability: "app.control",
             target: "com.example.Reader",
             expiresAt: Date.now() + 60_000,
           },
         ],
+        policy: DEFAULT_INTENT_POLICY,
       }),
     ).toMatchObject({
-      decision: "dictation",
-      action: {
-        kind: "insertText",
-        parameters: { text: "open Brave", replaceSelection: true },
-      },
+      decision: "unsupported",
+      reason: "tool_not_supported",
     });
+  });
+
+  it("rejects generic text entry instead of treating it as a control action", () => {
+    const controlRequest: IntentRouteRequest = {
+      ...request,
+      utterance: "Type open Brave",
+      supportedActions: ["press"],
+      supportedCapabilities: ["app.input"],
+    };
+    expect(
+      decideFallback({
+        request: controlRequest,
+        intent: "unsupported",
+        grants: [],
+      }),
+    ).toMatchObject({ decision: "unsupported", action: null });
   });
 });
 
@@ -497,10 +577,7 @@ describe("intent fixture coverage", () => {
     intent: string;
     action?: string;
   }): string | undefined {
-    return (
-      expected.action ??
-      (expected.intent === "dictation" ? "insertText" : undefined)
-    );
+    return expected.action;
   }
 
   it("contains at least 300 grouped English scenarios covering every registered control", () => {

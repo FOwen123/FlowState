@@ -14,6 +14,7 @@ const capabilities = new Set([
   "file.upload",
   "mail.read",
   "mail.send",
+  "mail.draft",
   "spend.confirm",
 ]);
 

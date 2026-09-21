@@ -433,13 +433,44 @@ describe("typed action-plan contracts", () => {
       deviceId: "core-device-f",
       command: "scroll down in my reader",
       locale: "en",
+      supportedTools: ["nativeAccessibility"],
+      integrations: [],
+      applicationCandidates: [
+        {
+          bundleIdentifier: "com.example.Reader",
+          displayName: "Reader",
+          normalizedNames: ["reader"],
+          supportedActions: ["scroll"],
+          integrations: [],
+        },
+      ],
     });
     await expect(user.action(api.plans.resolveActionPlan, { planId })).resolves.toMatchObject({
       status: "awaiting_approval",
       actions: [{ kind: "scroll", executor: "desktop" }],
     });
+    expect(JSON.stringify(fetch.mock.calls[0])).toContain(
+      "openURL {targetBundleIdentifier: required advertised app, url",
+    );
+    expect(JSON.stringify(fetch.mock.calls[0])).toContain(
+      "draftMessage {targetBundleIdentifier: required advertised app, recipient,subject,body}",
+    );
     const view = await user.query(api.plans.getActionPlan, { planId });
-    expect(view).toMatchObject({ status: "awaiting_approval", explanation: "Scroll down in the reader" });
+    expect(view).toMatchObject({
+      status: "awaiting_approval",
+      explanation: "Scroll down in the reader",
+      supportedTools: ["nativeAccessibility"],
+      integrations: [],
+      applicationCandidates: [
+        {
+          bundleIdentifier: "com.example.Reader",
+          displayName: "Reader",
+          normalizedNames: ["reader"],
+          supportedActions: ["scroll"],
+          integrations: [],
+        },
+      ],
+    });
     await expect(
       user.mutation(api.plans.approveActionPlan, { planId, fingerprint: view.fingerprint ?? "" }),
     ).rejects.toThrow("missing active grant");

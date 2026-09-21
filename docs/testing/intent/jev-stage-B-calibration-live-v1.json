@@ -1,0 +1,142 @@
+{
+  "mode": "live",
+  "suite": "plan-step-validation",
+  "stage": "B",
+  "split": "calibration",
+  "seed": 17,
+  "fixture": {
+    "version": 1,
+    "language": "en",
+    "policyVersion": "control-decisions-v1",
+    "sha256": "451f7996fe2249742cb55b59aa7daf2b1728f8bdfcb30034e2a1dc315cc23215",
+    "groups": 4,
+    "scenarios": 4
+  },
+  "splitCounts": {
+    "development": 2,
+    "calibration": 1,
+    "holdout": 1
+  },
+  "familyIsolation": {
+    "groups": 4,
+    "holdoutGroups": 1,
+    "note": "The untouched holdout is one independent family in this bounded fixture."
+  },
+  "prompt": {
+    "version": "jev-stage-questions-v1",
+    "questionsFrozen": true,
+    "thresholdsFrozen": true
+  },
+  "pricing": {
+    "provider": "TypeSafe",
+    "model": "jev-1.13.0",
+    "inputUSDPerMillion": 0.042,
+    "outputUSDPerMillion": 0,
+    "source": "https://docs.typesafe.ai/models.md",
+    "version": "models.md-jev-1.13.0"
+  },
+  "budget": {
+    "maxCases": 4,
+    "maxCalls": 4,
+    "maxTokens": 12000
+  },
+  "cases": 1,
+  "evaluatedCases": 1,
+  "calls": 1,
+  "tokens": 470,
+  "stoppedReason": null,
+  "providerFailures": [],
+  "rows": [
+    {
+      "id": "b-open-step/matches-open",
+      "baselineAnswers": {
+        "stepValidation": "match"
+      },
+      "actualAnswers": {
+        "stepValidation": "abstain"
+      },
+      "contractValid": true,
+      "modelLatencyMs": 645.958958,
+      "endToEndLatencyMs": 646.895292,
+      "usage": {
+        "input_tokens": 422,
+        "output_tokens": 48,
+        "total_tokens": 470
+      },
+      "executed": false
+    }
+  ],
+  "metrics": {
+    "calibration": {
+      "samples": 1,
+      "baseline": {
+        "samples": 1,
+        "exactChoiceCorrectness": 1,
+        "consequentialFalseExecution": 0,
+        "abstentionRate": 0,
+        "modelLatencyMs": null,
+        "endToEndLatencyMs": {
+          "p50": 0.026625000000002785,
+          "p95": 0.026625000000002785,
+          "samples": 1
+        },
+        "tokens": 0,
+        "costUSD": 0
+      },
+      "jev": {
+        "samples": 1,
+        "attempted": 1,
+        "contractValid": 1,
+        "contractValidity": 1,
+        "exactChoiceCorrectness": 0,
+        "consequentialFalseExecution": 0,
+        "abstentionRate": 1,
+        "modelLatencyMs": {
+          "p50": 645.958958,
+          "p95": 645.958958,
+          "samples": 1
+        },
+        "endToEndLatencyMs": {
+          "p50": 646.895292,
+          "p95": 646.895292,
+          "samples": 1
+        },
+        "tokens": 470,
+        "costUSD": 0.000017724000000000002
+      },
+      "questionMetrics": {
+        "stepValidation": {
+          "samples": 1,
+          "predictions": 1,
+          "correct": 0,
+          "accuracy": 0,
+          "modelLatencyMs": {
+            "p50": 645.958958,
+            "p95": 645.958958,
+            "samples": 1
+          },
+          "endToEndLatencyMs": {
+            "p50": 646.895292,
+            "p95": 646.895292,
+            "samples": 1
+          },
+          "tokens": 470,
+          "costUSD": 0.000017724000000000002
+        }
+      },
+      "comparisonGate": {
+        "status": "evaluated",
+        "accepted": false,
+        "reason": "correctness_below_deterministic_baseline",
+        "contractValid": true,
+        "noConsequentialFalseExecution": true,
+        "correctnessAtLeastBaseline": false,
+        "p95Faster": false
+      },
+      "dryRun": true
+    }
+  },
+  "status": "disabled",
+  "automaticExecution": false,
+  "note": "Live Jev is measured in a dry run only. Automatic execution remains disabled unless every release gate passes."
+}

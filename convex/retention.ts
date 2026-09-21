@@ -1,5 +1,7 @@
 import { internalMutationGeneric, mutationGeneric } from "convex/server";
 import { v } from "convex/values";
+import { type MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 
 import { requireIdentity } from "./lib/identity";
 
@@ -16,6 +18,17 @@ function boundedLimit(value: number | undefined, maximum: number): number {
     throw new Error(`maxRecords must be between 1 and ${maximum}`);
   }
   return result;
+}
+
+async function deleteStepApprovals(
+  ctx: MutationCtx,
+  planId: Id<"actionPlans">,
+): Promise<void> {
+  const approvals = await ctx.db
+    .query("actionStepApprovals")
+    .withIndex("by_plan_step", (q) => q.eq("planId", planId))
+    .collect();
+  for (const approval of approvals) await ctx.db.delete(approval._id);
 }
 
 export const deleteMyData = mutationGeneric({
@@ -111,6 +124,7 @@ export const deleteMyData = mutationGeneric({
       .withIndex("by_owner", (q) => q.eq("ownerKey", identity.tokenIdentifier))
       .take(Math.max(0, limit - processed));
     for (const plan of plans) {
+      await deleteStepApprovals(ctx, plan._id);
       if (plan.status === "executing" || plan.status === "uncertain") {
         preservedUncertain += 1;
         await ctx.db.patch(plan._id, {
@@ -125,6 +139,33 @@ export const deleteMyData = mutationGeneric({
         });
       } else {
         await ctx.db.delete(plan._id);
+      }
+      processed += 1;
+    }
+
+    const stepApprovals = await ctx.db
+      .query("actionStepApprovals")
+      .withIndex("by_owner", (q) => q.eq("ownerKey", identity.tokenIdentifier))
+      .take(Math.max(0, limit - processed));
+    for (const approval of stepApprovals) {
+      await ctx.db.delete(approval._id);
+      processed += 1;
+    }
+
+    const receipts = await ctx.db
+      .query("actionExecutionReceipts")
+      .filter((q) => q.eq(q.field("ownerKey"), identity.tokenIdentifier))
+      .take(Math.max(0, limit - processed));
+    for (const receipt of receipts) {
+      if (receipt.status === "pending" || receipt.status === "uncertain") {
+        preservedUncertain += 1;
+        await ctx.db.patch(receipt._id, {
+          status: "uncertain",
+          errorCode: "data_deleted_external_effect_uncertain",
+          updatedAt: Date.now(),
+        });
+      } else {
+        await ctx.db.delete(receipt._id);
       }
       processed += 1;
     }
@@ -165,6 +206,14 @@ export const deleteMyData = mutationGeneric({
         .first()) !== null ||
       (await ctx.db
         .query("actionPlans")
+        .withIndex("by_owner", (q) => q.eq("ownerKey", identity.tokenIdentifier))
+        .first()) !== null ||
+      (await ctx.db
+        .query("actionExecutionReceipts")
+        .filter((q) => q.eq(q.field("ownerKey"), identity.tokenIdentifier))
+        .first()) !== null ||
+      (await ctx.db
+        .query("actionStepApprovals")
         .withIndex("by_owner", (q) => q.eq("ownerKey", identity.tokenIdentifier))
         .first()) !== null;
     const hasMoreDevices =
@@ -237,11 +286,25 @@ export const purgeExpired = internalMutationGeneric({
       .take(Math.min(Math.max(limit - deleted, 0) * 4, 500));
     for (const plan of oldPlans) {
       if (deleted >= limit) break;
+      await deleteStepApprovals(ctx, plan._id);
       if (plan.status === "executing" || plan.status === "uncertain") {
         preservedUncertain += 1;
         continue;
       }
       await ctx.db.delete(plan._id);
+      deleted += 1;
+    }
+    const oldReceipts = await ctx.db
+      .query("actionExecutionReceipts")
+      .filter((q) => q.lt(q.field("updatedAt"), cutoff))
+      .take(Math.min(Math.max(limit - deleted, 0) * 4, 500));
+    for (const receipt of oldReceipts) {
+      if (deleted >= limit) break;
+      if (receipt.status === "pending" || receipt.status === "uncertain") {
+        preservedUncertain += 1;
+        continue;
+      }
+      await ctx.db.delete(receipt._id);
       deleted += 1;
     }
     const oldEvents = await ctx.db

@@ -71,3 +71,48 @@ it("runs a scoped idempotent locale migration without changing literal user cont
     value: { language: "en", literal: "繁體中文內容" },
   });
 });
+
+it("invalidates legacy control plans that still contain insertText", async () => {
+  const t = convexTest(schema, modules);
+  const user = t.withIdentity({ tokenIdentifier: "legacy-control-owner", subject: "legacy-control-owner" });
+  await user.mutation(anyApi.workflows.registerDevice, { deviceId: "legacy-device" });
+  const planId = await t.run((ctx) =>
+    ctx.db.insert("actionPlans", {
+      ownerKey: "legacy-control-owner",
+      deviceId: "legacy-device",
+      command: "legacy typing plan",
+      locale: "en",
+      status: "approved",
+      actionsJson: JSON.stringify([
+        {
+          kind: "insertText",
+          targetBundleIdentifier: "com.example.Editor",
+          parameters: { text: "hello" },
+        },
+      ]),
+      planFingerprint: "legacy-fingerprint",
+      cancellationGeneration: 3,
+      expiresAt: Date.now() + 60_000,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }),
+  );
+
+  await expect(
+    user.mutation(anyApi.migrations.invalidateLegacyInsertTextPlans, {
+      maxRecords: 10,
+    }),
+  ).resolves.toMatchObject({ invalidated: 1 });
+  const invalidated = await t.run((ctx) => ctx.db.get(planId));
+  expect(invalidated).toMatchObject({
+    status: "failed",
+    errorCode: "legacy_insertText_invalidated",
+  });
+  expect(invalidated?.actionsJson).toBeUndefined();
+  expect(invalidated?.planFingerprint).toBeUndefined();
+  await expect(
+    user.mutation(anyApi.migrations.invalidateLegacyInsertTextPlans, {
+      maxRecords: 10,
+    }),
+  ).resolves.toMatchObject({ invalidated: 0 });
+});

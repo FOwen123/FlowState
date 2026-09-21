@@ -3,11 +3,22 @@ import {
   ACTION_KINDS,
   requiredCapability,
   type IntentActionKind,
+  type IntentClarification,
   type IntentName,
   type IntentRouteRequest,
+  type IntentRiskClass,
+  type IntentToolKind,
 } from "./intent_contract";
 
-export type IntentStage = "intent" | "action" | "target";
+export type IntentStage =
+  | "intent"
+  | "app"
+  | "action"
+  | "tool"
+  | "target"
+  | "requiredSlots"
+  | "risk"
+  | "clarification";
 
 export type IntentThresholds = {
   minimumSelectedProbability: number;
@@ -31,7 +42,16 @@ export const DEFAULT_INTENT_POLICY: IntentPolicy = {
   // selects review proposals; it does not establish unattended safety.
   requireReview: true,
   thresholds: Object.fromEntries(
-    ["intent", "action", "target"].map((stage) => [
+    [
+      "intent",
+      "app",
+      "action",
+      "tool",
+      "target",
+      "requiredSlots",
+      "risk",
+      "clarification",
+    ].map((stage) => [
       stage,
       {
         minimumSelectedProbability: 0.5,
@@ -67,15 +87,20 @@ export type IntentActionProposal = {
 };
 
 export type IntentDecision = {
-  decision: "execute" | "dictation" | "clarify" | "unsupported" | "abstain";
+  decision: "execute" | "clarify" | "unsupported" | "abstain";
   reason: string;
-  intent: "dictation" | "action" | "clarify" | "unsupported" | null;
+  intent: "action" | "clarify" | "unsupported" | null;
   action: IntentActionProposal | null;
   clarification: string | null;
   confidence: {
     intent: IntentAnswer | null;
+    app: IntentAnswer | null;
     action: IntentAnswer | null;
+    tool: IntentAnswer | null;
     target: IntentAnswer | null;
+    requiredSlots: IntentAnswer | null;
+    risk: IntentAnswer | null;
+    clarification: IntentAnswer | null;
   };
 };
 
@@ -241,6 +266,35 @@ function keyFromUtterance(
   return aliases.find(([pattern]) => pattern.test(utterance))?.[1] ?? null;
 }
 
+function normalizedPhrase(value: string): string {
+  return value
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function hasBoundedCandidateName(
+  utterance: string,
+  candidate: IntentRouteRequest["context"]["targetCandidates"][number],
+): boolean {
+  const utteranceName = normalizedPhrase(utterance);
+  const names = [
+    candidate.label,
+    ...(candidate.normalizedNames ?? []),
+    ...(candidate.matchedAlias === undefined ? [] : [candidate.matchedAlias]),
+  ]
+    .map(normalizedPhrase)
+    .filter((name) => name.length > 0);
+  return names.some(
+    (name) =>
+      utteranceName === name ||
+      utteranceName.startsWith(`${name} `) ||
+      utteranceName.endsWith(` ${name}`) ||
+      utteranceName.includes(` ${name} `),
+  );
+}
+
 function fallbackId(value: unknown, label: string): string {
   if (
     typeof value !== "string" ||
@@ -276,10 +330,6 @@ function fallbackParameters(
     focus: ["role", "label"],
     select: ["label"],
     press: ["key", "modifiers"],
-    insertText: [],
-    openURL: [],
-    attachFile: [],
-    sendEmail: [],
   };
   const allowed = new Set(allowedByAction[actionKind]);
   if (Object.keys(value).some((key) => !allowed.has(key))) {
@@ -328,7 +378,6 @@ export function parseFallbackDecision(value: unknown): ParsedFallbackDecision {
   if (Object.keys(value).some((key) => !allowed.has(key)))
     throw new Error("fallback returned unknown fields");
   if (
-    value.intent !== "dictation" &&
     value.intent !== "action" &&
     value.intent !== "clarify" &&
     value.intent !== "unsupported"
@@ -386,6 +435,12 @@ export function buildActionProposal(
     (item) => item.id === targetId,
   );
   if (!candidate) return null;
+  if (
+    candidate.supportedActions !== undefined &&
+    !candidate.supportedActions.includes(actionKind)
+  ) {
+    return null;
+  }
   if (actionKind === "openApplication" && candidate.kind !== "app") return null;
   if (
     (actionKind === "focus" || actionKind === "select") &&
@@ -395,15 +450,11 @@ export function buildActionProposal(
   const targetBundleIdentifier =
     candidate.bundleIdentifier ?? request.context.focusedAppBundleIdentifier;
   if (
-    ["scroll", "focus", "select", "press", "insertText"].includes(actionKind) &&
+    ["scroll", "focus", "select", "press"].includes(actionKind) &&
     targetBundleIdentifier !== request.context.focusedAppBundleIdentifier
   )
     return null;
-  if (
-    actionKind !== "attachFile" &&
-    actionKind !== "sendEmail" &&
-    targetBundleIdentifier === undefined
-  ) {
+  if (targetBundleIdentifier === undefined) {
     return null;
   }
   let parameters: Record<string, string | number | boolean>;
@@ -462,49 +513,98 @@ export function buildActionProposal(
       requiresApproval ||= key === "Enter";
       break;
     }
-    case "insertText":
-      parameters = {
-        text: dictationText(request.utterance),
-        replaceSelection: true,
-      };
-      requiresApproval = true;
-      break;
-    case "openURL":
-    case "attachFile":
-    case "sendEmail":
-      return null;
   }
   return {
     kind: actionKind,
     ...(targetBundleIdentifier === undefined ? {} : { targetBundleIdentifier }),
     parameters,
     capability: requiredCapability(actionKind),
-    executor: ["openURL", "attachFile", "sendEmail"].includes(actionKind)
-      ? "service"
-      : "desktop",
+    executor: "desktop",
     requiresApproval,
     targetId,
   };
 }
 
-function dictationText(utterance: string): string {
-  const explicitType = utterance.match(/^\s*(?:please\s+)?type\s+(.+)$/i);
-  return explicitType?.[1] ?? utterance;
+function expectedTool(_action: IntentActionKind): IntentToolKind {
+  return "nativeAccessibility";
 }
 
-function dictationAction(request: IntentRouteRequest): IntentActionProposal {
+function deterministicRisk(
+  action: IntentActionKind,
+  parameters: Record<string, string | number | boolean>,
+): IntentRiskClass {
+  if (action === "press" && (parameters.key === "Enter" || parameters.modifiers !== undefined)) {
+    return "confirm";
+  }
+  return "reversible";
+}
+
+function requiredSlotsComplete(
+  request: IntentRouteRequest,
+  action: IntentActionKind,
+  targetId: string,
+): boolean {
+  const candidate = request.context.targetCandidates.find((item) => item.id === targetId);
+  if (candidate === undefined) return false;
+  switch (action) {
+    case "openApplication":
+      return candidate.kind === "app" && hasBoundedCandidateName(request.utterance, candidate);
+    case "scroll":
+      return /\b(?:up|down|higher|lower|back|forward)\b/i.test(request.utterance);
+    case "focus":
+      return request.context.focusedRole !== undefined;
+    case "select":
+      return candidate.kind === "control" && candidate.label.trim().length > 0;
+    case "press":
+      return keyFromUtterance(request.utterance) !== null;
+  }
+}
+
+function appAnswerMatches(
+  request: IntentRouteRequest,
+  action: IntentActionKind,
+  targetId: string,
+  appChoice: string,
+): boolean {
+  const target = request.context.targetCandidates.find((item) => item.id === targetId);
+  if (target === undefined) return false;
+  if (action === "openApplication") return appChoice === targetId;
+  if (appChoice === "focused") {
+    return request.context.focusedAppBundleIdentifier !== undefined &&
+      (target.bundleIdentifier === undefined ||
+        target.bundleIdentifier === request.context.focusedAppBundleIdentifier);
+  }
+  const app = request.context.targetCandidates.find(
+    (item) => item.id === appChoice && item.kind === "app",
+  );
+  return app?.bundleIdentifier !== undefined &&
+    app.bundleIdentifier ===
+      (target.bundleIdentifier ?? request.context.focusedAppBundleIdentifier);
+}
+
+function confidenceFor(answers: Record<string, IntentAnswer>): IntentDecision["confidence"] {
   return {
-    kind: "insertText",
-    ...(request.context.focusedAppBundleIdentifier === undefined
-      ? {}
-      : { targetBundleIdentifier: request.context.focusedAppBundleIdentifier }),
-    parameters: {
-      text: dictationText(request.utterance),
-      replaceSelection: true,
-    },
-    capability: "app.input",
-    executor: "desktop",
-    requiresApproval: true,
+    intent: confidenceOf(answers, "intent"),
+    app: confidenceOf(answers, "app"),
+    action: confidenceOf(answers, "action"),
+    tool: confidenceOf(answers, "tool"),
+    target: confidenceOf(answers, "target"),
+    requiredSlots: confidenceOf(answers, "requiredSlots"),
+    risk: confidenceOf(answers, "risk"),
+    clarification: confidenceOf(answers, "clarification"),
+  };
+}
+
+function emptyConfidence(): IntentDecision["confidence"] {
+  return {
+    intent: null,
+    app: null,
+    action: null,
+    tool: null,
+    target: null,
+    requiredSlots: null,
+    risk: null,
+    clarification: null,
   };
 }
 
@@ -516,11 +616,7 @@ export function decideIntent(input: {
   now?: number;
 }): IntentDecision {
   const { request, answers, policy } = input;
-  const confidence = {
-    intent: confidenceOf(answers, "intent"),
-    action: confidenceOf(answers, "action"),
-    target: confidenceOf(answers, "target"),
-  };
+  const confidence = confidenceFor(answers);
   const base = {
     intent: null,
     action: null,
@@ -537,57 +633,8 @@ export function decideIntent(input: {
   if (!answerPasses(intentAnswer, policy.thresholds?.intent)) {
     return { ...base, decision: "abstain", reason: "intent_threshold" };
   }
-  if (
-    (request.mode === "commands" && intentAnswer.choice === "dictation") ||
-    (request.mode === "dictation" && intentAnswer.choice === "action")
-  ) {
-    return {
-      ...base,
-      decision: "clarify",
-      reason: "mode_conflict",
-      clarification: "That request does not match the selected voice mode.",
-    };
-  }
-  if (intentAnswer.choice === "dictation") {
-    const target = request.context.focusedAppBundleIdentifier;
-    if (
-      !request.supportedActions.includes("insertText") ||
-      !request.supportedCapabilities.includes("app.input")
-    ) {
-      return {
-        ...base,
-        decision: "unsupported",
-        reason: "dictation_input_not_supported",
-        intent: "unsupported",
-      };
-    }
-    if (
-      !request.context.editable ||
-      !hasGrant(input.grants, "app.input", target, input.now ?? Date.now())
-    ) {
-      return {
-        ...base,
-        decision: "clarify",
-        reason: "dictation_target_or_grant_missing",
-        intent: "dictation",
-        clarification: "Which editable field should receive that text?",
-      };
-    }
-    return {
-      ...base,
-      decision: "dictation",
-      reason: "policy_pass",
-      intent: "dictation",
-      action: dictationAction(request),
-    };
-  }
   if (intentAnswer.choice === "unsupported") {
-    return {
-      ...base,
-      decision: "unsupported",
-      reason: "intent_unsupported",
-      intent: "unsupported",
-    };
+    return { ...base, decision: "unsupported", reason: "intent_unsupported", intent: "unsupported" };
   }
   if (intentAnswer.choice === "clarify") {
     return {
@@ -598,51 +645,92 @@ export function decideIntent(input: {
       clarification: "What should I do with that request?",
     };
   }
-  const actionAnswer = answers.action;
-  const targetAnswer = answers.target;
-  if (
-    !answerPasses(actionAnswer, policy.thresholds?.action) ||
-    !answerPasses(targetAnswer, policy.thresholds?.target)
-  ) {
-    return {
-      ...base,
-      decision: "abstain",
-      reason: "action_or_target_threshold",
-      intent: "action",
-    };
+
+  const requiredStages: IntentStage[] = [
+    "app",
+    "action",
+    "tool",
+    "target",
+    "requiredSlots",
+    "risk",
+    "clarification",
+  ];
+  if (requiredStages.some((stage) => !answerPasses(answers[stage], policy.thresholds?.[stage]))) {
+    return { ...base, decision: "abstain", reason: "action_context_threshold", intent: "action" };
   }
-  if (actionAnswer.choice === "none" || targetAnswer.choice === "none") {
+  const clarification = answers.clarification?.choice as IntentClarification;
+  if (clarification === "abstain") {
+    return { ...base, decision: "abstain", reason: "model_abstained", intent: "action" };
+  }
+  if (clarification === "needed" || answers.requiredSlots?.choice === "missing") {
     return {
       ...base,
       decision: "clarify",
-      reason: "action_or_target_unresolved",
+      reason: answers.requiredSlots?.choice === "missing" ? "required_slots_missing" : "model_requested_clarification",
       intent: "clarify",
-      clarification: "Which action or target did you mean?",
+      clarification: "Which missing detail should I use?",
+    };
+  }
+  const actionAnswer = answers.action;
+  const appAnswer = answers.app;
+  const toolAnswer = answers.tool;
+  const targetAnswer = answers.target;
+  if (
+    actionAnswer.choice === "none" ||
+    targetAnswer.choice === "none" ||
+    appAnswer.choice === "none" ||
+    toolAnswer.choice === "none"
+  ) {
+    return {
+      ...base,
+      decision: "clarify",
+      reason: "bounded_reference_unresolved",
+      intent: "clarify",
+      clarification: "Which app, action, target, or route did you mean?",
     };
   }
   const actionKind = actionAnswer.choice as IntentActionKind;
-  const proposal = buildActionProposal(
-    request,
-    actionKind,
-    targetAnswer.choice,
-  );
-  if (!proposal) {
+  if (!ACTION_KINDS.includes(actionKind)) {
+    return { ...base, decision: "unsupported", reason: "action_not_registered", intent: "unsupported" };
+  }
+  if (!appAnswerMatches(request, actionKind, targetAnswer.choice, appAnswer.choice)) {
+    return { ...base, decision: "abstain", reason: "app_target_mismatch", intent: "action" };
+  }
+  const selectedTool = toolAnswer.choice as IntentToolKind;
+  if (selectedTool !== expectedTool(actionKind)) {
+    return { ...base, decision: "abstain", reason: "tool_route_mismatch", intent: "action" };
+  }
+  if (!request.supportedTools.includes(selectedTool)) {
     return {
       ...base,
       decision: "unsupported",
-      reason: "action_not_supported",
+      reason: "tool_not_supported",
       intent: "action",
     };
   }
+  if (!requiredSlotsComplete(request, actionKind, targetAnswer.choice)) {
+    return {
+      ...base,
+      decision: "clarify",
+      reason: "required_slots_invalid",
+      intent: "clarify",
+      clarification: "Which required detail should I use?",
+    };
+  }
+  const proposal = buildActionProposal(request, actionKind, targetAnswer.choice);
+  if (!proposal) {
+    return { ...base, decision: "unsupported", reason: "action_not_supported", intent: "action" };
+  }
+  const deterministicRiskClass = deterministicRisk(actionKind, proposal.parameters);
+  if (answers.risk?.choice === "unsupported") {
+    return { ...base, decision: "clarify", reason: "risk_suggestion_unsupported", intent: "clarify", clarification: "Should I continue with this action?" };
+  }
+  // Jev's risk is a suggestion; deterministic policy still owns approval.
+  proposal.requiresApproval ||= deterministicRiskClass === "confirm" || policy.requireReview === true;
   const target = proposal.targetBundleIdentifier;
   const now = input.now ?? Date.now();
   if (!request.supportedCapabilities.includes(proposal.capability)) {
-    return {
-      ...base,
-      decision: "unsupported",
-      reason: "capability_not_supported",
-      intent: "action",
-    };
+    return { ...base, decision: "unsupported", reason: "capability_not_supported", intent: "action" };
   }
   if (!hasGrant(input.grants, proposal.capability, target, now)) {
     return {
@@ -650,23 +738,15 @@ export function decideIntent(input: {
       decision: "clarify",
       reason: "grant_missing_or_expired",
       intent: "action",
-      clarification:
-        "FlowState needs permission for that target before acting.",
+      clarification: "FlowState needs permission for that target before acting.",
     };
   }
-  proposal.requiresApproval ||= policy.requireReview === true;
-  return {
-    ...base,
-    decision: "execute",
-    reason: "policy_pass",
-    intent: "action",
-    action: proposal,
-  };
+  return { ...base, decision: "execute", reason: "policy_pass", intent: "action", action: proposal };
 }
 
 export function decideFallback(input: {
   request: IntentRouteRequest;
-  intent: "dictation" | "action" | "clarify" | "unsupported";
+  intent: IntentName;
   actionKind?: string;
   targetId?: string;
   parameters?: FallbackParameters;
@@ -677,57 +757,10 @@ export function decideFallback(input: {
     intent: input.intent,
     action: null,
     clarification: null,
-    confidence: { intent: null, action: null, target: null },
+    confidence: emptyConfidence(),
   } as const;
-  if (
-    (input.request.mode === "commands" && input.intent === "dictation") ||
-    (input.request.mode === "dictation" && input.intent === "action")
-  ) {
-    return {
-      ...base,
-      decision: "clarify",
-      reason: "mode_conflict",
-      clarification: "That request does not match the selected voice mode.",
-    };
-  }
-  if (input.intent === "dictation") {
-    const target = input.request.context.focusedAppBundleIdentifier;
-    if (
-      !input.request.supportedActions.includes("insertText") ||
-      !input.request.supportedCapabilities.includes("app.input")
-    ) {
-      return {
-        ...base,
-        decision: "unsupported",
-        reason: "dictation_input_not_supported",
-        intent: "unsupported",
-      };
-    }
-    if (
-      !input.request.context.editable ||
-      !hasGrant(input.grants, "app.input", target, input.now ?? Date.now())
-    ) {
-      return {
-        ...base,
-        decision: "clarify",
-        reason: "dictation_target_or_grant_missing",
-        clarification: "Which editable field should receive that text?",
-      };
-    }
-    return {
-      ...base,
-      decision: "dictation",
-      reason: "fallback_validated",
-      action: dictationAction(input.request),
-    };
-  }
   if (input.intent === "clarify") {
-    return {
-      ...base,
-      decision: "clarify",
-      reason: "fallback_requested_clarification",
-      clarification: "Could you clarify the action or target?",
-    };
+    return { ...base, decision: "clarify", reason: "fallback_requested_clarification", clarification: "Could you clarify the action or target?" };
   }
   if (input.intent === "unsupported") {
     return { ...base, decision: "unsupported", reason: "fallback_unsupported" };
@@ -735,74 +768,23 @@ export function decideFallback(input: {
   const actionKind = input.actionKind;
   const targetId = input.targetId;
   if (!actionKind || !targetId || !requestActionKind(actionKind)) {
-    return {
-      ...base,
-      decision: "clarify",
-      intent: "action",
-      reason: "fallback_action_or_target_missing",
-      clarification: "Which registered action and target should I use?",
-    };
+    return { ...base, decision: "clarify", intent: "action", reason: "fallback_action_or_target_missing", clarification: "Which registered action and target should I use?" };
   }
-  const proposal = buildActionProposal(
-    input.request,
-    actionKind,
-    targetId,
-    input.parameters,
-  );
+  const proposal = buildActionProposal(input.request, actionKind, targetId, input.parameters);
   if (proposal === null) {
-    return {
-      ...base,
-      decision: "unsupported",
-      intent: "action",
-      reason: "fallback_action_not_supported",
-    };
+    return { ...base, decision: "unsupported", intent: "action", reason: "fallback_action_not_supported" };
   }
   if (!input.request.supportedCapabilities.includes(proposal.capability)) {
-    return {
-      ...base,
-      decision: "unsupported",
-      intent: "action",
-      reason: "fallback_capability_not_supported",
-    };
+    return { ...base, decision: "unsupported", intent: "action", reason: "fallback_capability_not_supported" };
   }
-  if (
-    !hasGrant(
-      input.grants,
-      proposal.capability,
-      proposal.targetBundleIdentifier,
-      input.now ?? Date.now(),
-    )
-  ) {
-    return {
-      ...base,
-      decision: "clarify",
-      intent: "action",
-      reason: "fallback_grant_missing_or_expired",
-      clarification:
-        "FlowState needs permission for that target before acting.",
-    };
+  if (!hasGrant(input.grants, proposal.capability, proposal.targetBundleIdentifier, input.now ?? Date.now())) {
+    return { ...base, decision: "clarify", intent: "action", reason: "fallback_grant_missing_or_expired", clarification: "FlowState needs permission for that target before acting." };
   }
   // Fallback has no calibrated execution confidence; always review its proposal.
   proposal.requiresApproval = true;
-  return {
-    ...base,
-    decision: "execute",
-    intent: "action",
-    reason: "fallback_validated",
-    action: proposal,
-  };
+  return { ...base, decision: "execute", intent: "action", reason: "fallback_validated", action: proposal };
 }
 
 function requestActionKind(value: string): value is IntentActionKind {
-  return [
-    "openApplication",
-    "scroll",
-    "focus",
-    "select",
-    "press",
-    "insertText",
-    "openURL",
-    "attachFile",
-    "sendEmail",
-  ].includes(value as IntentActionKind);
+  return ACTION_KINDS.includes(value as IntentActionKind);
 }

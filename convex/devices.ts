@@ -51,6 +51,15 @@ export const revoke = mutationGeneric({
       .filter((q) => q.eq(q.field("deviceId"), deviceId))
       .collect();
     for (const plan of plans) {
+      const approvals = await ctx.db
+        .query("actionStepApprovals")
+        .withIndex("by_plan_step", (q) => q.eq("planId", plan._id))
+        .collect();
+      for (const approval of approvals) {
+        if (approval.consumedAt === undefined && approval.expiresAt > timestamp) {
+          await ctx.db.patch(approval._id, { expiresAt: timestamp, updatedAt: timestamp });
+        }
+      }
       if (["queued", "planning", "awaiting_approval", "approved"].includes(plan.status)) {
         await ctx.db.patch(plan._id, {
           status: "cancelled",

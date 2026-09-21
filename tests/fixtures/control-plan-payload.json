@@ -1,0 +1,85 @@
+{
+  "availability": {
+    "supportedTools": ["nativeAccessibility"],
+    "integrations": [],
+    "applicationCandidates": [
+      {
+        "bundleIdentifier": "com.brave.Browser",
+        "displayName": "Brave Browser",
+        "normalizedNames": ["brave", "brave browser"],
+        "supportedActions": ["openApplication", "scroll"],
+        "integrations": []
+      }
+    ]
+  },
+  "request": {
+    "actions": [
+      {
+        "kind": "openApplication",
+        "targetBundleIdentifier": "com.brave.Browser",
+        "parameters": {}
+      },
+      {
+        "kind": "scroll",
+        "targetBundleIdentifier": "com.brave.Browser",
+        "parameters": {
+          "lines": -3
+        }
+      }
+    ],
+    "explanation": "Open Brave and scroll down in the current page.",
+    "clarificationNeeded": false
+  },
+  "response": {
+    "planId": "plan-native-fixture",
+    "status": "awaiting_approval",
+    "fingerprint": "{\"actions\":[{\"capability\":\"app.open\",\"executor\":\"desktop\",\"kind\":\"openApplication\",\"parameters\":{},\"preconditions\":{\"requiresFreshObservation\":false,\"targetBundleIdentifier\":\"com.brave.Browser\"},\"requiresApproval\":false,\"reversal\":{\"kind\":\"none\",\"supported\":false},\"riskClass\":\"reversible\",\"route\":\"nativeAccessibility\",\"targetBundleIdentifier\":\"com.brave.Browser\",\"verifier\":{\"kind\":\"boundedAction\"}},{\"capability\":\"app.control\",\"executor\":\"desktop\",\"kind\":\"scroll\",\"parameters\":{\"lines\":-3},\"preconditions\":{\"requiresFreshObservation\":false,\"targetBundleIdentifier\":\"com.brave.Browser\"},\"requiresApproval\":false,\"reversal\":{\"kind\":\"none\",\"supported\":false},\"riskClass\":\"reversible\",\"route\":\"nativeAccessibility\",\"targetBundleIdentifier\":\"com.brave.Browser\",\"verifier\":{\"kind\":\"boundedAction\"}}],\"capabilities\":[\"app.control\",\"app.open\"]}",
+    "actions": [
+      {
+        "kind": "openApplication",
+        "targetBundleIdentifier": "com.brave.Browser",
+        "parameters": {},
+        "capability": "app.open",
+        "executor": "desktop",
+        "requiresApproval": false,
+        "route": "nativeAccessibility",
+        "riskClass": "reversible",
+        "preconditions": {
+          "targetBundleIdentifier": "com.brave.Browser",
+          "requiresFreshObservation": false
+        },
+        "verifier": {
+          "kind": "boundedAction"
+        },
+        "reversal": {
+          "kind": "none",
+          "supported": false
+        }
+      },
+      {
+        "kind": "scroll",
+        "targetBundleIdentifier": "com.brave.Browser",
+        "parameters": {
+          "lines": -3
+        },
+        "capability": "app.control",
+        "executor": "desktop",
+        "requiresApproval": false,
+        "route": "nativeAccessibility",
+        "riskClass": "reversible",
+        "preconditions": {
+          "targetBundleIdentifier": "com.brave.Browser",
+          "requiresFreshObservation": false
+        },
+        "verifier": {
+          "kind": "boundedAction"
+        },
+        "reversal": {
+          "kind": "none",
+          "supported": false
+        }
+      }
+    ],
+    "capabilities": ["app.control", "app.open"]
+  }
+}

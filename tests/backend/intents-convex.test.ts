@@ -33,11 +33,15 @@ function request(overrides: Record<string, unknown> = {}) {
           id: "reader",
           label: "Reader",
           bundleIdentifier: "com.example.Reader",
-          kind: "window" as const,
+          kind: "app" as const,
+          isRunning: true,
+          supportedActions: ["scroll" as const],
+          integrations: ["nativeAccessibility"],
         },
       ],
     },
     supportedActions: ["scroll" as const],
+    supportedTools: ["nativeAccessibility" as const],
     supportedCapabilities: ["app.control"],
     policyVersion: "intent-v1",
     ...overrides,
@@ -57,10 +61,9 @@ function strictJevResponse(
         questionId: "intent",
         choice,
         probabilities: {
-          dictation: 0.01,
           action: 0.96,
           clarify: 0.02,
-          unsupported: 0.01,
+          unsupported: 0.02,
         },
         confidence: 0.96,
       },
@@ -71,11 +74,46 @@ function strictJevResponse(
         probabilities: { none: 0.01, scroll: 0.99 },
         confidence: 0.99,
       },
+      app: {
+        type: "choice",
+        questionId: "app",
+        choice: "focused",
+        probabilities: { none: 0.01, focused: 0.99, reader: 0 },
+        confidence: 0.98,
+      },
+      tool: {
+        type: "choice",
+        questionId: "tool",
+        choice: "nativeAccessibility",
+        probabilities: { none: 0.01, nativeAccessibility: 0.99 },
+        confidence: 0.99,
+      },
       target: {
         type: "choice",
         questionId: "target",
         choice: target,
         probabilities: { none: 0.01, reader: 0.99 },
+        confidence: 0.99,
+      },
+      requiredSlots: {
+        type: "choice",
+        questionId: "requiredSlots",
+        choice: "complete",
+        probabilities: { complete: 0.99, missing: 0.01 },
+        confidence: 0.99,
+      },
+      risk: {
+        type: "choice",
+        questionId: "risk",
+        choice: "reversible",
+        probabilities: { reversible: 0.99, confirm: 0.005, unsupported: 0.005 },
+        confidence: 0.99,
+      },
+      clarification: {
+        type: "choice",
+        questionId: "clarification",
+        choice: "notNeeded",
+        probabilities: { notNeeded: 0.99, needed: 0.005, abstain: 0.005 },
         confidence: 0.99,
       },
     },
@@ -222,7 +260,8 @@ describe("authenticated intent route", () => {
       });
     await grant("app.control");
     const visual = request({ utterance: "Scroll down in this view" });
-    expect(await user.action(anyApi.intents.route, visual)).toMatchObject({
+    const visualResult = await user.action(anyApi.intents.route, visual);
+    expect(visualResult).toMatchObject({
       decision: "clarify",
       requiresObservation: false,
     });

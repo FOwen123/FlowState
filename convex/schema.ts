@@ -151,6 +151,7 @@ export default defineSchema({
     ownerKey: v.string(),
     deviceId: v.string(),
     command: v.string(),
+    contextRevision: v.optional(v.number()),
     completedSteps: v.optional(v.number()),
     executingStep: v.optional(v.number()),
     locale: v.union(v.literal("en"), v.literal("zh-Hant")),
@@ -168,6 +169,9 @@ export default defineSchema({
     explanation: v.optional(v.string()),
     actionsJson: v.optional(v.string()),
     capabilitiesJson: v.optional(v.string()),
+    supportedToolsJson: v.optional(v.string()),
+    integrationsJson: v.optional(v.string()),
+    applicationCandidatesJson: v.optional(v.string()),
     planFingerprint: v.optional(v.string()),
     cancellationGeneration: v.number(),
     expiresAt: v.number(),
@@ -177,6 +181,45 @@ export default defineSchema({
   })
     .index("by_owner", ["ownerKey", "updatedAt"])
     .index("by_owner_device", ["ownerKey", "deviceId", "updatedAt"]),
+
+  actionExecutionReceipts: defineTable({
+    ownerKey: v.string(),
+    deviceId: v.string(),
+    planId: v.id("actionPlans"),
+    ordinal: v.number(),
+    generation: v.number(),
+    provider: v.string(),
+    idempotencyKey: v.string(),
+    requestFingerprint: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("uncertain"),
+    ),
+    externalId: v.optional(v.string()),
+    errorCode: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_plan_step", ["planId", "ordinal"])
+    .index("by_idempotency", ["provider", "idempotencyKey"]),
+
+  actionStepApprovals: defineTable({
+    ownerKey: v.string(),
+    deviceId: v.string(),
+    planId: v.id("actionPlans"),
+    ordinal: v.number(),
+    generation: v.number(),
+    planFingerprint: v.string(),
+    actionFingerprint: v.string(),
+    expiresAt: v.number(),
+    consumedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_plan_step", ["planId", "ordinal"])
+    .index("by_owner", ["ownerKey"]),
 
   intentRequests: defineTable({
     ownerKey: v.string(),

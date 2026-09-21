@@ -1,0 +1,47 @@
+{
+  "mode": "deterministic",
+  "fixture": {
+    "path": "tests/fixtures/control-decisions/en.json",
+    "version": 1,
+    "language": "en",
+    "policyVersion": "control-decisions-v1",
+    "sha256": "451f7996fe2249742cb55b59aa7daf2b1728f8bdfcb30034e2a1dc315cc23215",
+    "suites": 5,
+    "groupsPerSuite": 4,
+    "scenariosPerSuite": 4
+  },
+  "seed": 17,
+  "splitCountsPerSuite": {
+    "development": 2,
+    "calibration": 1,
+    "holdout": 1
+  },
+  "stages": {
+    "A": "missing-slots-risk",
+    "B": "plan-step-validation",
+    "C": "memory-ranking",
+    "D": "result-validation",
+    "E": "route-model-selection"
+  },
+  "status": "disabled",
+  "comparisonGate": {
+    "status": "evaluated",
+    "accepted": false,
+    "reason": "no_stage_passed_release_gate"
+  },
+  "liveEvidence": {
+    "reports": "jev-stage-{A-E}-{development,calibration,holdout}-live-v1.json",
+    "dryRun": true,
+    "providerFailures": 0,
+    "automaticExecution": false,
+    "pricing": {
+      "provider": "TypeSafe",
+      "model": "jev-1.13.0",
+      "inputUSDPerMillion": 0.042,
+      "outputUSDPerMillion": 0,
+      "source": "https://docs.typesafe.ai/models.md",
+      "version": "models.md-jev-1.13.0"
+    }
+  },
+  "note": "Synthetic contract fixture with bounded dry-run Jev evidence. Every stage remains disabled because no stage passed all release gates; no desktop or service effects were performed."
+}

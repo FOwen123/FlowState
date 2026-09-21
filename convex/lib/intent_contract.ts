@@ -2,28 +2,40 @@ import { isRecord } from "./http";
 import type { StrictTypeSafeQuestion } from "./typesafe";
 import { buildIntentQuestionsData } from "./intent_questions";
 
+// routeIntent is Mac Control only. Structured service actions are planned via
+// createActionPlan, where their typed parameters and approval policy live.
 export const ACTION_KINDS = [
   "openApplication",
   "scroll",
   "focus",
   "select",
   "press",
-  "insertText",
-  "openURL",
-  "attachFile",
-  "sendEmail",
 ] as const;
 
 export type IntentActionKind = (typeof ACTION_KINDS)[number];
-export type IntentMode = "auto" | "dictation" | "commands";
-export type IntentName = "dictation" | "action" | "clarify" | "unsupported";
+export const TOOL_KINDS = [
+  "structuredIntegration",
+  "nativeAccessibility",
+  "visualComputerUse",
+] as const;
+export type IntentToolKind = (typeof TOOL_KINDS)[number];
+export type IntentMode = "auto" | "commands" | "control";
+export type IntentName = "action" | "clarify" | "unsupported";
+export type IntentRiskClass = "reversible" | "confirm" | "unsupported";
+export type IntentSlotStatus = "complete" | "missing";
+export type IntentClarification = "notNeeded" | "needed" | "abstain";
 export type CandidateKind = "app" | "window" | "control" | "file";
 
 export type IntentCandidate = {
   id: string;
   label: string;
+  normalizedNames?: string[];
+  matchedAlias?: string;
   bundleIdentifier?: string;
   kind: CandidateKind;
+  isRunning?: boolean;
+  supportedActions?: IntentActionKind[];
+  integrations?: string[];
 };
 
 export type IntentContext = {
@@ -58,6 +70,7 @@ export type IntentRouteRequest = {
   mode: IntentMode;
   context: IntentContext;
   supportedActions: IntentActionKind[];
+  supportedTools: IntentToolKind[];
   supportedCapabilities: string[];
   policyVersion: string;
   observation?: IntentObservation;
@@ -73,11 +86,13 @@ const CAPABILITIES = new Set([
   "file.upload",
   "mail.read",
   "mail.send",
+  "mail.draft",
   "spend.confirm",
 ]);
 
 const ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 const BUNDLE_PATTERN = /^[A-Za-z0-9.-]{3,200}$/;
+const INTEGRATION_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 
 function exactKeys(
   value: Record<string, unknown>,
@@ -119,16 +134,56 @@ function bundle(value: unknown, label: string): string {
   return result;
 }
 
+function normalizedName(value: unknown, label: string): string {
+  const result = boundedString(value, label, 1, 100)
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (result.length === 0) throw new Error(`${label} is invalid`);
+  return result;
+}
+
 function validateCandidate(value: unknown): IntentCandidate {
   if (!isRecord(value)) throw new Error("intent candidate must be an object");
   exactKeys(
     value,
-    ["id", "label", "bundleIdentifier", "kind"],
+    [
+      "id",
+      "label",
+      "normalizedNames",
+      "matchedAlias",
+      "bundleIdentifier",
+      "kind",
+      "isRunning",
+      "supportedActions",
+      "integrations",
+    ],
     "intent candidate",
   );
   const candidateId = id(value.id, "candidate id");
   if (candidateId === "none") throw new Error("candidate id is reserved");
   const label = boundedString(value.label, "candidate label", 1, 300);
+  let normalizedNames: string[] | undefined;
+  if (value.normalizedNames !== undefined) {
+    if (
+      !Array.isArray(value.normalizedNames) ||
+      value.normalizedNames.length === 0 ||
+      value.normalizedNames.length > 16
+    ) {
+      throw new Error("candidate normalizedNames are invalid");
+    }
+    normalizedNames = value.normalizedNames.map((name) =>
+      normalizedName(name, "candidate normalized name"),
+    );
+    if (new Set(normalizedNames).size !== normalizedNames.length) {
+      throw new Error("candidate normalizedNames must be unique");
+    }
+  }
+  const matchedAlias =
+    value.matchedAlias === undefined
+      ? undefined
+      : normalizedName(value.matchedAlias, "candidate matchedAlias");
   if (value.bundleIdentifier !== undefined)
     bundle(value.bundleIdentifier, "candidate bundleIdentifier");
   if (
@@ -139,9 +194,55 @@ function validateCandidate(value: unknown): IntentCandidate {
   ) {
     throw new Error("candidate kind is invalid");
   }
+  let isRunning: boolean | undefined;
+  if (value.isRunning !== undefined) {
+    if (typeof value.isRunning !== "boolean") {
+      throw new Error("candidate isRunning is invalid");
+    }
+    isRunning = value.isRunning;
+  }
+  let supportedActions: IntentActionKind[] | undefined;
+  if (value.supportedActions !== undefined) {
+    if (
+      !Array.isArray(value.supportedActions) ||
+      value.supportedActions.length > ACTION_KINDS.length ||
+      value.supportedActions.some(
+        (action) =>
+          typeof action !== "string" ||
+          !ACTION_KINDS.includes(action as IntentActionKind),
+      )
+    ) {
+      throw new Error("candidate supportedActions are invalid");
+    }
+    supportedActions = [...new Set(value.supportedActions)] as IntentActionKind[];
+    if (supportedActions.length !== value.supportedActions.length) {
+      throw new Error("candidate supportedActions must be unique");
+    }
+  }
+  let integrations: string[] | undefined;
+  if (value.integrations !== undefined) {
+    if (
+      !Array.isArray(value.integrations) ||
+      value.integrations.length > 32 ||
+      value.integrations.some(
+        (integration) =>
+          typeof integration !== "string" ||
+          !INTEGRATION_PATTERN.test(integration.trim()) ||
+          integration.trim().length === 0,
+      )
+    ) {
+      throw new Error("candidate integrations are invalid");
+    }
+    integrations = value.integrations.map((integration) => integration.trim());
+    if (new Set(integrations).size !== integrations.length) {
+      throw new Error("candidate integrations must be unique");
+    }
+  }
   return {
     id: candidateId,
     label,
+    ...(normalizedNames === undefined ? {} : { normalizedNames }),
+    ...(matchedAlias === undefined ? {} : { matchedAlias }),
     ...(value.bundleIdentifier === undefined
       ? {}
       : {
@@ -151,6 +252,9 @@ function validateCandidate(value: unknown): IntentCandidate {
           ),
         }),
     kind: value.kind,
+    ...(isRunning === undefined ? {} : { isRunning }),
+    ...(supportedActions === undefined ? {} : { supportedActions }),
+    ...(integrations === undefined ? {} : { integrations }),
   };
 }
 
@@ -229,6 +333,7 @@ export function validateIntentRouteRequest(value: unknown): IntentRouteRequest {
       "mode",
       "context",
       "supportedActions",
+      "supportedTools",
       "supportedCapabilities",
       "policyVersion",
       "observation",
@@ -275,6 +380,19 @@ export function validateIntentRouteRequest(value: unknown): IntentRouteRequest {
     throw new Error("supportedActions are invalid");
   }
   const uniqueActions = [...new Set(supportedActions)] as IntentActionKind[];
+  const supportedTools = value.supportedTools;
+  if (
+    !Array.isArray(supportedTools) ||
+    supportedTools.length === 0 ||
+    supportedTools.some(
+      (tool) =>
+        typeof tool !== "string" ||
+        !TOOL_KINDS.includes(tool as IntentToolKind),
+    )
+  ) {
+    throw new Error("supportedTools are invalid");
+  }
+  const uniqueTools = [...new Set(supportedTools)] as IntentToolKind[];
   const supportedCapabilities = value.supportedCapabilities;
   if (
     !Array.isArray(supportedCapabilities) ||
@@ -294,11 +412,7 @@ export function validateIntentRouteRequest(value: unknown): IntentRouteRequest {
   ) {
     throw new Error("contextRevision must be a non-negative integer");
   }
-  if (
-    value.mode !== "auto" &&
-    value.mode !== "dictation" &&
-    value.mode !== "commands"
-  ) {
+  if (value.mode !== "auto" && value.mode !== "commands" && value.mode !== "control") {
     throw new Error("intent mode is invalid");
   }
   const context: IntentContext = {
@@ -350,6 +464,7 @@ export function validateIntentRouteRequest(value: unknown): IntentRouteRequest {
     mode: value.mode,
     context,
     supportedActions: uniqueActions,
+    supportedTools: uniqueTools,
     supportedCapabilities: uniqueCapabilities,
     policyVersion: boundedString(value.policyVersion, "policyVersion", 1, 100),
     ...(value.observation === undefined
@@ -362,13 +477,6 @@ export function requiredCapability(action: IntentActionKind): string {
   switch (action) {
     case "openApplication":
       return "app.open";
-    case "insertText":
-      return "app.input";
-    case "attachFile":
-      return "file.upload";
-    case "sendEmail":
-      return "mail.send";
-    case "openURL":
     case "scroll":
     case "focus":
     case "select":
@@ -389,6 +497,8 @@ export function buildIntentQuestions(
 > {
   return buildIntentQuestionsData({
     supportedActions: request.supportedActions,
+    supportedTools: request.supportedTools,
+    focusedAppBundleIdentifier: request.context.focusedAppBundleIdentifier,
     targetCandidates: request.context.targetCandidates,
   });
 }

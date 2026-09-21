@@ -1,0 +1,41 @@
+{
+  "mode": "deterministic",
+  "fixture": {
+    "version": 2,
+    "language": "en",
+    "policyVersion": "intent-v1",
+    "groups": 80,
+    "scenarios": 320,
+    "sha256": "c17562b8c3b270467985d561521773f0306f88b6d91aebc480d75449815016ee"
+  },
+  "seed": 17,
+  "promptVersion": "intent-questions-v3",
+  "candidateSetVersion": "fixture-candidates-v2",
+  "splitCounts": {
+    "development": 160,
+    "calibration": 80,
+    "holdout": 80
+  },
+  "questions": [
+    "intent",
+    "app",
+    "action",
+    "tool",
+    "target",
+    "requiredSlots",
+    "risk",
+    "clarification"
+  ],
+  "liveComparison": {
+    "status": "evaluated",
+    "accepted": false,
+    "reason": "no_split_passed_release_gate",
+    "reports": [
+      "intent-v3-development-live-v1.json",
+      "intent-v3-calibration-live-v1.json",
+      "intent-v3-holdout-live-v1.json"
+    ],
+    "automaticExecution": false
+  },
+  "note": "Deterministic contract fixture paired with bounded dry-run v3 live reports. No desktop or service effects were performed; historical v2 reports remain unchanged."
+}

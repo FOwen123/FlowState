@@ -11,9 +11,19 @@ import { GenericId, v } from "convex/values";
 
 import { requireIdentity } from "./lib/identity";
 import { createOpenAIClient } from "./lib/openai";
-import { normalizeModelPlan, parsePlannerText, PlannedAction } from "./lib/action_plan";
+import {
+  containsLegacyInsertTextJson,
+  parsePlanAvailability,
+  normalizeModelPlan,
+  normalizeApplicationRegistryCandidates,
+  normalizeStoredActions,
+  parsePlannerText,
+  PlannedAction,
+  type PlanAvailability,
+} from "./lib/action_plan";
 import { usageLimit } from "./usage";
 import { isRecord } from "./lib/http";
+import type { MutationCtx } from "./_generated/server";
 
 type PlanId = GenericId<"actionPlans">;
 type PlanStatus =
@@ -32,11 +42,15 @@ type StoredPlan = {
   ownerKey: string;
   deviceId: string;
   command: string;
+  contextRevision?: number;
   locale: "en" | "zh-Hant";
   status: PlanStatus;
   explanation?: string;
   actionsJson?: string;
   capabilitiesJson?: string;
+  supportedToolsJson?: string;
+  integrationsJson?: string;
+  applicationCandidatesJson?: string;
   planFingerprint?: string;
   cancellationGeneration: number;
   expiresAt: number;
@@ -111,13 +125,70 @@ function requireCommand(command: string): string {
   return value;
 }
 
-function parseActions(actionsJson: string): PlannedAction[] {
+function parseActions(
+  actionsJson: string,
+  availability?: PlanAvailability,
+): PlannedAction[] {
   try {
     const value = JSON.parse(actionsJson) as unknown;
-    if (!Array.isArray(value)) throw new Error("actions are not an array");
-    return value as PlannedAction[];
+    return normalizeStoredActions(value, availability);
   } catch {
     throw new Error("stored action plan is invalid");
+  }
+}
+
+function parseAdvertisedList(
+  values: string[] | undefined,
+  label: string,
+  max: number,
+): string[] | undefined {
+  if (values === undefined) return undefined;
+  if (
+    values.length > max ||
+    values.some((value) => value.trim().length === 0 || value.trim().length > 128)
+  ) {
+    throw new Error(`${label} is invalid`);
+  }
+  const normalized = values.map((value) => value.trim());
+  if (new Set(normalized).size !== normalized.length) {
+    throw new Error(`${label} must be unique`);
+  }
+  return normalized;
+}
+
+function parseApplicationCandidates(value: unknown): string {
+  const serialized = JSON.stringify(normalizeApplicationRegistryCandidates(value));
+  if (serialized.length > 100_000) throw new Error("application candidates exceed the size limit");
+  return serialized;
+}
+
+function planningAvailability(plan: Pick<StoredPlan, "supportedToolsJson" | "integrationsJson" | "applicationCandidatesJson">): PlanAvailability | undefined {
+  return parsePlanAvailability(
+    plan.supportedToolsJson,
+    plan.integrationsJson,
+    plan.applicationCandidatesJson ?? "[]",
+  );
+}
+
+function rejectLegacyActions(actionsJson: string | undefined): void {
+  if (containsLegacyInsertTextJson(actionsJson)) {
+    throw new Error("legacy insertText plan must be invalidated before use");
+  }
+}
+
+async function expireStepApprovals(
+  ctx: MutationCtx,
+  planId: PlanId,
+): Promise<void> {
+  const approvals = await ctx.db
+    .query("actionStepApprovals")
+    .withIndex("by_plan_step", (q) => q.eq("planId", planId))
+    .collect();
+  const now = Date.now();
+  for (const approval of approvals) {
+    if (approval.consumedAt === undefined && approval.expiresAt > now) {
+      await ctx.db.patch(approval._id, { expiresAt: now, updatedAt: now });
+    }
   }
 }
 
@@ -136,8 +207,22 @@ export const createActionPlan = mutationGeneric({
   args: {
     deviceId: v.string(),
     command: v.string(),
+    contextRevision: v.optional(v.number()),
     locale: v.literal("en"),
     expiresAt: v.optional(v.number()),
+    supportedTools: v.optional(v.array(v.string())),
+    integrations: v.optional(v.array(v.string())),
+    applicationCandidates: v.optional(
+      v.array(
+        v.object({
+          bundleIdentifier: v.string(),
+          displayName: v.string(),
+          normalizedNames: v.array(v.string()),
+          supportedActions: v.array(v.string()),
+          integrations: v.array(v.string()),
+        }),
+      ),
+    ),
   },
   handler: async (ctx, args) => {
     const identity = await requireIdentity(ctx);
@@ -149,6 +234,35 @@ export const createActionPlan = mutationGeneric({
       .first();
     if (device === null || device.revokedAt !== undefined) throw new Error("device is not active");
     const command = requireCommand(args.command);
+    const supportedTools = parseAdvertisedList(args.supportedTools, "supportedTools", 3);
+    const integrations = parseAdvertisedList(args.integrations, "integrations", 32);
+    let applicationCandidatesJson: string | undefined;
+    if (args.applicationCandidates !== undefined) {
+      try {
+        applicationCandidatesJson = parseApplicationCandidates(args.applicationCandidates);
+      } catch (error) {
+        throw new Error(error instanceof Error ? error.message : "application candidates are invalid");
+      }
+    }
+    if (supportedTools !== undefined) {
+      try {
+        parsePlanAvailability(
+          JSON.stringify(supportedTools),
+          JSON.stringify(integrations ?? []),
+          applicationCandidatesJson,
+        );
+      } catch (error) {
+        throw new Error(error instanceof Error ? error.message : "plan availability is invalid");
+      }
+    } else if (integrations !== undefined) {
+      throw new Error("supportedTools is required when integrations are advertised");
+    }
+    if (
+      args.contextRevision !== undefined &&
+      (!Number.isInteger(args.contextRevision) || args.contextRevision < 0)
+    ) {
+      throw new Error("contextRevision must be a non-negative integer");
+    }
     const timestamp = Date.now();
     const expiresAt = args.expiresAt ?? timestamp + 10 * 60 * 1_000;
     if (!Number.isFinite(expiresAt) || expiresAt <= timestamp || expiresAt > timestamp + 60 * 60 * 1_000) {
@@ -179,7 +293,19 @@ export const createActionPlan = mutationGeneric({
       ownerKey: identity.tokenIdentifier,
       deviceId,
       command,
+      ...(args.contextRevision === undefined
+        ? {}
+        : { contextRevision: args.contextRevision }),
       locale: args.locale,
+      ...(supportedTools === undefined
+        ? {}
+        : { supportedToolsJson: JSON.stringify(supportedTools) }),
+      ...(integrations === undefined
+        ? {}
+        : { integrationsJson: JSON.stringify(integrations) }),
+      ...(applicationCandidatesJson === undefined
+        ? {}
+        : { applicationCandidatesJson }),
       status: "queued",
       cancellationGeneration: 0,
       expiresAt,
@@ -202,14 +328,26 @@ export const getActionPlan = queryGeneric({
       .filter((q) => q.eq(q.field("deviceId"), plan.deviceId))
       .first();
     if (device === null || device.revokedAt !== undefined) throw new Error("device has been revoked");
+    rejectLegacyActions(plan.actionsJson);
+    const availability = parsePlanAvailability(
+      plan.supportedToolsJson,
+      plan.integrationsJson,
+      plan.applicationCandidatesJson,
+    );
     return {
       id: String(plan._id),
       command: plan.command,
       locale: plan.locale,
       status: plan.status,
       explanation: plan.explanation ?? null,
-      actions: plan.actionsJson === undefined ? [] : parseActions(plan.actionsJson),
+      actions:
+        plan.actionsJson === undefined
+          ? []
+          : parseActions(plan.actionsJson, availability),
       capabilities: parseCapabilities(plan.capabilitiesJson),
+      supportedTools: availability?.supportedTools ?? [],
+      integrations: availability?.integrations ?? [],
+      applicationCandidates: availability?.applicationCandidates ?? [],
       fingerprint: plan.planFingerprint ?? null,
       expiresAt: plan.expiresAt,
       error: plan.errorCode ?? null,
@@ -235,6 +373,16 @@ export const resolveActionPlan = actionGeneric({
       throw new Error(`action plan is ${plan.status}`);
     }
     try {
+      const availability = parsePlanAvailability(
+        plan.supportedToolsJson,
+        plan.integrationsJson,
+        plan.applicationCandidatesJson ?? "[]",
+      );
+      const supportedTools = availability?.supportedTools.join(", ") ?? "none";
+      const integrations = availability?.integrations.join(", ") ?? "none";
+      const applicationCandidates = JSON.stringify(
+        availability?.applicationCandidates ?? [],
+      );
       // Voice classification belongs to the evaluated intent endpoint. This
       // explicit planning surface always returns a proposal for human review.
       const openai = createOpenAIClient({
@@ -244,15 +392,15 @@ export const resolveActionPlan = actionGeneric({
       const inputParts: Array<Record<string, unknown>> = [
         {
           type: "input_text",
-          text: `Locale: en\nCommand: ${plan.command}\nReturn only JSON with actions, explanation, and clarificationNeeded. Use only registered action kinds: openApplication, scroll, focus, select, press, insertText, openURL, attachFile, sendEmail. Never invent permissions or file paths.`,
+          text: `Locale: en\nCommand: ${plan.command}\nAdvertised tools: ${supportedTools}\nAdvertised integrations: ${integrations}\nAdvertised application candidates: ${applicationCandidates}\nReturn only JSON with actions, explanation, and clarificationNeeded. Use only registered action kinds: openApplication, scroll, focus, select, press, openURL, attachFile, sendEmail, draftMessage. Generic text entry belongs to the separate Dictation shortcut and is unsupported here. Never invent permissions, app bundle identifiers, or file paths. Every app target must exactly match an advertised application candidate bundleIdentifier and supportedActions entry.`,
         },
       ];
       const response = await openai.createResponse({
         input: [{ role: "user", content: inputParts }],
         instructions:
-          "You are a constrained planner. Model output is a proposal only. Return strict JSON: {actions:[{kind,targetBundleIdentifier,parameters}],explanation,clarificationNeeded}. Every desktop action requires its own targetBundleIdentifier, including scroll and insertText; repeat the selected app identifier on each step. Parameters: openApplication {}; scroll {lines: integer from -100 to 100, negative means down}; insertText {text: string, replaceSelection: true}; focus {role: string, label?: string}; select {label: string}; press {key: ArrowUp|ArrowDown|ArrowLeft|ArrowRight|PageUp|PageDown|Home|End|Tab|Escape|Enter|A|C|V, modifiers?: Shift|Command}; openURL {url: http(s) URL}; attachFile {fileId: existing approved ID}; sendEmail {recipient,subject,body}. Use 1 to 12 actions. Do not include executor, capability or requiresApproval; the server supplies them. Omit visualTarget unless supplied with verified current geometry. Never infer unknown file IDs or permissions. Do not include markdown.",
+          "You are a constrained planner. Model output is a proposal only. Return strict JSON: {actions:[{kind,targetBundleIdentifier,parameters}],explanation,clarificationNeeded}. Every desktop action requires its own targetBundleIdentifier; repeat the selected app identifier on each step. Parameters: openApplication {}; scroll {lines: integer from -100 to 100, negative means down}; focus {role: string, label?: string}; select {label: string}; press {key: ArrowUp|ArrowDown|ArrowLeft|ArrowRight|PageUp|PageDown|Home|End|Tab|Escape|Enter|A|C|V, modifiers?: Shift|Command}; openURL {targetBundleIdentifier: required advertised app, url}; attachFile {fileId: existing approved ID}; sendEmail {recipient,subject,body}; draftMessage {targetBundleIdentifier: required advertised app, recipient,subject,body} and never sends. An openURL target must advertise openURL and a matching structured integration; a draftMessage target must advertise draftMessage and requires user approval. Use only the advertised tools, application candidates, and integrations; do not invent an unavailable route. Generic text entry is unsupported because Dictation has its own shortcut. Use 1 to 12 actions. Do not include executor, capability or requiresApproval; the server supplies them. Omit visualTarget unless supplied with verified current geometry. Never infer unknown file IDs or permissions. Do not include markdown.",
       });
-      const normalized = parsePlannerText(response.outputText);
+      const normalized = parsePlannerText(response.outputText, availability);
       await ctx.runMutation(internalSavePlan, {
         planId: args.planId,
         cancellationGeneration: plan.cancellationGeneration,
@@ -297,7 +445,16 @@ export const approveActionPlan = mutationGeneric({
       .filter((q) => q.eq(q.field("deviceId"), plan.deviceId))
       .first();
     if (device === null || device.revokedAt !== undefined) throw new Error("device is not active");
-    const actions = plan.actionsJson === undefined ? [] : parseActions(plan.actionsJson);
+    rejectLegacyActions(plan.actionsJson);
+    const availability = parsePlanAvailability(
+      plan.supportedToolsJson,
+      plan.integrationsJson,
+      plan.applicationCandidatesJson,
+    );
+    const actions =
+      plan.actionsJson === undefined
+        ? []
+        : parseActions(plan.actionsJson, availability);
     const grants = await ctx.db
       .query("grants")
       .withIndex("by_owner_device", (q) => q.eq("ownerKey", identity.tokenIdentifier))
@@ -330,6 +487,7 @@ export const cancelActionPlan = mutationGeneric({
       throw new Error(`action plan cannot be cancelled while ${plan.status}`);
     }
     const status = plan.executingStep !== undefined || plan.status === "uncertain" ? "uncertain" : "cancelled";
+    await expireStepApprovals(ctx, args.planId);
     await ctx.db.patch(args.planId, {
       status,
       cancellationGeneration: plan.cancellationGeneration + 1,
@@ -413,12 +571,17 @@ export const savePlan = internalMutationGeneric({
           };
         })
       : actions;
-    const normalized = normalizeModelPlan({
-      actions: rawActions,
-      explanation: args.explanation,
-      clarificationNeeded: args.clarificationNeeded,
-    });
+    const availability = planningAvailability(plan);
+    const normalized = normalizeModelPlan(
+      {
+        actions: rawActions,
+        explanation: args.explanation,
+        clarificationNeeded: args.clarificationNeeded,
+      },
+      availability,
+    );
     if (normalized.fingerprint !== args.fingerprint) throw new Error("planner fingerprint mismatch");
+    await expireStepApprovals(ctx, args.planId);
     await ctx.db.patch(args.planId, {
       status: "awaiting_approval",
       explanation: normalized.explanation,
