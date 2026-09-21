@@ -233,8 +233,8 @@ private struct VoiceSettingsView: View {
             }
 
             settingsPanel {
-                Button(L10n.text("Install selected language model")) { model.installSpeechLanguage() }
-                Text(L10n.text("Speech stays on this Mac. A one-time model download may be needed."))
+                Button(L10n.text("Download English speech model")) { model.installSpeechLanguage() }
+                Text(L10n.text("Uses Apple’s on-device English speech recognition (SpeechTranscriber). Download the speech model once with an internet connection; transcription then runs on this Mac."))
                     .font(.caption).foregroundStyle(PaperStyle.muted)
                 SettingRow(
                     title: "Microphone",

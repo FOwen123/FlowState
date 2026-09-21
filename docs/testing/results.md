@@ -146,3 +146,10 @@ A rapid-toggle regression now prevents restarting while the prior final result i
 The landing hero follows Paper’s “14 · Hero motion / Woodland blur”: woodland imagery, centered English product copy and a compact illustrative voice strip. The background does not intercept input and its pan animation stops under Reduce Motion. The disabled download still states that a release is pending.
 
 Checks passed: 26 web component tests, TypeScript checking, formatting, and three Chromium browser checks covering desktop/mobile layout, workspace entry, privacy focus/Escape and reduced motion. A new viewport-position assertion reproduced a Privacy dialog regression caused by the background stacking selector; excluding the dialog restored its fixed positioning. Desktop and mobile screenshots were reviewed. No development server, release build or deployment was performed.
+
+### Minimal listening bar and speech setup — September 21, 2026
+
+- Replaced the floating bar's app-name/transcript header with a 140 × 56 waveform and Stop strip while listening. Recovery and confirmation details still expand; transcripts remain available in Voice settings and expanded feedback.
+- Voice settings and missing-model feedback now identify Apple's on-device English SpeechTranscriber assets and the Download English speech model button. Jev is not the transcription engine.
+- Observed the compact-layout tests fail before implementation, then all 111 Core, 9 Cloud, and 36 App tests pass with Swift compilation. Stable-signed debug app repackaged and relaunched; live menu → Settings check passed. Signature verification passed.
+- No model download or new audio-recognition check was performed. Waveform animation indicates listening, not measured microphone amplitude.

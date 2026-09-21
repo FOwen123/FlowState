@@ -108,12 +108,7 @@ struct VoiceHUDView: View {
                 VoiceHUDWaveform(isListening: model.isListening)
                     .frame(width: 48, height: 26)
                     .accessibilityLabel(model.isListening ? "Listening" : "Processing")
-                Text(model.transcript.isEmpty ? (model.isListening ? "Listening…" : "Flow State") : model.transcript)
-                    .font(.custom("Helvetica Neue", size: 15))
-                    .foregroundStyle(.white)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel("Latest transcript")
+                Spacer(minLength: 0)
                 Button(action: model.onStop) {
                     Image(systemName: "stop.fill")
                         .font(.system(size: 10, weight: .semibold))
@@ -133,6 +128,11 @@ struct VoiceHUDView: View {
 
             if showsDetails {
                 VStack(alignment: .leading, spacing: 12) {
+                    if !model.transcript.isEmpty {
+                        Text(model.transcript)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityLabel("Latest transcript")
+                    }
                     Text(L10n.text(model.status))
                         .font(.custom("Helvetica Neue", size: 14))
                         .foregroundStyle(.white)
@@ -156,7 +156,7 @@ struct VoiceHUDView: View {
                 .padding(.bottom, 16)
             }
         }
-        .frame(width: 360)
+        .frame(width: showsDetails ? 360 : 140)
         .glassEffect(reduceTransparency ? .identity : .regular.tint(PaperStyle.hud),
                      in: .rect(cornerRadius: showsDetails ? 20 : 28))
         .background {

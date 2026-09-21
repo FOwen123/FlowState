@@ -11,26 +11,26 @@ import Testing
     #expect(view.fittingSize.height > 156)
 }
 
-@Test("ordinary listening uses the compact Paper transcript strip")
+@Test("ordinary listening uses a minimal waveform strip")
 @MainActor func listeningUsesCompactStrip() {
     let model = VoiceHUDModel()
     model.isListening = true
     model.status = "Listening — say a command or press Stop"
     model.transcript = "Open Brave."
     let view = NSHostingView(rootView: VoiceHUDView(model: model))
-    #expect(abs(view.fittingSize.width - 360) < 1)
+    #expect(abs(view.fittingSize.width - 140) < 1)
     #expect(abs(view.fittingSize.height - 56) < 1)
 }
 
-@Test("long transcripts expand instead of hiding recognized words")
+@Test("listening stays minimal even with a long transcript")
 @MainActor func longTranscriptRemainsReadable() {
     let model = VoiceHUDModel()
     model.isListening = true
     model.status = "Listening — say a command or press Stop"
     model.transcript = String(repeating: "A sentence that should stay readable. ", count: 8)
     let view = NSHostingView(rootView: VoiceHUDView(model: model))
-    #expect(view.fittingSize.height > 100)
-    #expect(abs(view.fittingSize.width - 360) < 1)
+    #expect(abs(view.fittingSize.height - 56) < 1)
+    #expect(abs(view.fittingSize.width - 140) < 1)
 }
 
 @Test("the session menu stays a compact native list")

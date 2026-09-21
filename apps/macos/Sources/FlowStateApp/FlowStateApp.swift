@@ -641,11 +641,11 @@ final class FlowStateAppModel: ObservableObject {
     }
 
     func installSpeechLanguage() {
-        voiceStatus = "Installing on-device language model…"
+        voiceStatus = "Downloading Apple’s English speech model…"
         let language = speechSettings.language
         Task {
-            do { try await AnalyzerSpeechCapture.installLanguage(language); voiceStatus = "Language model ready" }
-            catch { voiceStatus = "Could not install language model. Check your connection." }
+            do { try await AnalyzerSpeechCapture.installLanguage(language); voiceStatus = "English speech model ready" }
+            catch { voiceStatus = "Could not download the English speech model. Check your internet connection and try again." }
         }
     }
 
