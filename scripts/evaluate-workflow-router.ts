@@ -86,7 +86,7 @@ const ROUTER_POLICY_CANDIDATES = [
 ] as const;
 
 const BASELINE_INSTRUCTIONS =
-  "Classify only the downstream role for a completed English voice-control utterance. Return exactly one JSON object with one key: {\"route\":\"direct_action\"} or {\"route\":\"workflow\"}. Use direct_action only for exactly one clear, complete, bounded local action. Use workflow for compounds, sequencing, negation, corrections, follow-ups, unresolved references, generated content, external requests, unsupported workflows, or uncertainty. Do not extract arguments or execute anything.";
+  'Classify only the downstream role for a completed English voice-control utterance. Return exactly one JSON object with one key: {"route":"direct_action"} or {"route":"workflow"}. Use direct_action only for exactly one clear, complete, bounded local action. Use workflow for compounds, sequencing, negation, corrections, follow-ups, unresolved references, generated content, external requests, unsupported workflows, or uncertainty. Do not extract arguments or execute anything.';
 
 function parseArgs(argv: string[]): Map<string, string> {
   const result = new Map<string, string>();
@@ -94,14 +94,19 @@ function parseArgs(argv: string[]): Map<string, string> {
     const raw = argv[index];
     if (!raw?.startsWith("--")) throw new Error("unexpected argument");
     const value = argv[index + 1];
-    if (!value || value.startsWith("--")) throw new Error(`${raw} requires a value`);
+    if (!value || value.startsWith("--"))
+      throw new Error(`${raw} requires a value`);
     result.set(raw.slice(2), value);
     index += 1;
   }
   return result;
 }
 
-function positiveBounded(args: Map<string, string>, key: string, fallback: number): number {
+function positiveBounded(
+  args: Map<string, string>,
+  key: string,
+  fallback: number,
+): number {
   const raw = args.get(key);
   if (raw === undefined) return fallback;
   const value = Number(raw);
@@ -116,9 +121,12 @@ function hash(value: string): number {
   return createHash("sha256").update(value).digest().readUInt32BE(0);
 }
 
-function splitFixture(fixture: Fixture, seed: number): Record<Split, Scenario[]> {
-  const groups = [...fixture.groups].sort((a, b) =>
-    hash(`${seed}:${a.id}`) - hash(`${seed}:${b.id}`),
+function splitFixture(
+  fixture: Fixture,
+  seed: number,
+): Record<Split, Scenario[]> {
+  const groups = [...fixture.groups].sort(
+    (a, b) => hash(`${seed}:${a.id}`) - hash(`${seed}:${b.id}`),
   );
   const developmentCount = Math.max(1, Math.floor(groups.length * 0.5));
   const calibrationCount = Math.max(1, Math.floor(groups.length * 0.25));
@@ -169,14 +177,18 @@ async function loadEnv(): Promise<void> {
   }
 }
 
-function boundedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+function boundedFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
   return fetch(input, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
 }
 
 function parseUsage(value: Record<string, number> | undefined): Usage {
   const inputTokens = value?.input_tokens;
   const outputTokens = value?.output_tokens;
-  const totalTokens = value?.total_tokens ??
+  const totalTokens =
+    value?.total_tokens ??
     (typeof inputTokens === "number" && typeof outputTokens === "number"
       ? inputTokens + outputTokens
       : undefined);
@@ -233,14 +245,24 @@ async function requestJev(input: {
   baseUrl: string;
   state: Record<string, unknown>;
   question: Record<string, unknown>;
-}): Promise<ProviderResult<{ response: ReturnType<typeof parseStrictTypeSafeResponse> }>> {
+}): Promise<
+  ProviderResult<{ response: ReturnType<typeof parseStrictTypeSafeResponse> }>
+> {
   const result = await requestProvider(
     "typesafe",
     `${input.baseUrl.replace(/\/$/, "")}/systemone`,
     input.apiKey,
-    { state: input.state, model: input.model, questions: { route: input.question } },
+    {
+      state: input.state,
+      model: input.model,
+      questions: { route: input.question },
+    },
   );
-  const response = result.value as { model?: unknown; answers?: unknown; usage?: unknown };
+  const response = result.value as {
+    model?: unknown;
+    answers?: unknown;
+    usage?: unknown;
+  };
   const usageRecord =
     typeof response.usage === "object" && response.usage !== null
       ? Object.fromEntries(
@@ -250,7 +272,11 @@ async function requestJev(input: {
         )
       : undefined;
   return {
-    value: { response: parseStrictTypeSafeResponse(result.value, { route: { choices: WORKFLOW_ROUTER_ROUTES } }) },
+    value: {
+      response: parseStrictTypeSafeResponse(result.value, {
+        route: { choices: WORKFLOW_ROUTER_ROUTES },
+      }),
+    },
     latencyMs: result.latencyMs,
     usage: parseUsage(usageRecord),
   };
@@ -330,14 +356,17 @@ function parseBaselineText(response: {
   output?: unknown;
 }): string {
   if (typeof response.output_text === "string") return response.output_text;
-  if (!Array.isArray(response.output)) throw new Error("baseline_missing_output");
+  if (!Array.isArray(response.output))
+    throw new Error("baseline_missing_output");
   const chunks: string[] = [];
   for (const item of response.output) {
-    if (typeof item !== "object" || item === null || !("content" in item)) continue;
+    if (typeof item !== "object" || item === null || !("content" in item))
+      continue;
     const content = (item as { content?: unknown }).content;
     if (!Array.isArray(content)) continue;
     for (const part of content) {
-      if (typeof part !== "object" || part === null || !("text" in part)) continue;
+      if (typeof part !== "object" || part === null || !("text" in part))
+        continue;
       const text = (part as { text?: unknown }).text;
       if (typeof text === "string") chunks.push(text);
     }
@@ -347,7 +376,10 @@ function parseBaselineText(response: {
 }
 
 function routePolicy(
-  thresholds: { minSelectedProbability: number; minTopTwoMargin: number } | null,
+  thresholds: {
+    minSelectedProbability: number;
+    minTopTwoMargin: number;
+  } | null,
 ): WorkflowRouterPolicy {
   if (thresholds === null) return DEFAULT_WORKFLOW_ROUTER_POLICY;
   return {
@@ -363,7 +395,9 @@ function metricRows(rows: EvaluationRow[], policy: WorkflowRouterPolicy) {
     (row) => row.baseline?.route === row.expectedRoute,
   ).length;
   const baselineHarmful = baselinePredictions.filter(
-    (row) => row.expectedRoute === "workflow" && row.baseline?.route === "direct_action",
+    (row) =>
+      row.expectedRoute === "workflow" &&
+      row.baseline?.route === "direct_action",
   ).length;
   const jevPredictions = rows.filter((row) => row.jev !== undefined);
   const jevDecisions = jevPredictions.map((row) => ({
@@ -378,9 +412,13 @@ function metricRows(rows: EvaluationRow[], policy: WorkflowRouterPolicy) {
   ).length;
   const harmfulAcceptedWrongRoute = jevDecisions.filter(
     ({ row, decision }) =>
-      row.harmfulIfDirectAction && decision.accepted && decision.route === "direct_action",
+      row.harmfulIfDirectAction &&
+      decision.accepted &&
+      decision.route === "direct_action",
   ).length;
-  const directExpected = rows.filter((row) => row.expectedRoute === "direct_action").length;
+  const directExpected = rows.filter(
+    (row) => row.expectedRoute === "direct_action",
+  ).length;
   const latency = (values: number[]) => {
     const sorted = [...values].sort((a, b) => a - b);
     if (sorted.length === 0) return { p50: null, p95: null, samples: 0 };
@@ -390,8 +428,14 @@ function metricRows(rows: EvaluationRow[], policy: WorkflowRouterPolicy) {
       samples: sorted.length,
     };
   };
-  const baselineLatency = latency(rows.map((row) => row.baselineAttempt?.latencyMs ?? 0).filter((value) => value > 0));
-  const jevLatency = latency(jevPredictions.map((row) => row.jev?.latencyMs ?? 0));
+  const baselineLatency = latency(
+    rows
+      .map((row) => row.baselineAttempt?.latencyMs ?? 0)
+      .filter((value) => value > 0),
+  );
+  const jevLatency = latency(
+    jevPredictions.map((row) => row.jev?.latencyMs ?? 0),
+  );
   const jevRawCorrect = jevPredictions.filter(
     (row) => row.jev?.answer.choice === row.expectedRoute,
   ).length;
@@ -399,27 +443,42 @@ function metricRows(rows: EvaluationRow[], policy: WorkflowRouterPolicy) {
     samples: rows.length,
     baseline: {
       predictions: baselinePredictions.length,
-      contractValidity: rows.length === 0 ? null : baselinePredictions.length / rows.length,
-      routeCorrectness: rows.length === 0 ? null : baselineCorrect / rows.length,
+      contractValidity:
+        rows.length === 0 ? null : baselinePredictions.length / rows.length,
+      routeCorrectness:
+        rows.length === 0 ? null : baselineCorrect / rows.length,
       harmfulWrongDirectAction: baselineHarmful,
       latencyMs: baselineLatency,
-      tokens: rows.reduce((sum, row) => sum + (row.baselineAttempt?.usage.totalTokens ?? 0), 0),
+      tokens: rows.reduce(
+        (sum, row) => sum + (row.baselineAttempt?.usage.totalTokens ?? 0),
+        0,
+      ),
     },
     jev: {
       predictions: jevPredictions.length,
-      contractValidity: rows.length === 0 ? null : jevPredictions.length / rows.length,
+      contractValidity:
+        rows.length === 0 ? null : jevPredictions.length / rows.length,
       routeCorrectness: rows.length === 0 ? null : jevCorrect / rows.length,
-      rawChoiceCorrectness: rows.length === 0 ? null : jevRawCorrect / rows.length,
+      rawChoiceCorrectness:
+        rows.length === 0 ? null : jevRawCorrect / rows.length,
       harmfulAcceptedWrongRoute,
-      directActionCoverage: directExpected === 0
-        ? null
-        : jevDecisions.filter(
-            ({ row, decision }) => row.expectedRoute === "direct_action" && decision.accepted,
-          ).length / directExpected,
+      directActionCoverage:
+        directExpected === 0
+          ? null
+          : jevDecisions.filter(
+              ({ row, decision }) =>
+                row.expectedRoute === "direct_action" && decision.accepted,
+            ).length / directExpected,
       latencyMs: jevLatency,
-      tokens: jevPredictions.reduce((sum, row) => sum + (row.jev?.usage.totalTokens ?? 0), 0),
+      tokens: jevPredictions.reduce(
+        (sum, row) => sum + (row.jev?.usage.totalTokens ?? 0),
+        0,
+      ),
       costUSD: jevPredictions.reduce(
-        (sum, row) => sum + ((row.jev?.usage.inputTokens ?? 0) / 1_000_000) * TYPESAFE_INPUT_USD_PER_MILLION,
+        (sum, row) =>
+          sum +
+          ((row.jev?.usage.inputTokens ?? 0) / 1_000_000) *
+            TYPESAFE_INPUT_USD_PER_MILLION,
         0,
       ),
     },
@@ -427,23 +486,30 @@ function metricRows(rows: EvaluationRow[], policy: WorkflowRouterPolicy) {
 }
 
 function chooseCalibrationPolicy(rows: EvaluationRow[]): {
-  thresholds: { minSelectedProbability: number; minTopTwoMargin: number } | null;
+  thresholds: {
+    minSelectedProbability: number;
+    minTopTwoMargin: number;
+  } | null;
   calibration: ReturnType<typeof metricRows>;
 } {
   const baseline = metricRows(rows, DEFAULT_WORKFLOW_ROUTER_POLICY).baseline;
   const candidates = ROUTER_POLICY_CANDIDATES.map((thresholds) => ({
     thresholds,
     metrics: metricRows(rows, routePolicy(thresholds)),
-  })).filter(({ metrics }) =>
-    metrics.jev.harmfulAcceptedWrongRoute === 0 &&
-    metrics.jev.contractValidity === 1 &&
-    (metrics.jev.routeCorrectness ?? -1) >= (baseline.routeCorrectness ?? -1),
+  })).filter(
+    ({ metrics }) =>
+      metrics.jev.harmfulAcceptedWrongRoute === 0 &&
+      metrics.jev.contractValidity === 1 &&
+      (metrics.jev.routeCorrectness ?? -1) >= (baseline.routeCorrectness ?? -1),
   );
   const selected = candidates.sort((a, b) => {
-    const coverage = (b.metrics.jev.directActionCoverage ?? 0) - (a.metrics.jev.directActionCoverage ?? 0);
+    const coverage =
+      (b.metrics.jev.directActionCoverage ?? 0) -
+      (a.metrics.jev.directActionCoverage ?? 0);
     if (coverage !== 0) return coverage;
     return (
-      a.thresholds.minSelectedProbability + a.thresholds.minTopTwoMargin -
+      a.thresholds.minSelectedProbability +
+      a.thresholds.minTopTwoMargin -
       (b.thresholds.minSelectedProbability + b.thresholds.minTopTwoMargin)
     );
   })[0];
@@ -453,7 +519,10 @@ function chooseCalibrationPolicy(rows: EvaluationRow[]): {
   };
 }
 
-function deterministicReport(fixture: Fixture, splits: Record<Split, Scenario[]>) {
+function deterministicReport(
+  fixture: Fixture,
+  splits: Record<Split, Scenario[]>,
+) {
   return {
     schemaVersion: 1,
     mode: "deterministic",
@@ -464,12 +533,18 @@ function deterministicReport(fixture: Fixture, splits: Record<Split, Scenario[]>
       policyVersion: fixture.policyVersion,
       sha256: fixtureHash(fixture),
       groups: fixture.groups.length,
-      scenarios: fixture.groups.reduce((sum, group) => sum + group.scenarios.length, 0),
+      scenarios: fixture.groups.reduce(
+        (sum, group) => sum + group.scenarios.length,
+        0,
+      ),
     },
     promptVersions: { jev: PROMPT_VERSION, baseline: BASELINE_PROMPT_VERSION },
     seed: SEED,
     splitCounts: Object.fromEntries(
-      Object.entries(splits).map(([split, scenarios]) => [split, scenarios.length]),
+      Object.entries(splits).map(([split, scenarios]) => [
+        split,
+        scenarios.length,
+      ]),
     ),
     policy: { status: "disabled", thresholds: null },
     gates: { accepted: false, reason: "live_comparison_required" },
@@ -552,18 +627,32 @@ async function liveReport(
       note: "No provider call was attempted; secrets and model names are never included in this report.",
     };
   }
-  const calibration = splits.calibration.map((scenario) => ({ ...scenario, split: "calibration" as const }));
-  const holdout = splits.holdout.map((scenario) => ({ ...scenario, split: "holdout" as const }));
-  const calibrationLimit = Math.min(calibration.length, Math.ceil(maxCases / 2));
+  const calibration = splits.calibration.map((scenario) => ({
+    ...scenario,
+    split: "calibration" as const,
+  }));
+  const holdout = splits.holdout.map((scenario) => ({
+    ...scenario,
+    split: "holdout" as const,
+  }));
+  const calibrationLimit = Math.min(
+    calibration.length,
+    Math.ceil(maxCases / 2),
+  );
   const selectedCases: ScenarioWithSplit[] = [
     ...calibration.slice(0, calibrationLimit),
     ...holdout.slice(0, maxCases - calibrationLimit),
   ];
   const budget = new Budget(maxCalls, maxTokens);
-  const jevBaseUrl = process.env.TYPESAFE_BASE_URL ?? "https://api.typesafe.ai/v1";
-  const baselineBaseUrl = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
+  const jevBaseUrl =
+    process.env.TYPESAFE_BASE_URL ?? "https://api.typesafe.ai/v1";
+  const baselineBaseUrl =
+    process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
   const rows: EvaluationRow[] = [];
-  let frozenThresholds: { minSelectedProbability: number; minTopTwoMargin: number } | null = null;
+  let frozenThresholds: {
+    minSelectedProbability: number;
+    minTopTwoMargin: number;
+  } | null = null;
   for (const scenario of selectedCases) {
     if (budget.stoppedReason !== null) break;
     const row: EvaluationRow = {
@@ -588,7 +677,10 @@ async function liveReport(
         state: request.state,
       });
       budget.finishCall(response.usage);
-      row.baselineAttempt = { latencyMs: response.latencyMs, usage: response.usage };
+      row.baselineAttempt = {
+        latencyMs: response.latencyMs,
+        usage: response.usage,
+      };
       try {
         row.baseline = {
           route: parseBaselineRoute(response.value.outputText),
@@ -598,7 +690,10 @@ async function liveReport(
         };
       } catch (error) {
         row.errors.push(
-          (error instanceof Error ? error.message : "baseline_invalid_output").slice(0, 64),
+          (error instanceof Error
+            ? error.message
+            : "baseline_invalid_output"
+          ).slice(0, 64),
         );
       }
     } catch (error) {
@@ -638,12 +733,19 @@ async function liveReport(
         if (budget.stoppedReason !== null) break;
       }
     }
-    if (scenario.split === "calibration" && selectedCases.indexOf(scenario) === calibrationLimit - 1) {
-      frozenThresholds = chooseCalibrationPolicy(rows.filter((item) => item.split === "calibration")).thresholds;
+    if (
+      scenario.split === "calibration" &&
+      selectedCases.indexOf(scenario) === calibrationLimit - 1
+    ) {
+      frozenThresholds = chooseCalibrationPolicy(
+        rows.filter((item) => item.split === "calibration"),
+      ).thresholds;
     }
   }
   if (frozenThresholds === null) {
-    frozenThresholds = chooseCalibrationPolicy(rows.filter((item) => item.split === "calibration")).thresholds;
+    frozenThresholds = chooseCalibrationPolicy(
+      rows.filter((item) => item.split === "calibration"),
+    ).thresholds;
   }
   const policy = routePolicy(frozenThresholds);
   const calibrationRows = rows.filter((row) => row.split === "calibration");
@@ -653,16 +755,20 @@ async function liveReport(
   const jevP95 = holdoutMetrics.jev.latencyMs.p95;
   const baselineP95 = holdoutMetrics.baseline.latencyMs.p95;
   const gates = {
-    completeEvaluation: rows.length === selectedCases.length && budget.stoppedReason === null,
+    completeEvaluation:
+      rows.length === selectedCases.length && budget.stoppedReason === null,
     directExecutionValidated: false,
     contractValidity: holdoutMetrics.jev.contractValidity === 1,
     correctnessAtLeastBaseline:
       holdoutMetrics.jev.routeCorrectness !== null &&
       holdoutMetrics.baseline.routeCorrectness !== null &&
-      holdoutMetrics.jev.routeCorrectness >= holdoutMetrics.baseline.routeCorrectness,
-    noHarmfulAcceptedWrongRoute: holdoutMetrics.jev.harmfulAcceptedWrongRoute === 0,
+      holdoutMetrics.jev.routeCorrectness >=
+        holdoutMetrics.baseline.routeCorrectness,
+    noHarmfulAcceptedWrongRoute:
+      holdoutMetrics.jev.harmfulAcceptedWrongRoute === 0,
     coverageMeasured: holdoutMetrics.jev.directActionCoverage !== null,
-    classifierP95Faster: jevP95 !== null && baselineP95 !== null && jevP95 < baselineP95,
+    classifierP95Faster:
+      jevP95 !== null && baselineP95 !== null && jevP95 < baselineP95,
     endToEndSavingsEstablished: false,
   };
   const accepted = Object.values(gates).every(Boolean);
@@ -679,7 +785,10 @@ async function liveReport(
     models: { jev: jevModel, baseline: baselineModel },
     seed: SEED,
     splitCounts: Object.fromEntries(
-      Object.entries(splits).map(([split, scenarios]) => [split, scenarios.length]),
+      Object.entries(splits).map(([split, scenarios]) => [
+        split,
+        scenarios.length,
+      ]),
     ),
     evaluatedCases: rows.length,
     splitRows: {
@@ -721,11 +830,15 @@ async function main(): Promise<void> {
   const fixture = JSON.parse(await readFile(FIXTURE_PATH, "utf8")) as Fixture;
   const splits = splitFixture(fixture, SEED);
   if (mode === "deterministic") {
-    process.stdout.write(`${JSON.stringify(deterministicReport(fixture, splits), null, 2)}\n`);
+    process.stdout.write(
+      `${JSON.stringify(deterministicReport(fixture, splits), null, 2)}\n`,
+    );
     return;
   }
   if (mode !== "live") throw new Error("--mode must be deterministic or live");
-  process.stdout.write(`${JSON.stringify(await liveReport(fixture, splits, args), null, 2)}\n`);
+  process.stdout.write(
+    `${JSON.stringify(await liveReport(fixture, splits, args), null, 2)}\n`,
+  );
 }
 
 try {
