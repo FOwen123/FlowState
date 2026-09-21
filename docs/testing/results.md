@@ -158,6 +158,8 @@ Checks passed: 26 web component tests, TypeScript checking, formatting, and thre
 
 Branch: local `main`. No push, production deployment, or message send was performed.
 
+The single divergent `origin/main` rename-only history was reconciled with a local `ours` merge after the reviewed feature commits, preserving both the FlowState tree and the concurrent speech-finalization work.
+
 - FlowState now exposes two independently configurable hold-only shortcuts. Dictation locks the focused non-secure editable field at key-down and never enters control routing. Mac Control cannot emit generic text insertion and directs `type`, `write`, and `dictate` requests to the Dictation shortcut.
 - Speech recognition uses Apple's on-device English `SpeechTranscriber`. Spoken assistant output uses `AVSpeechSynthesizer` with the selected installed English macOS voice; no cloud TTS model is used. Automated policy checks cover completion timing, mute/replay, and redaction, but an automated test cannot establish perceived audio quality.
 - The installed-app registry includes closed apps, deterministic aliases, explicit capabilities, and ambiguity handling. A live failure showed that “Open Brave” did not derive the “Brave” alias from “Brave Browser”; a failing regression preceded the generic-suffix alias fix. The opt-in synthetic Brave test then passed opening Brave plus verified down/up scrolling.

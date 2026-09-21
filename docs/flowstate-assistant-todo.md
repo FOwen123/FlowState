@@ -39,7 +39,7 @@ TODO:
 - [x] Replace Auto/Dictation/Commands mode selection, toggle, and wake-phrase scope with the two hold-only shortcut contract.
 - [x] Replace "physical input pauses" with this rule: unrelated input may continue; every step reobserves; target divergence replans or clarifies; **X** is the authoritative user cancellation path.
 - [x] Document spoken assistant output, task-scoped conversation, separate histories, clipboard insertion, and control-mode text prohibition.
-- [ ] Reconcile `main` with `origin/main` and the concurrent uncommitted speech-finalization changes before implementation. Preserve user work.
+- [x] Reconcile `main` with `origin/main` and the concurrent uncommitted speech-finalization changes before implementation. Preserve user work.
 - [x] Capture the pre-change green baseline with `pnpm test`, `pnpm typecheck`, and `swift test --package-path apps/macos`.
 
 Exit: the authority documents describe one consistent product, and baseline failures are recorded before feature changes.
