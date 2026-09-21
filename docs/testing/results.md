@@ -183,3 +183,14 @@ Final automated evidence after integration:
 | Opt-in desktop smoke | Disposable TextEdit fixture passed; synthetic local Brave page passed open plus both scroll directions |
 
 Authenticated cloud planning, real Gmail account selection, visual-computer-use routing, file attachment, and sending remain unavailable or unverified and are not advertised as supported. Jev stages that missed correctness or latency gates remain disabled rather than being counted as shipped capabilities.
+
+### Settings and provider check — September 22, 2026
+
+- Sidebar regrouped as General, Models, History, Memory, Permissions, Account; Gmail entry removed. Mail control remains available through the existing desktop workflow.
+- General puts Mac Control first. Start already used the control purpose; it is now explicitly labeled Start Mac Control. Verified saved shortcuts on this Mac: Control–Shift–Space for control, Option–Space for dictation. No user shortcuts were overwritten.
+- Plain button surfaces replace interactive glass in settings; disabled controls are visibly dimmed. Live Accessibility actions opened all six sections, and the Gmail sidebar entry was absent.
+- A live request through `createFirecrawlClient().scrape("https://example.com")` succeeded and returned 167 characters including Example Domain. No provider key or private page content was logged. Provider/boundary tests: 17 passed; TypeScript typecheck passed. This checks the configured local credential and adapter, not authenticated production end-to-end research.
+- Before account changes, live Sign in AXPress opened the configured hosted account domain in Brave. Completing user authentication and validating the resulting authenticated backend session require the user's login; that has not been claimed as verified.
+
+- Sign in now disables only during an active sign-in attempt, rather than background account hydration. A physical mouse click near the button padding showed the browser sign-in guidance. Full account authentication remains awaiting the user’s browser login.
+- Final native suite passed (132 Core, 19 Cloud, 82 App tests, including opt-in tests skipped in the ordinary run). Independent review found no blocking issues; concise browser guidance appears during login instead of a permanent explanatory paragraph.

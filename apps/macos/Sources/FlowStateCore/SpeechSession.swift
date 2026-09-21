@@ -269,7 +269,7 @@ public enum SpeechCaptureError: Error, Equatable, LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .modelNotInstalled: "Download Apple’s English speech model in Voice & activation → Download English speech model."
+        case .modelNotInstalled: "Download Apple’s English speech model in Models → Download English speech model."
         case .unavailable: "Speech recognition is unavailable for this language on this Mac."
         case .speechPermissionDenied: "Speech Recognition permission is required."
         case .microphonePermissionDenied: "Microphone permission is required."

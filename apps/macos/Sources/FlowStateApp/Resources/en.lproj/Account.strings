@@ -1,23 +1,15 @@
 "account.title" = "Account";
-"account.subtitle" = "Connect Flow State to public research and reviewed email.";
 "account.unavailable.title" = "Account services unavailable";
 "account.unavailable.message" = "Account services are unavailable in this version. Check for an update.";
 "account.retry" = "Retry";
-"account.signed_out.title" = "Sign in to Flow State";
-"account.signed_out.subtitle" = "Use your Flow State account to continue with public research and reviewed email.";
-"account.benefit.research.title" = "Public research with sources";
-"account.benefit.research.detail" = "Gather current public information and keep the sources with your notes.";
-"account.benefit.email.title" = "Review email before sending";
-"account.benefit.email.detail" = "Prepare an assistant inbox email, inspect it, and choose whether to send it.";
-"account.browser_reassurance" = "Sign-in opens in your browser. Your password stays there, and Flow State never asks you to enter it here.";
-"account.sign_in" = "Sign in to Flow State";
-"account.signing_in" = "Opening sign-in…";
+"account.sign_in" = "Sign in";
+"account.signing_in" = "Signing in…";
 "account.connected" = "Connected";
 "account.sign_out" = "Sign out";
-"account.connected.subtitle" = "Your account is connected. Review plans and research results here.";
+"account.connected.subtitle" = "Signed in.";
 "account.managed.title" = "Voice plans";
-"account.managed.description" = "Turn an unfamiliar voice request into a plan you can review before anything runs.";
-"account.managed.toggle" = "Prepare plans for unfamiliar voice requests";
+"account.managed.description" = "Review and run a task.";
+"account.managed.toggle" = "Use AI for commands";
 "account.managed.command.placeholder" = "Describe what Flow State should do";
 "account.managed.prepare" = "Prepare plan";
 "account.managed.preparing" = "Preparing…";
@@ -27,8 +19,8 @@
 "account.plan.action" = "Plan action %d: %@";
 "account.language.label" = "Answer language";
 "account.language.english" = "English";
-"account.research.title" = "Public research";
-"account.research.placeholder" = "Research a public topic";
+"account.research.title" = "Research";
+"account.research.placeholder" = "What would you like to research?";
 "account.research.action" = "Research";
 "account.research.cancel" = "Cancel research";
 "account.research.status" = "Status: %@";
@@ -41,7 +33,7 @@
 "account.mail.sender_note" = "This email will be sent from your Flow State assistant inbox, not your personal mailbox.";
 "account.mail.send" = "Confirm send";
 "account.mail.cancel" = "Cancel";
-"account.status.researching" = "Researching public sources…";
+"account.status.researching" = "Researching…";
 "account.status.research_ready" = "Research is ready.";
 "account.status.research_stopped" = "Research stopped. Check your connection and sign-in.";
 "account.status.signin_required" = "Sign in to use this feature.";
@@ -89,3 +81,5 @@
 "mail.error.url_too_long" = "This draft is too long to open safely.";
 "mail.error.compose_url" = "Could not prepare the Gmail draft safely.";
 "mail.error.generic" = "Could not prepare the draft. Review the fields and try again.";
+
+"account.browser_wait" = "Finish signing in in your browser.";

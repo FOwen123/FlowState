@@ -5,10 +5,7 @@ import Testing
 
 @Test("settings navigation follows the Paper screen order")
 func settingsNavigationFollowsPaperOrder() {
-    #expect(FlowStateSettingsSection.allCases == [.voice, .cloud, .personalMail, .tasks, .memory, .permissions])
-    #expect(FlowStateSettingsSection.voice.title == "Voice & activation")
-    #expect(FlowStateSettingsSection.cloud.title == "Account")
-    #expect(FlowStateSettingsSection.personalMail.title == "Gmail in Brave")
+    #expect(FlowStateSettingsSection.allCases.map(\.title) == ["General", "Models", "History", "Memory", "Permissions", "Account"])
 }
 
 @Test("personal mail keeps a readable message editor")

@@ -13,7 +13,7 @@ import Testing
     #expect(settings.language == .english)
     #expect(defaults.string(forKey: InterfaceLanguage.defaultsKey) == "en")
     #expect(defaults.string(forKey: "draft") == "你好 — draft")
-    #expect(L10n.text("account.signed_out.title", table: "Account") == "Sign in to Flow State")
+    #expect(L10n.text("account.sign_in", table: "Account") == "Sign in")
 }
 
 @Test func englishPlanSummaryPreservesUnicodeAndFormatCharacters() {

@@ -2284,7 +2284,7 @@ final class FlowStateAppModel: ObservableObject {
         case .pausedForUser:
             return "Paused after mouse or keyboard input. Say Resume, then repeat your command."
         case .reconciliationRequired:
-            return "Check the last action's result, then choose I've checked the result in Tasks & history."
+            return "Check the last action's result, then choose I've checked the result in History."
         case .running:
             return "An action is still running. Wait for it to finish."
         default:
@@ -2431,7 +2431,7 @@ struct FlowStateMenuView: View {
                     Image(systemName: model.isListening || model.isFinishingVoice ? "stop" : "play")
                         .font(.system(size: 12))
                         .frame(width: 14)
-                    Text(model.isListening || model.isFinishingVoice ? "Stop session" : "Start session")
+                    Text(model.isListening || model.isFinishingVoice ? "Stop session" : "Start Mac Control")
                     Spacer()
                 }
             }

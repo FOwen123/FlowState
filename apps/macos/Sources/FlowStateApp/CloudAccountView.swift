@@ -14,9 +14,6 @@ struct CloudAccountView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(accountText("account.title"))
                         .font(PaperStyle.textFont(size: PaperStyle.headingFontSize, weight: .bold))
-                    Text(accountText("account.subtitle"))
-                        .font(.system(size: 15))
-                        .foregroundStyle(PaperStyle.muted)
                 }
 
                 if let session = model.cloudSession {
@@ -131,58 +128,27 @@ private struct CloudConnectedView: View {
 
     private var signedOutContent: some View {
         VStack(alignment: .leading, spacing: 22) {
-            Image(systemName: "person.crop.circle")
-                .font(.system(size: 44, weight: .light))
-                .foregroundStyle(PaperStyle.secondary)
-                .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text(text("account.signed_out.title"))
-                    .font(PaperStyle.textFont(size: 24, weight: .bold))
-                Text(text("account.signed_out.subtitle"))
-                    .font(.system(size: 15))
-                    .foregroundStyle(PaperStyle.muted)
-            }
-
-            VStack(alignment: .leading, spacing: 16) {
-                benefit(
-                    icon: "magnifyingglass",
-                    title: text("account.benefit.research.title"),
-                    detail: text("account.benefit.research.detail")
-                )
-                Divider().overlay(PaperStyle.divider)
-                benefit(
-                    icon: "envelope.open",
-                    title: text("account.benefit.email.title"),
-                    detail: text("account.benefit.email.detail")
-                )
-            }
-
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "safari")
-                    .foregroundStyle(PaperStyle.muted)
-                    .accessibilityHidden(true)
-                Text(text("account.browser_reassurance"))
-                    .font(.system(size: 13))
-                    .foregroundStyle(PaperStyle.muted)
-            }
-
             Button {
                 perform({ try await cloud.signIn() }, failureKey: "account.error.sign_in")
             } label: {
                 HStack(spacing: 8) {
-                    if busy || cloud.connecting {
+                    if busy {
                         ProgressView()
                             .controlSize(.small)
                             .tint(PaperStyle.text)
                     }
-                    Text(busy || cloud.connecting ? text("account.signing_in") : text("account.sign_in"))
+                    Text(busy ? text("account.signing_in") : text("account.sign_in"))
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(PaperBorderButtonStyle())
-            .disabled(busy || cloud.connecting)
+            .disabled(busy)
 
+            if busy {
+                Text(text("account.browser_wait"))
+                    .font(.system(size: 13))
+                    .foregroundStyle(PaperStyle.muted)
+            }
             if let error {
                 Text(text(error))
                     .font(.system(size: 13))
@@ -453,22 +419,6 @@ private struct CloudConnectedView: View {
                 }
                 .buttonStyle(PaperBorderButtonStyle())
                 .disabled(busy)
-            }
-        }
-    }
-
-    private func benefit(icon: String, title: String, detail: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .frame(width: 20)
-                .foregroundStyle(PaperStyle.secondary)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 14, weight: .medium))
-                Text(detail)
-                    .font(.system(size: 13))
-                    .foregroundStyle(PaperStyle.muted)
             }
         }
     }

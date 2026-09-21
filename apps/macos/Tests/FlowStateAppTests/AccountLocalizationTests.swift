@@ -5,7 +5,9 @@ import Testing
 func accountCataloguesStayInSync() throws {
     let english = try loadAccountCatalogue(language: "en")
 
-    #expect(english["account.signed_out.title"] == "Sign in to Flow State")
+    #expect(english["account.sign_in"] == "Sign in")
+    #expect(english["account.subtitle"] == nil)
+    #expect(english["account.benefit.research.title"] == nil)
 
     let forbiddenTerms = [
         "AgentMail", "Clerk", "Convex", "Firecrawl", "OpenAI", "TypeSafe",

@@ -3,20 +3,20 @@ import SwiftUI
 
 enum FlowStateSettingsSection: String, CaseIterable, Identifiable {
     case voice
-    case cloud
-    case personalMail
+    case models
     case tasks
     case memory
     case permissions
+    case cloud
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .personalMail: "Gmail in Brave"
+        case .models: "Models"
         case .cloud: "Account"
-        case .voice: "Voice & activation"
-        case .tasks: "Tasks & history"
+        case .voice: "General"
+        case .tasks: "History"
         case .memory: "Memory"
         case .permissions: "Permissions"
         }
@@ -24,7 +24,7 @@ enum FlowStateSettingsSection: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .personalMail: "envelope"
+        case .models: "cpu"
         case .cloud: "cloud"
         case .voice: "gearshape"
         case .tasks: "waveform"
@@ -67,12 +67,10 @@ struct FlowStateSettingsView: View {
     @ObservedObject private var localization = UILocalization.shared
 
     var body: some View {
-        GlassEffectContainer(spacing: 8) {
-            HStack(spacing: 0) {
+        HStack(spacing: 0) {
                 sidebar
                 Divider().overlay(PaperStyle.divider)
                 content
-            }
         }
         .frame(minWidth: 960, idealWidth: 960, minHeight: 680, idealHeight: 680)
         .background(PaperStyle.appCanvas)
@@ -136,8 +134,8 @@ struct FlowStateSettingsView: View {
     @ViewBuilder
     private var content: some View {
         switch model.settingsSection {
-        case .personalMail:
-            PersonalMailView()
+        case .models:
+            ModelsSettingsView(model: model)
         case .cloud:
             CloudAccountView(model: model)
         case .voice:
@@ -152,36 +150,13 @@ struct FlowStateSettingsView: View {
     }
 }
 
-private struct VoiceSettingsView: View {
-    @ObservedObject private var localization = UILocalization.shared
+private struct ModelsSettingsView: View {
     @ObservedObject var model: FlowStateAppModel
 
     var body: some View {
         settingsColumn {
-            pageHeading(
-                title: "Voice & activation",
-                subtitle: "Hold one shortcut to dictate and another to control your Mac."
-            )
-
+            pageHeading(title: "Models", subtitle: "Speech recognition runs on this Mac.")
             settingsPanel {
-                PickerRow(
-                    title: "Dictation shortcut",
-                    subtitle: "Hold to paste cleaned speech into the focused text field.",
-                    selection: Binding(
-                        get: { model.speechSettings.dictationShortcut },
-                        set: { updateDictationShortcut($0) }
-                    ),
-                    options: VoiceShortcut.allCases
-                )
-                PickerRow(
-                    title: "Mac Control shortcut",
-                    subtitle: "Hold to control apps with a verified voice command.",
-                    selection: Binding(
-                        get: { model.speechSettings.controlShortcut },
-                        set: { updateControlShortcut($0) }
-                    ),
-                    options: VoiceShortcut.allCases
-                )
                 PickerRow(
                     title: "Language",
                     subtitle: "Choose the language you speak.",
@@ -194,6 +169,58 @@ private struct VoiceSettingsView: View {
                         }
                     ),
                     options: SpeechLanguage.allCases
+                )
+            }
+            settingsPanel {
+                Button(L10n.text("Download English speech model")) { model.installSpeechLanguage() }
+                Text(L10n.text("Uses Apple’s on-device English speech recognition (SpeechTranscriber). Download the speech model once with an internet connection; transcription then runs on this Mac."))
+                    .font(.caption).foregroundStyle(PaperStyle.muted)
+                SettingRow(
+                    title: "Microphone",
+                    subtitle: "Use the Mac's selected audio input.",
+                    trailing: { permissionBadge(model.permissionSnapshot.microphone) }
+                )
+                SettingRow(
+                    title: "Speech & output",
+                    subtitle: "Your speech is processed on this Mac.",
+                    trailing: { Text(L10n.text("On-device")).foregroundStyle(PaperStyle.muted) }
+                )
+            }
+
+            Text(L10n.text(model.voiceStatus)).font(.callout)
+        }
+    }
+}
+
+private struct VoiceSettingsView: View {
+    @ObservedObject private var localization = UILocalization.shared
+    @ObservedObject var model: FlowStateAppModel
+
+    var body: some View {
+        settingsColumn {
+            pageHeading(
+                title: "General",
+                subtitle: "Control your Mac with your voice."
+            )
+
+            settingsPanel {
+                PickerRow(
+                    title: "Mac Control shortcut",
+                    subtitle: "Hold to control your Mac. Release to run your command.",
+                    selection: Binding(
+                        get: { model.speechSettings.controlShortcut },
+                        set: { updateControlShortcut($0) }
+                    ),
+                    options: VoiceShortcut.allCases
+                )
+                PickerRow(
+                    title: "Dictation shortcut",
+                    subtitle: "Hold to type what you say.",
+                    selection: Binding(
+                        get: { model.speechSettings.dictationShortcut },
+                        set: { updateDictationShortcut($0) }
+                    ),
+                    options: VoiceShortcut.allCases
                 )
                 if let error = model.shortcutError {
                     Text(L10n.text(error)).font(.caption).foregroundStyle(.orange)
@@ -215,7 +242,7 @@ private struct VoiceSettingsView: View {
                 .pickerStyle(.menu)
                 ToggleRow(
                     title: "Spoken task updates",
-                    subtitle: "Speak questions, meaningful milestones, failures, and verified completion.",
+                    subtitle: "Read task updates aloud.",
                     isOn: Binding(
                         get: { !model.spokenResponsesMuted },
                         set: { model.setSpokenResponsesMuted(!$0) }
@@ -229,7 +256,7 @@ private struct VoiceSettingsView: View {
             settingsPanel {
                 ToggleRow(
                     title: "Dictation cleanup",
-                    subtitle: "Apply conservative local cleanup before pasting. Managed cleanup, when configured, is text-only and time-bounded.",
+                    subtitle: "Add punctuation and tidy dictated text.",
                     isOn: Binding(
                         get: { model.dictationCleanupEnabled },
                         set: { model.setDictationCleanup(enabled: $0) }
@@ -237,7 +264,7 @@ private struct VoiceSettingsView: View {
                 )
                 TextFieldRow(
                     title: "Cleanup instructions",
-                    subtitle: "Optional guidance for formatting only; it cannot authorize actions.",
+                    subtitle: "How should your dictated text be formatted?",
                     text: Binding(
                         get: { model.dictationCleanupInstructions },
                         set: { model.setDictationCleanupInstructions($0) }
@@ -252,31 +279,16 @@ private struct VoiceSettingsView: View {
                     .textSelection(.enabled)
                     .accessibilityLabel(L10n.format("Latest transcript: %@", model.latestTranscript))
                 HStack {
-                    Button(L10n.text("Start listening")) { model.startVoiceSession() }
+                    Button(L10n.text("Start Mac Control")) { model.startVoiceSession() }
                         .disabled(model.isListening || model.isFinishingVoice)
                     Button(L10n.text("Stop")) { model.stopVoiceSession() }
                 }
             }
 
-            settingsPanel {
-                Button(L10n.text("Download English speech model")) { model.installSpeechLanguage() }
-                Text(L10n.text("Uses Apple’s on-device English speech recognition (SpeechTranscriber). Download the speech model once with an internet connection; transcription then runs on this Mac."))
-                    .font(.caption).foregroundStyle(PaperStyle.muted)
-                SettingRow(
-                    title: "Microphone",
-                    subtitle: "Use the Mac's selected audio input.",
-                    trailing: { permissionBadge(model.permissionSnapshot.microphone) }
-                )
-                SettingRow(
-                    title: "Speech & output",
-                    subtitle: "Your speech is processed on this Mac.",
-                    trailing: { Text(L10n.text("On-device")).foregroundStyle(PaperStyle.muted) }
-                )
-            }
 
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "info.circle")
-                Text(L10n.text("Hold Dictation to enter text. Hold Mac Control to control your Mac. Release either shortcut to finish."))
+                Text(L10n.text("Mac Control runs commands. The separate Dictation shortcut types text."))
                     .font(.system(size: 13))
                     .foregroundStyle(PaperStyle.muted)
             }
@@ -306,7 +318,7 @@ private struct TasksSettingsView: View {
 
     var body: some View {
         settingsColumn {
-            pageHeading(title: "Tasks & history", subtitle: "Review what Flow State is doing before it acts.")
+            pageHeading(title: "History", subtitle: "Recent tasks and dictation.")
             settingsPanel {
                 SettingRow(
                     title: "Desktop control",
@@ -600,7 +612,7 @@ private struct SettingRow<Trailing: View>: View {
             Spacer()
             trailing
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, 12)
     }
 }
 
@@ -623,7 +635,7 @@ private struct ToggleRow: View {
                 .tint(PaperStyle.accent)
                 .accessibilityLabel(L10n.text(title))
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, 12)
     }
 }
 
@@ -658,7 +670,7 @@ private struct PickerRow<Value: Hashable & CaseIterable & RawRepresentable>: Vie
             .font(PaperStyle.textFont(size: PaperStyle.controlFontSize))
             .frame(width: 180)
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, 12)
     }
 
     private func displayName(_ option: Value) -> String {
@@ -689,7 +701,7 @@ private struct TextFieldRow: View {
                 .modifier(PaperInputStyle())
                 .frame(width: 220)
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, 12)
     }
 }
 
@@ -736,15 +748,17 @@ private func permissionBadge(_ status: MacPermissionStatus) -> some View {
 }
 
 struct PaperBorderButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(PaperStyle.textFont(size: PaperStyle.controlFontSize))
             .foregroundStyle(PaperStyle.text)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
-            .glassEffect(.regular.tint(PaperStyle.surface).interactive(), in: RoundedRectangle(cornerRadius: PaperStyle.controlRadius))
+            .background(configuration.isPressed ? PaperStyle.selected : PaperStyle.surface, in: RoundedRectangle(cornerRadius: PaperStyle.controlRadius))
+            .contentShape(RoundedRectangle(cornerRadius: PaperStyle.controlRadius))
             .overlay(RoundedRectangle(cornerRadius: PaperStyle.controlRadius).stroke(PaperStyle.controlBorder))
-            .opacity(configuration.isPressed ? 0.65 : 1)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.65 : 1) : 0.4)
     }
 }
 

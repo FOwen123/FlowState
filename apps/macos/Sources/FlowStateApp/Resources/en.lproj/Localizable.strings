@@ -171,7 +171,7 @@
 "This action is not granted for the current task." = "This action isn’t allowed for the current task.";
 "This request needs clarification or could not be planned." = "This request needs clarification or couldn’t be planned.";
 "This sensitive system path cannot be selected." = "This protected system location can’t be selected.";
-"This shortcut is in use or unavailable. Choose another in Voice & activation." = "This shortcut is in use or unavailable. Choose another in Voice & activation.";
+"This shortcut is in use or unavailable. Choose another in Voice & activation." = "This shortcut is in use or unavailable. Choose another in General.";
 "This workflow operation is not known on this Mac." = "This workflow action isn’t available on this Mac.";
 "Toggle" = "Toggle";
 "Transcript ready" = "Transcript ready";
