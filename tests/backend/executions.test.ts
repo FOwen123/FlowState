@@ -772,3 +772,63 @@ it("recovers external receipts across plans by owner, device, provider, and requ
   expect(otherOwner).toMatchObject({ status: "pending" });
   expect(otherOwner.receiptId).not.toBe(succeeded.receiptId);
 });
+
+it("a new browser request gets its own receipt after the same URL previously succeeded", async () => {
+  const t = convexTest(schema, modules);
+  const user = t.withIdentity({
+    subject: "repeat-browser",
+    tokenIdentifier: "test|repeat-browser",
+  });
+  await user.mutation(anyApi.workflows.registerDevice, {
+    deviceId: "repeat-browser",
+  });
+  const action = {
+    kind: "openURL",
+    targetBundleIdentifier: "com.brave.Browser",
+    parameters: { url: "https://search.brave.com/search?q=Hello%20World" },
+    capability: "app.control",
+    executor: "service",
+    requiresApproval: false,
+  };
+  const create = () =>
+    t.run((ctx) =>
+      ctx.db.insert("actionPlans", {
+        ownerKey: "test|repeat-browser",
+        deviceId: "repeat-browser",
+        command: "search again",
+        locale: "en",
+        status: "executing",
+        executingStep: 0,
+        cancellationGeneration: 0,
+        expiresAt: Date.now() + 60000,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        actionsJson: JSON.stringify([action]),
+      }),
+    );
+  const firstPlan = await create();
+  const first = await user.mutation(anyApi.executions.beginExternalEffect, {
+    planId: firstPlan,
+    ordinal: 0,
+    generation: 0,
+    provider: "flowstate-native",
+    idempotencyKey: "first-browser-request",
+    requestFingerprint: "same-url",
+  });
+  await user.mutation(anyApi.executions.reconcileExternalEffect, {
+    receiptId: first.receiptId,
+    status: "succeeded",
+    requestFingerprint: "same-url",
+  });
+  const nextPlan = await create();
+  const next = await user.mutation(anyApi.executions.beginExternalEffect, {
+    planId: nextPlan,
+    ordinal: 0,
+    generation: 0,
+    provider: "flowstate-native",
+    idempotencyKey: "second-browser-request",
+    requestFingerprint: "same-url",
+  });
+  expect(next.status).toBe("pending");
+  expect(next.receiptId).not.toBe(first.receiptId);
+});

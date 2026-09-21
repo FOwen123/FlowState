@@ -391,7 +391,7 @@ export const beginExternalEffect = mutation({
       (receipt) =>
         receipt.status === "pending" ||
         receipt.status === "uncertain" ||
-        receipt.status === "succeeded",
+        (receipt.status === "succeeded" && action.kind !== "openURL"),
     );
     if (existingRequest !== undefined) {
       return {
