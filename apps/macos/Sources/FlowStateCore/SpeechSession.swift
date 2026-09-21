@@ -349,14 +349,18 @@ public actor SpeechSessionCoordinator {
 
     public func pushToTalkUp() {
         guard settings.activation == .pushToTalk else { return }
+        finish()
+    }
+
+    public func finish() {
         if phase == .listening { phase = .stopping }
     }
 
     @discardableResult
     public func toggle() -> UInt64 {
-        guard settings.activation == .toggle else { return generation }
+        guard settings.activation == .toggle, phase != .stopping else { return generation }
         if phase == .listening {
-            phase = .stopping
+            finish()
             return generation
         }
         return beginListening()

@@ -35,13 +35,31 @@ enum FlowStateSettingsSection: String, CaseIterable, Identifiable {
 }
 
 enum PaperStyle {
-    static let canvas = Color(red: 0, green: 0, blue: 0)
-    static let raised = Color(red: 11 / 255, green: 14 / 255, blue: 20 / 255)
     static let text = Color.white
     static let secondary = Color(red: 240 / 255, green: 240 / 255, blue: 240 / 255)
     static let muted = Color(red: 161 / 255, green: 164 / 255, blue: 165 / 255)
     static let divider = Color(red: 41 / 255, green: 45 / 255, blue: 48 / 255)
     static let iron = Color(red: 110 / 255, green: 114 / 255, blue: 122 / 255)
+
+    // Native settings palette from the current Paper app screens.
+    static let appCanvas = Color(red: 0x10 / 255, green: 0x11 / 255, blue: 0x13 / 255)
+    static let surface = Color(red: 0x19 / 255, green: 0x1A / 255, blue: 0x1D / 255)
+    static let hud = Color(red: 0x19 / 255, green: 0x22 / 255, blue: 0x1F / 255)
+    static let accent = Color(red: 0x05 / 255, green: 0x96 / 255, blue: 0x69 / 255)
+    static let selected = Color(red: 0x07 / 255, green: 0x1D / 255, blue: 0x17 / 255)
+    static let controlBorder = Color(red: 0x53 / 255, green: 0x61 / 255, blue: 0x5A / 255)
+    static let panelBorder = Color(red: 0x2C / 255, green: 0x2E / 255, blue: 0x32 / 255)
+    static let input = Color(red: 0x09 / 255, green: 0x0E / 255, blue: 0x15 / 255)
+
+    static let panelRadius: CGFloat = 20
+    static let selectionRadius: CGFloat = 8
+    static let controlRadius: CGFloat = 8
+    static let controlFontSize: CGFloat = 14
+    static let headingFontSize: CGFloat = 26
+
+    static func textFont(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        Font.custom("Helvetica Neue", size: size).weight(weight)
+    }
 }
 
 struct FlowStateSettingsView: View {
@@ -49,13 +67,15 @@ struct FlowStateSettingsView: View {
     @ObservedObject private var localization = UILocalization.shared
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-            Divider().overlay(PaperStyle.divider)
-            content
+        GlassEffectContainer(spacing: 8) {
+            HStack(spacing: 0) {
+                sidebar
+                Divider().overlay(PaperStyle.divider)
+                content
+            }
         }
-        .frame(minWidth: 820, minHeight: 560)
-        .background(PaperStyle.canvas)
+        .frame(minWidth: 960, idealWidth: 960, minHeight: 680, idealHeight: 680)
+        .background(PaperStyle.appCanvas)
         .foregroundStyle(PaperStyle.text)
         .preferredColorScheme(.dark)
         .environment(\.locale, Locale(identifier: InterfaceLanguage.resolve(localization.language).rawValue))
@@ -65,10 +85,10 @@ struct FlowStateSettingsView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                WaveMark()
-                    .frame(width: 30, height: 30)
+                FlowStateBrandMark(size: 30)
+                    .foregroundStyle(PaperStyle.text)
                 Text(L10n.text("Flow State"))
-                    .font(.custom("Space Grotesk", size: 20))
+                    .font(PaperStyle.textFont(size: 20))
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 18)
@@ -87,8 +107,9 @@ struct FlowStateSettingsView: View {
                     }
                     .padding(.horizontal, 12)
                     .frame(height: 44)
-                    .background(model.settingsSection == item ? PaperStyle.raised : .clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                    .foregroundStyle(model.settingsSection == item ? PaperStyle.accent : PaperStyle.text)
+                    .background(model.settingsSection == item ? PaperStyle.selected : .clear)
+                    .clipShape(RoundedRectangle(cornerRadius: PaperStyle.selectionRadius))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -107,7 +128,8 @@ struct FlowStateSettingsView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 28)
-        .frame(width: 204)
+        .background(PaperStyle.surface.opacity(0.72))
+        .frame(width: 232)
         .frame(maxHeight: .infinity)
     }
 
@@ -144,7 +166,7 @@ private struct VoiceSettingsView: View {
             settingsPanel {
                 PickerRow(
                     title: "Activation",
-                    subtitle: "Push to talk keeps every session explicit.",
+                    subtitle: "Hold to talk, or press once to start and again to finish.",
                     selection: Binding(
                         get: { model.speechSettings.activation },
                         set: { updateActivation($0) }
@@ -160,6 +182,19 @@ private struct VoiceSettingsView: View {
                     ),
                     options: VoiceMode.allCases
                 )
+                PickerRow(
+                    title: "Language",
+                    subtitle: "Choose the language you speak.",
+                    selection: Binding(
+                        get: { model.speechSettings.language },
+                        set: {
+                            var settings = model.speechSettings
+                            settings.language = $0
+                            model.updateSpeechSettings(settings)
+                        }
+                    ),
+                    options: SpeechLanguage.allCases
+                )
                 if model.speechSettings.activation == .wakePhrase {
                     TextFieldRow(
                         title: "Wake phrase",
@@ -172,7 +207,7 @@ private struct VoiceSettingsView: View {
                 }
                 PickerRow(
                     title: "Keyboard shortcut",
-                    subtitle: "Hold to speak. Choose a shortcut unused by your other apps.",
+                    subtitle: "Release to finish in push-to-talk mode. Press again to finish in toggle mode.",
                     selection: Binding(
                         get: { model.speechSettings.shortcut },
                         set: { updateShortcut($0) }
@@ -192,7 +227,7 @@ private struct VoiceSettingsView: View {
                     .accessibilityLabel(L10n.format("Latest transcript: %@", model.latestTranscript))
                 HStack {
                     Button(L10n.text("Start listening")) { model.startVoiceSession() }
-                    Button(L10n.text("Finish")) { model.finishVoiceSession() }
+                        .disabled(model.isListening || model.isFinishingVoice)
                     Button(L10n.text("Stop")) { model.stopVoiceSession() }
                 }
             }
@@ -220,7 +255,8 @@ private struct VoiceSettingsView: View {
                     .foregroundStyle(PaperStyle.muted)
             }
             .padding(16)
-            .background(PaperStyle.raised.opacity(0.65))
+            .background(PaperStyle.surface)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(PaperStyle.panelBorder))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
@@ -266,7 +302,7 @@ private struct TasksSettingsView: View {
                 ForEach(DesktopActionKind.allCases, id: \.rawValue) { action in
                     ToggleRow(
                         title: L10n.actionName(action),
-                        subtitle: "Choose whether Flow State may use this desktop action.",
+                        subtitle: "Allow this desktop action during an active task.",
                         isOn: Binding(
                             get: { model.allowedInputActions.contains(action) },
                             set: { model.setInputAction(action, enabled: $0) }
@@ -437,7 +473,7 @@ private struct SettingRow<Trailing: View>: View {
     var body: some View {
         HStack(alignment: .center, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(L10n.text(title)).font(.system(size: 16, weight: .medium))
+                Text(L10n.text(title)).font(.custom("Helvetica Neue", size: 16).weight(.medium))
                 Text(L10n.text(subtitle)).font(.system(size: 14)).foregroundStyle(PaperStyle.muted)
             }
             Spacer()
@@ -456,13 +492,14 @@ private struct ToggleRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(L10n.text(title)).font(.system(size: 16, weight: .medium))
+                Text(L10n.text(title)).font(PaperStyle.textFont(size: 16, weight: .medium))
                 Text(L10n.text(subtitle)).font(.system(size: 14)).foregroundStyle(PaperStyle.muted)
             }
             Spacer()
             Toggle("", isOn: $isOn)
                 .labelsHidden()
                 .toggleStyle(.switch)
+                .tint(PaperStyle.accent)
                 .accessibilityLabel(L10n.text(title))
         }
         .padding(.vertical, 20)
@@ -486,7 +523,7 @@ private struct PickerRow<Value: Hashable & CaseIterable & RawRepresentable>: Vie
     var body: some View {
         HStack(alignment: .center, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(L10n.text(title)).font(.system(size: 16, weight: .medium))
+                Text(L10n.text(title)).font(PaperStyle.textFont(size: 16, weight: .medium))
                 Text(L10n.text(subtitle)).font(.system(size: 14)).foregroundStyle(PaperStyle.muted)
             }
             Spacer()
@@ -496,6 +533,8 @@ private struct PickerRow<Value: Hashable & CaseIterable & RawRepresentable>: Vie
                 }
             }
             .pickerStyle(.menu)
+            .labelsHidden()
+            .font(PaperStyle.textFont(size: PaperStyle.controlFontSize))
             .frame(width: 180)
         }
         .padding(.vertical, 20)
@@ -520,12 +559,13 @@ private struct TextFieldRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 24) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(L10n.text(title)).font(.system(size: 16, weight: .medium))
+                Text(L10n.text(title)).font(.custom("Helvetica Neue", size: 16).weight(.medium))
                 Text(L10n.text(subtitle)).font(.system(size: 14)).foregroundStyle(PaperStyle.muted)
             }
             Spacer()
             TextField(L10n.text(title), text: $text)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .modifier(PaperInputStyle())
                 .frame(width: 220)
         }
         .padding(.vertical, 20)
@@ -535,17 +575,18 @@ private struct TextFieldRow: View {
 private func settingsColumn(@ViewBuilder content: () -> some View) -> some View {
     ScrollView {
         VStack(alignment: .leading, spacing: 26, content: content)
-            .frame(maxWidth: 720, alignment: .leading)
+            .frame(maxWidth: 756, alignment: .leading)
             .padding(.horizontal, 32)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 40)
     }
+    .background(PaperStyle.appCanvas)
 }
 
 private func pageHeading(title: String, subtitle: String) -> some View {
     VStack(alignment: .leading, spacing: 8) {
         Text(L10n.text(title))
-            .font(.system(size: 26, weight: .semibold))
+            .font(PaperStyle.textFont(size: PaperStyle.headingFontSize, weight: .medium))
         Text(L10n.text(subtitle))
             .font(.system(size: 15))
             .foregroundStyle(PaperStyle.muted)
@@ -555,15 +596,17 @@ private func pageHeading(title: String, subtitle: String) -> some View {
 private func settingsPanel<Content: View>(@ViewBuilder content: () -> Content) -> some View {
     VStack(alignment: .leading, spacing: 0, content: content)
         .padding(.horizontal, 24)
-        .background(PaperStyle.canvas)
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(PaperStyle.divider))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(PaperStyle.surface)
+        .overlay(RoundedRectangle(cornerRadius: PaperStyle.panelRadius).stroke(PaperStyle.panelBorder))
+        .clipShape(RoundedRectangle(cornerRadius: PaperStyle.panelRadius))
 }
 
 private func permissionBadge(_ status: MacPermissionStatus) -> some View {
     HStack(spacing: 6) {
         Circle()
-            .fill(status.isGranted ? Color.green : PaperStyle.iron)
+            .fill(status.isGranted ? PaperStyle.accent : PaperStyle.iron)
             .frame(width: 7, height: 7)
         Text(L10n.text(status.isGranted ? "Ready" : status.rawValue.replacingOccurrences(of: "notDetermined", with: "Not set")))
             .font(.system(size: 12))
@@ -574,24 +617,24 @@ private func permissionBadge(_ status: MacPermissionStatus) -> some View {
 struct PaperBorderButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 13))
+            .font(PaperStyle.textFont(size: PaperStyle.controlFontSize))
             .foregroundStyle(PaperStyle.text)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
-            .overlay(RoundedRectangle(cornerRadius: 7).stroke(PaperStyle.iron))
+            .glassEffect(.regular.tint(PaperStyle.surface).interactive(), in: RoundedRectangle(cornerRadius: PaperStyle.controlRadius))
+            .overlay(RoundedRectangle(cornerRadius: PaperStyle.controlRadius).stroke(PaperStyle.controlBorder))
             .opacity(configuration.isPressed ? 0.65 : 1)
     }
 }
 
-private struct WaveMark: View {
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach([12.0, 22.0, 30.0, 22.0, 12.0], id: \.self) { height in
-                Capsule()
-                    .fill(PaperStyle.secondary)
-                    .frame(width: 3, height: height)
-            }
-        }
-        .accessibilityHidden(true)
+struct PaperInputStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .font(PaperStyle.textFont(size: PaperStyle.controlFontSize))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(PaperStyle.input)
+            .overlay(RoundedRectangle(cornerRadius: PaperStyle.controlRadius).stroke(PaperStyle.controlBorder.opacity(0.55)))
+            .clipShape(RoundedRectangle(cornerRadius: PaperStyle.controlRadius))
     }
 }

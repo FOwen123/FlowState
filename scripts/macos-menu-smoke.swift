@@ -1,5 +1,5 @@
 // Opt-in acceptance check against the already-running development app.
-// `settings` opens Settings; `voice` checks capture; `hud` also checks control-settings navigation.
+// `settings` opens Settings; `voice` checks capture; `hud` also checks compact-menu navigation while listening.
 // Run in a quiet room: this briefly activates the microphone. No transcript text is logged.
 import AppKit
 import ApplicationServices
@@ -20,8 +20,9 @@ func voiceStatuses()->[String] {
  var output:[String]=[]
  func visit(_ e:AXUIElement,_ depth:Int) {
   guard depth<10 else{return}
+  if attr(e,"AXDescription") as? String == "Listening" { output.append("Listening") }
   if attr(e,"AXRole") as? String == "AXStaticText", let text=attr(e,"AXValue") as? String,
-     ["Listening —", "Voice status: Listening", "Preparing on-device", "Microphone permission", "Install the selected"].contains(where: { text.hasPrefix($0) }) {output.append(text)}
+     ["Listening…", "Listening —", "Voice status: Listening", "Preparing on-device", "Microphone permission", "Install the selected"].contains(where: { text.hasPrefix($0) }) {output.append(text)}
   for c in attr(e,"AXChildren") as? [AXUIElement] ?? [] {visit(c,depth+1)}
  }
  for w in windows(){visit(w,0)};return output
@@ -31,7 +32,7 @@ if mode == "settings" {
   if let close=attr(w,"AXCloseButton"), CFGetTypeID(close)==AXUIElementGetTypeID(){AXUIElementPerformAction(close as! AXUIElement,kAXPressAction as CFString)}
  }
 }
-guard let item=find(app,{attr($0,"AXRole") as? String == "AXMenuBarItem" && attr($0,"AXTitle") as? String == "waveform"}) else {fatalError("No Flow State status item")}
+guard let item=find(app,{attr($0,"AXRole") as? String == "AXMenuBarItem" && ["Flow State", "waveform"].contains(attr($0,"AXTitle") as? String ?? "") && (attr($0,"AXChildren") as? [AXUIElement] ?? []).isEmpty}) else {fatalError("No Flow State status item")}
 let label=mode == "settings" ? "Open settings" : "Start voice session"
 func menuButton() -> AXUIElement? { windows().compactMap({find($0,{attr($0,"AXDescription") as? String == label && attr($0,"AXRole") as? String == "AXButton"})}).first }
 if menuButton() == nil {
@@ -49,27 +50,35 @@ if mode == "settings" {
 } else {
  var listening = false
  for _ in 0..<50 {
-  listening = voiceStatuses().contains { $0.contains("Listening") }
+  let statuses = voiceStatuses()
+  listening = statuses.contains { $0.contains("Listening") } && !statuses.contains { $0.hasPrefix("Preparing") }
   if listening { break }
   Thread.sleep(forTimeInterval:0.1)
  }
  print("Visible listening indicator:", listening)
  var controlsOpened = mode != "hud"
- if mode == "hud", let settings=windows().compactMap({find($0,{attr($0,"AXDescription") as? String == "Open control settings"})}).first {
-  print("HUD settings press", AXUIElementPerformAction(settings,kAXPressAction as CFString).rawValue)
-  Thread.sleep(forTimeInterval:0.6)
-  controlsOpened = windows().contains { w in
-   guard attr(w,"AXTitle") as? String == "Flow State Settings" else { return false }
-   func hasText(_ text: String) -> Bool {
-    find(w,{ element in ["AXValue", "AXDescription", "AXTitle"].contains { name in (attr(element,name) as? String ?? "").contains(text) } }) != nil
-   }
-   let automatic = hasText("Uses the active app or the app named in your command.")
-   let permissionRecovery = hasText("Allow Flow State to control the active app or an app named in your command.") && hasText("Denied")
-   print("Automatic targeting page:", automatic, "Accessibility recovery page:", permissionRecovery)
-   return (automatic || permissionRecovery) && !hasText("Allow desktop control")
+ if mode == "hud" {
+  if windows().compactMap({find($0,{attr($0,"AXDescription") as? String == "Open settings"})}).first == nil {
+   AXUIElementPerformAction(item,kAXPressAction as CFString)
+   Thread.sleep(forTimeInterval:0.3)
   }
-  print("Control settings opened:",controlsOpened)
+  if let settings=windows().compactMap({find($0,{attr($0,"AXDescription") as? String == "Open settings"})}).first {
+   print("Menu settings press", AXUIElementPerformAction(settings,kAXPressAction as CFString).rawValue)
+   Thread.sleep(forTimeInterval:0.6)
+   controlsOpened = windows().contains { attr($0,"AXTitle") as? String == "Flow State Settings" }
+  }
+  print("Settings opened while listening:",controlsOpened)
  }
- if let stop=windows().compactMap({find($0,{["Stop listening", "Stop voice session"].contains(attr($0,"AXDescription") as? String ?? "")})}).first { print("Stop press", AXUIElementPerformAction(stop,kAXPressAction as CFString).rawValue) }
- if !listening || !controlsOpened { exit(1) }
+ guard let stop=windows().compactMap({find($0,{["Stop listening", "Stop voice session"].contains(attr($0,"AXDescription") as? String ?? "")})}).first else {
+  print("Stop control unavailable"); exit(1)
+ }
+ print("Stop press", AXUIElementPerformAction(stop,kAXPressAction as CFString).rawValue)
+ var stopped = false
+ for _ in 0..<30 {
+  stopped = !voiceStatuses().contains { $0.contains("Listening") }
+  if stopped { break }
+  Thread.sleep(forTimeInterval:0.1)
+ }
+ print("Listening ended:", stopped)
+ if !listening || !controlsOpened || !stopped { exit(1) }
 }

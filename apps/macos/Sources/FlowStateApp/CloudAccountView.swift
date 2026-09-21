@@ -10,10 +10,10 @@ struct CloudAccountView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 34) {
+            VStack(alignment: .leading, spacing: 26) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(accountText("account.title"))
-                        .font(.system(size: 26, weight: .semibold))
+                        .font(PaperStyle.textFont(size: PaperStyle.headingFontSize, weight: .bold))
                     Text(accountText("account.subtitle"))
                         .font(.system(size: 15))
                         .foregroundStyle(PaperStyle.muted)
@@ -29,13 +29,13 @@ struct CloudAccountView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .frame(maxWidth: 640, alignment: .leading)
-            .padding(.top, 32)
+            .frame(maxWidth: 692, alignment: .leading)
+            .padding(.top, 40)
             .padding(.horizontal, 32)
             .padding(.bottom, 48)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(PaperStyle.canvas)
+        .background(PaperStyle.appCanvas)
         .foregroundStyle(PaperStyle.text)
         .task {
             configureBundledAccount()
@@ -91,7 +91,7 @@ private struct AccountUnavailableView: View {
                 .foregroundStyle(PaperStyle.secondary)
                 .accessibilityHidden(true)
             Text(text("account.unavailable.title"))
-                .font(.system(size: 20, weight: .semibold))
+                .font(PaperStyle.textFont(size: 20, weight: .bold))
             Text(text("account.unavailable.message"))
                 .font(.system(size: 14))
                 .foregroundStyle(PaperStyle.muted)
@@ -132,13 +132,13 @@ private struct CloudConnectedView: View {
     private var signedOutContent: some View {
         VStack(alignment: .leading, spacing: 22) {
             Image(systemName: "person.crop.circle")
-                .font(.system(size: 42, weight: .light))
+                .font(.system(size: 44, weight: .light))
                 .foregroundStyle(PaperStyle.secondary)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(text("account.signed_out.title"))
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(PaperStyle.textFont(size: 24, weight: .bold))
                 Text(text("account.signed_out.subtitle"))
                     .font(.system(size: 15))
                     .foregroundStyle(PaperStyle.muted)
@@ -255,7 +255,8 @@ private struct CloudConnectedView: View {
             .toggleStyle(.switch)
 
             TextField(text("account.managed.command.placeholder"), text: $command)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .modifier(PaperInputStyle())
                 .accessibilityLabel(text("account.managed.command.placeholder"))
 
             Button(model.executingPlan ? text("account.managed.preparing") : text("account.managed.prepare")) {
@@ -308,7 +309,8 @@ private struct CloudConnectedView: View {
             )
 
             TextField(text("account.research.placeholder"), text: $query)
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .modifier(PaperInputStyle())
                 .accessibilityLabel(text("account.research.placeholder"))
 
             HStack {
@@ -352,7 +354,8 @@ private struct CloudConnectedView: View {
                     .frame(maxHeight: 180)
 
                     TextField(text("account.mail.recipient.placeholder"), text: $recipient)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
+                        .modifier(PaperInputStyle())
                         .accessibilityLabel(text("account.mail.recipient.placeholder"))
 
                     Button(text("account.mail.review")) {

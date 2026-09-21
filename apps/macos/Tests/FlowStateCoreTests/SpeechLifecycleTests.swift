@@ -50,3 +50,43 @@ import Testing
     await session.update(settings: SpeechSettings(activation: .wakePhrase, wakePhrase: "嘿，Flow State"))
     #expect(await session.detectWakePhrase("嘿，Flow State。") == true)
 }
+
+@Test("the second toggle press finishes once and preserves the final command")
+func toggleShortcutFinishesFinalCommand() async {
+    let session = SpeechSessionCoordinator(settings: SpeechSettings(activation: .toggle))
+    await session.toggle()
+    #expect(await session.phase == .listening)
+    await session.toggle()
+    #expect(await session.phase == .stopping)
+    #expect(await session.consume(transcript: "scroll down", isFinal: true) == .scroll(-3))
+    #expect(await session.phase == .idle)
+    #expect(await session.consume(transcript: "scroll down", isFinal: true) == nil)
+}
+
+@Test("capture finishing enters stopping for every activation mode", arguments: ActivationMode.allCases)
+func captureFinishUsesCurrentSession(mode: ActivationMode) async {
+    let session = SpeechSessionCoordinator(settings: SpeechSettings(activation: mode))
+    switch mode {
+    case .pushToTalk: await session.pushToTalkDown()
+    case .toggle: await session.toggle()
+    case .wakePhrase: _ = await session.detectWakePhrase("Hey Flow State")
+    }
+    await session.finish()
+    #expect(await session.phase == .stopping)
+    await session.finish()
+    #expect(await session.phase == .stopping)
+    #expect(await session.consume(transcript: "scroll down", isFinal: true) == .scroll(-3))
+    #expect(await session.phase == .idle)
+}
+
+@Test("a third toggle press cannot restart speech while the final result is pending")
+func toggleWaitsForFinalResult() async {
+    let session = SpeechSessionCoordinator(settings: SpeechSettings(activation: .toggle))
+    let generation = await session.toggle()
+    await session.finish()
+    #expect(await session.toggle() == generation)
+    #expect(await session.phase == .stopping)
+    #expect(await session.consume(transcript: "scroll down", isFinal: true) == .scroll(-3))
+    #expect(await session.toggle() > generation)
+    #expect(await session.phase == .listening)
+}

@@ -17,7 +17,7 @@ struct PersonalMailView: View {
             VStack(alignment: .leading, spacing: 24) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(text("mail.title"))
-                        .font(.system(size: 26, weight: .semibold))
+                        .font(PaperStyle.textFont(size: PaperStyle.headingFontSize, weight: .bold))
                     Text(text("mail.subtitle"))
                         .font(.system(size: 15))
                         .foregroundStyle(PaperStyle.muted)
@@ -29,15 +29,19 @@ struct PersonalMailView: View {
 
                 VStack(alignment: .leading, spacing: 14) {
                     TextField(text("mail.recipient.label"), text: $recipient)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
+                        .modifier(PaperInputStyle())
                         .accessibilityLabel(text("mail.recipient.label"))
                     TextField(text("mail.subject.label"), text: $subject)
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
+                        .modifier(PaperInputStyle())
                         .accessibilityLabel(text("mail.subject.label"))
                     Text(text("mail.message.label"))
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.custom("Helvetica Neue", size: PaperStyle.controlFontSize).weight(.medium))
                     TextEditor(text: $bodyText)
+                        .scrollContentBackground(.hidden)
                         .frame(minHeight: 180)
+                        .modifier(PaperInputStyle())
                         .accessibilityLabel(text("mail.message.accessibility"))
                 }
 
@@ -58,13 +62,13 @@ struct PersonalMailView: View {
                         .textSelection(.enabled)
                 }
             }
-            .frame(maxWidth: 640, alignment: .leading)
-            .padding(.top, 32)
+            .frame(maxWidth: 692, alignment: .leading)
+            .padding(.top, 40)
             .padding(.horizontal, 32)
             .padding(.bottom, 48)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(PaperStyle.canvas)
+        .background(PaperStyle.appCanvas)
         .foregroundStyle(PaperStyle.text)
     }
 

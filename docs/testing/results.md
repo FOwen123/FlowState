@@ -125,3 +125,18 @@ Independent review found no remaining actionable P1/P2 issues in the app targeti
 
 
 After the user re-enabled Accessibility, the packaged app's live HUD check passed Start/Stop and opened the automatic-targeting page instead of permission recovery. This verifies the app recognizes its Accessibility grant. A real spoken command in the packaged app remains separate from the synthetic speech-result tests. During local-main consolidation, both existing motion prototype checks passed (`node design/hero-motion/check.mjs` and `node design/hero-motion/forest-check.cjs`); these check prototypes, not the shipped UI.
+
+## Paper interface and logo verification — September 21, 2026
+
+On `codex/paper-ui`, using the primary M5 Pro Mac described above:
+
+- The native menu now uses the compact Start/Stop session, Settings and Quit layout. The listening HUD is 360 × 56 points and expands for long transcripts, recovery and confirmations. These floating surfaces use SwiftUI's native Liquid Glass; settings content uses solid panels.
+- The canonical Paper logo was exported as an 800 × 800 transparent PNG, with the separate 1024 × 1024 presentation artboard retained in `assets/brand/exports`. A real status-item screenshot exposed incorrect rendering through the resizable SwiftUI wrapper. A native 22-point template image fixed it. A second failing image-rendering test reproduced a blank settings logo; loading the bundled PNG as `NSImage` fixed both locations. The corrected status item and settings window were visually checked.
+- Native checks passed: 111 Core, 9 Cloud and 36 App tests. Opt-in desktop command tests were not repeated for this styling change. The packaged debug app passed live Start/listening/Stop and Settings navigation checks; every settings page opened. The window check found clipped navigation and duplicate picker labels, which were corrected and checked again.
+- These checks verify this interface change, not a notarized release, real-user speech accuracy, or the completion of pending product workflows.
+
+The user explicitly chose shortcut-based finishing instead of a Finish button. Manual Finish UI and the unused HUD callback were removed. A real packaged-app keyboard check confirmed Control–Shift–Space starts listening and a second press finishes in the configured toggle mode. Coordinator tests cover release-to-finish and preserving exactly one final command in push-to-talk and toggle modes. Stop remains cancellation.
+
+Independent review caught the app calling the push-to-talk-only completion method for toggle sessions. The app now calls an idempotent coordinator finish operation shared by activation modes. Tests cover all three activation modes, repeated finish calls and final-command preservation.
+
+A rapid-toggle regression now prevents restarting while the prior final result is pending. The app also blocks a new capture until finalization completes, while keeping Stop available from the HUD and menu.

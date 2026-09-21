@@ -44,6 +44,7 @@ final class FlowStateAppModel: ObservableObject {
     @Published var cloudSession: CloudSession?
     @Published private(set) var cloudStatus = "Sign in through Cloud account to use research"
     @Published private(set) var isListening = false { didSet { updateVoiceHUD() } }
+    @Published private(set) var isFinishingVoice = false
     private var preparingVoice = false
     private var voiceGeneration: UInt64 = 0
     private var utteranceGeneration: UInt64 = 0
@@ -543,7 +544,6 @@ final class FlowStateAppModel: ObservableObject {
     private func updateVoiceHUD() {
         guard showsVoiceHUD else { return }
         voiceHUD.show(status: voiceStatus, transcript: latestTranscript, isListening: isListening,
-            onFinish: { [weak self] in self?.finishVoiceSession() },
             onStop: { [weak self] in self?.stopVoiceSession() },
             onConfirm: pendingIntent == nil ? nil : { [weak self] in self?.confirmPendingIntent() },
             onSettings: { [weak self] in
@@ -553,6 +553,7 @@ final class FlowStateAppModel: ObservableObject {
     }
 
     func startVoiceSession() {
+        guard !isFinishingVoice else { return }
         if isListening {
             if speechSettings.activation == .toggle { finishVoiceSession() }
             return
@@ -614,13 +615,15 @@ final class FlowStateAppModel: ObservableObject {
             voiceStatus = "Released before speech was ready. Hold again."
             return
         }
+        isFinishingVoice = true
         speechCapture.finish()
-        Task { await speechCoordinator.pushToTalkUp() }
+        Task { await speechCoordinator.finish() }
         voiceStatus = "Finishing transcription"
     }
 
     func stopVoiceSession() {
         showsVoiceHUD = false
+        isFinishingVoice = false
         voiceHUD.hide()
         voiceGeneration &+= 1
         preparingVoice = false
@@ -701,6 +704,7 @@ final class FlowStateAppModel: ObservableObject {
         guard token == voiceGeneration else { return }
         if !result.transcript.isEmpty || !result.sessionEnded { latestTranscript = result.transcript }
         if result.sessionEnded {
+            isFinishingVoice = false
             isListening = false
             voiceStatus = latestTranscript.isEmpty
                 ? "No speech detected. Try again."
@@ -1055,77 +1059,61 @@ final class FlowStateAppModel: ObservableObject {
 
 struct FlowStateMenuView: View {
     @Environment(\.openSettings) private var openSettings
-    @ObservedObject private var localization = UILocalization.shared
     @ObservedObject var model: FlowStateAppModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(L10n.text("Flow State"))
-                    .font(.custom("Space Grotesk", size: 20, relativeTo: .headline))
-                Spacer()
-                Button {
-                    NSApplication.shared.activate()
-                    openSettings()
-                } label: {
-                    Image(systemName: "gearshape")
-                        .accessibilityLabel(L10n.text("Open settings"))
+        VStack(spacing: 4) {
+            Button {
+                if model.isListening || model.isFinishingVoice { model.stopVoiceSession() }
+                else { model.startVoiceSession() }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: model.isListening || model.isFinishingVoice ? "stop" : "play")
+                        .font(.system(size: 12))
+                        .frame(width: 14)
+                    Text(model.isListening || model.isFinishingVoice ? "Stop session" : "Start session")
+                    Spacer()
                 }
-                .buttonStyle(.plain)
             }
-            Text(L10n.text("A voice controller for your Mac. Sessions start only when you ask."))
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-
-            statusRow("Voice", detail: model.voiceStatus, icon: "waveform")
-            if !model.latestTranscript.isEmpty {
-                Text(model.latestTranscript).textSelection(.enabled)
-                    .accessibilityLabel(L10n.format("Latest transcript: %@", model.latestTranscript))
+            .accessibilityLabel(model.isListening || model.isFinishingVoice ? "Stop voice session" : "Start voice session")
+            Divider().overlay(Color.white.opacity(0.12))
+            Button("Settings…") {
+                NSApplication.shared.activate()
+                openSettings()
             }
-            Button(L10n.text("Start voice session")) { model.startVoiceSession() }
-
-            Button(L10n.text("Stop listening")) { model.stopVoiceSession() }
-
-            Divider()
-            statusRow("Screen capture", detail: model.permissionStatus, icon: "lock.shield")
-            HStack {
-                Button(L10n.text("Request permission")) { model.requestScreenPermission() }
-                Button(L10n.text("Refresh")) { model.refreshPermissionStatus() }
+            .accessibilityLabel("Open settings")
+            Divider().overlay(Color.white.opacity(0.12))
+            Button("Quit Flow State") {
+                model.stopVoiceSession()
+                NSApplication.shared.terminate(nil)
             }
-
-            Divider()
-            Text("Uses the active app or the app named in your command.")
-                .font(.caption).foregroundStyle(.secondary)
-            Toggle("Use screen context when needed", isOn: $model.allowCloudScreenContext)
-            Text("With Screen Recording access, the relevant window can be sent to the cloud to understand a visual command.")
-                .font(.caption).foregroundStyle(.secondary)
-            HStack {
-                if model.desktopState == .reconciliationRequired {
-                    Button("I've checked the result") { model.beginInputTask() }
-                }
-                Button("Resume") { model.resumeInputTask() }
-                    .disabled(model.desktopState != .pausedForUser)
-                Button("Undo last edit") { model.undoLastDesktopAction() }
-            }
-            Text(L10n.text(model.desktopStatus))
-                .font(.system(size: 12))
-                .foregroundStyle(model.desktopState == .pausedForUser ? .orange : .secondary)
         }
-        .padding(18)
-        .frame(width: 380)
-        .background(PaperStyle.canvas)
+        .buttonStyle(FlowStateMenuRowStyle())
+        .padding(6)
+        .frame(width: 280)
+        .glassEffect(.regular.tint(PaperStyle.hud), in: .rect(cornerRadius: 12))
         .preferredColorScheme(.dark)
     }
+}
 
-    private func statusRow(_ title: String, detail: String, icon: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: icon)
-                .frame(width: 18)
-                .foregroundStyle(PaperStyle.secondary)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(L10n.text(title)).font(.system(size: 14, weight: .medium))
-                Text(L10n.text(detail)).font(.system(size: 12)).foregroundStyle(PaperStyle.muted)
-            }
+private struct FlowStateMenuRowStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Row(configuration: configuration)
+    }
+
+    private struct Row: View {
+        let configuration: ButtonStyleConfiguration
+        @State private var hovering = false
+        var body: some View {
+            configuration.label
+                .font(.custom("Helvetica Neue", size: 14))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .frame(height: 32)
+                .foregroundStyle(hovering || configuration.isPressed ? PaperStyle.accent : .white)
+                .background(hovering || configuration.isPressed ? PaperStyle.selected : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .contentShape(Rectangle())
+                .onHover { hovering = $0 }
         }
     }
 }
@@ -1135,8 +1123,11 @@ struct FlowStateApp: App {
     @StateObject private var model = FlowStateAppModel(preferences: .standard)
 
     var body: some Scene {
-        MenuBarExtra("Flow State", systemImage: "waveform") {
+        MenuBarExtra {
             FlowStateMenuView(model: model)
+        } label: {
+            Image(nsImage: FlowStateBrandMark.menuBarImage)
+                .accessibilityLabel("Flow State")
         }
         .menuBarExtraStyle(.window)
 

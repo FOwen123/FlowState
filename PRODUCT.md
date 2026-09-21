@@ -25,7 +25,7 @@ Examples include Brave and Substack reading, Spotify, messaging, and creative AI
 Use a native menu-bar app with a compact, transient heads-up display (HUD) and a separate settings window. Show what was heard, interpreted intent, current step, local/cloud processing, and accessible controls to stop, confirm, retry, or undo.
 
 - Offer configurable push-to-talk and a locally detected wake phrase. A hands-free session must not require holding a key. Validate microphone, battery, false activation, and interruption behavior before shipping wake activation.
-- Default to Auto intent recognition, with optional Dictation only and Commands only overrides. Finalize complete utterances automatically within an active session; Finish remains an override. Dictating a sentence containing “delete” must not execute a delete command.
+- Default to Auto intent recognition, with optional Dictation only and Commands only overrides. Finalize complete utterances automatically within an active session. Releasing the shortcut in push-to-talk mode, or pressing it again in toggle mode, finishes transcription; do not require a Finish button. Dictating a sentence containing “delete” must not execute a delete command.
 - Support voice correction and clarification in English. Preserve meaning during dictation cleanup; do not invent or silently remove substantive content.
 - States: idle, listening, resolving, acting, awaiting confirmation, paused, completed, failed, cancelled. Screen capture is off while idle.
 - A local stop path remains available while cloud calls or actions are running. Cancellation invalidates queued actions and late replies. Report already completed external effects accurately.

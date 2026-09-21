@@ -10,7 +10,6 @@ final class VoiceHUDController {
         status: String,
         transcript: String,
         isListening: Bool,
-        onFinish: @escaping () -> Void,
         onStop: @escaping () -> Void,
         onConfirm: (() -> Void)? = nil,
         onSettings: @escaping () -> Void = {}
@@ -18,7 +17,6 @@ final class VoiceHUDController {
         model.status = status
         model.transcript = transcript
         model.isListening = isListening
-        model.onFinish = onFinish
         model.onStop = onStop
         model.onSettings = onSettings
         model.onConfirm = onConfirm
@@ -43,7 +41,7 @@ final class VoiceHUDController {
         }
 
         let panel = VoiceHUDPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 156),
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 56),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -83,7 +81,6 @@ final class VoiceHUDModel: ObservableObject {
     @Published var status = "Ready"
     @Published var transcript = ""
     @Published var isListening = false
-    var onFinish: () -> Void = {}
     var onStop: () -> Void = {}
     var onSettings: () -> Void = {}
     var onConfirm: (() -> Void)?
@@ -97,120 +94,112 @@ private final class VoiceHUDPanel: NSPanel {
 
 struct VoiceHUDView: View {
     @Environment(\.openSettings) private var openSettings
-    @ObservedObject private var localization = UILocalization.shared
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @ObservedObject var model: VoiceHUDModel
+
+    private var showsDetails: Bool {
+        model.canConfirm || !model.isListening ||
+            !(model.status.hasPrefix("Listening —") || model.status.hasPrefix("Listening for "))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
+            HStack(alignment: .center, spacing: 16) {
                 VoiceHUDWaveform(isListening: model.isListening)
-                    .frame(width: 64, height: 30)
-                    .accessibilityLabel(L10n.text(model.isListening ? "Listening" : "Processing"))
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(L10n.text("Flow State"))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(VoiceHUDPalette.text)
+                    .frame(width: 48, height: 26)
+                    .accessibilityLabel(model.isListening ? "Listening" : "Processing")
+                Text(model.transcript.isEmpty ? (model.isListening ? "Listening…" : "Flow State") : model.transcript)
+                    .font(.custom("Helvetica Neue", size: 15))
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel("Latest transcript")
+                Button(action: model.onStop) {
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 32, height: 32)
+                        .background(.white.opacity(0.08), in: Circle())
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
                 }
-
-                Spacer(minLength: 12)
-
-                HStack(spacing: 8) {
-                    Button {
-                        model.onSettings()
-                        NSApplication.shared.activate()
-                        openSettings()
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                    .accessibilityLabel("Open control settings")
-                    .buttonStyle(VoiceHUDButtonStyle(tint: VoiceHUDPalette.divider))
-                    Button(model.canConfirm ? "Confirm" : L10n.text("Finish")) {
-                        if model.canConfirm { model.onConfirm?() } else { model.onFinish() }
-                    }
-                        .buttonStyle(VoiceHUDButtonStyle(tint: VoiceHUDPalette.accent))
-                        .accessibilityLabel(model.canConfirm ? "Confirm proposed action" : L10n.text("Finish voice session"))
-                        .disabled(!model.isListening && !model.canConfirm)
-                        .opacity(model.isListening || model.canConfirm ? 1 : 0.45)
-                    Button(L10n.text("Stop"), action: model.onStop)
-                        .buttonStyle(VoiceHUDButtonStyle(tint: VoiceHUDPalette.stop))
-                        .accessibilityLabel(L10n.text("Stop voice session"))
-                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Stop voice session")
+                .help("Stop listening and cancel the current command")
             }
+            .padding(.leading, 12)
+            .padding(.trailing, 6)
+            .padding(.vertical, 6)
 
-            Text(L10n.text(model.status))
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(VoiceHUDPalette.text)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 12)
-                .accessibilityLabel("Voice status")
-
-            Divider()
-                .overlay(VoiceHUDPalette.divider)
-                .padding(.vertical, 12)
-
-            Text(model.transcript.isEmpty ? (model.isListening ? L10n.text("Listening for your voice…") : L10n.text("No transcript yet")) : model.transcript)
-                .font(.system(size: 13))
-                .foregroundStyle(model.transcript.isEmpty ? VoiceHUDPalette.muted : VoiceHUDPalette.text)
-                .lineLimit(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel(L10n.text("Latest transcript"))
-        }
-        .padding(16)
-        .frame(width: 520)
-        .background {
-            RoundedRectangle(cornerRadius: 16)
-                .fill(VoiceHUDPalette.panel)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(VoiceHUDPalette.divider, lineWidth: 1)
+            if showsDetails {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(L10n.text(model.status))
+                        .font(.custom("Helvetica Neue", size: 14))
+                        .foregroundStyle(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel("Voice status")
+                    HStack(spacing: 12) {
+                        if model.canConfirm {
+                            Button("Confirm action") { model.onConfirm?() }
+                                .accessibilityLabel("Confirm proposed action")
+                        }
+                        Button("Settings…") {
+                            model.onSettings()
+                            NSApplication.shared.activate()
+                            openSettings()
+                        }
+                        .accessibilityLabel("Open control settings")
+                    }
+                    .buttonStyle(VoiceHUDActionStyle())
                 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+            }
+        }
+        .frame(width: 360)
+        .glassEffect(reduceTransparency ? .identity : .regular.tint(PaperStyle.hud),
+                     in: .rect(cornerRadius: showsDetails ? 20 : 28))
+        .background {
+            if reduceTransparency {
+                RoundedRectangle(cornerRadius: showsDetails ? 20 : 28)
+                    .fill(PaperStyle.hud)
+                    .overlay { RoundedRectangle(cornerRadius: showsDetails ? 20 : 28).stroke(PaperStyle.controlBorder, lineWidth: 1) }
+            }
         }
         .preferredColorScheme(.dark)
         .accessibilityElement(children: .contain)
+
     }
 }
 
-private struct VoiceHUDButtonStyle: ButtonStyle {
-    let tint: Color
-
+private struct VoiceHUDActionStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(VoiceHUDPalette.text)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 6)
-            .background(tint.opacity(configuration.isPressed ? 0.78 : 1))
-            .clipShape(Capsule())
-            .contentShape(Capsule())
+            .font(.custom("Helvetica Neue", size: 14))
+            .foregroundStyle(configuration.isPressed ? PaperStyle.accent : .white)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 36)
+            .background(configuration.isPressed ? PaperStyle.selected : .clear, in: Capsule())
+            .overlay(Capsule().stroke(PaperStyle.controlBorder, lineWidth: 1))
     }
 }
 
 private struct VoiceHUDWaveform: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let isListening: Bool
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 0.12, paused: !isListening)) { timeline in
+        TimelineView(.animation(minimumInterval: 0.12, paused: !isListening || reduceMotion)) { timeline in
             HStack(alignment: .center, spacing: 4) {
-                ForEach(0..<8, id: \.self) { index in
-                    let phase = timeline.date.timeIntervalSinceReferenceDate * 4.0 + Double(index) * 0.7
-                    let level = isListening ? 0.25 + 0.75 * ((sin(phase) + 1) / 2) : 0.25
+                ForEach(0..<7, id: \.self) { index in
+                    let phase = timeline.date.timeIntervalSinceReferenceDate * 4 + Double(index) * 0.7
+                    let level = isListening && !reduceMotion ? 0.25 + 0.75 * ((sin(phase) + 1) / 2) : [0.2, 0.6, 0.85, 0.7, 1, 0.5, 0.2][index]
                     Capsule()
-                        .fill(isListening ? VoiceHUDPalette.accent : VoiceHUDPalette.muted)
-                        .frame(width: 4, height: 6 + CGFloat(level * 22))
+                        .fill(isListening ? PaperStyle.accent : PaperStyle.muted)
+                        .frame(width: 3, height: 4 + CGFloat(level * 20))
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
-}
-
-private enum VoiceHUDPalette {
-    static let panel = Color(red: 11 / 255, green: 14 / 255, blue: 20 / 255)
-    static let text = Color.white
-    static let muted = Color(red: 161 / 255, green: 164 / 255, blue: 165 / 255)
-    static let divider = Color(red: 41 / 255, green: 45 / 255, blue: 48 / 255)
-    static let accent = Color(red: 88 / 255, green: 194 / 255, blue: 255 / 255)
-    static let stop = Color(red: 214 / 255, green: 95 / 255, blue: 104 / 255)
 }
