@@ -20,7 +20,8 @@ func voiceStatuses()->[String] {
  var output:[String]=[]
  func visit(_ e:AXUIElement,_ depth:Int) {
   guard depth<10 else{return}
-  if attr(e,"AXDescription") as? String == "Listening" { output.append("Listening") }
+  if let description = attr(e,"AXDescription") as? String,
+     description.hasPrefix("Listening") { output.append(description) }
   if attr(e,"AXRole") as? String == "AXStaticText", let text=attr(e,"AXValue") as? String,
      ["Listening…", "Listening —", "Voice status: Listening", "Preparing on-device", "Microphone permission", "Install the selected"].contains(where: { text.hasPrefix($0) }) {output.append(text)}
   for c in attr(e,"AXChildren") as? [AXUIElement] ?? [] {visit(c,depth+1)}
@@ -69,10 +70,10 @@ if mode == "settings" {
   }
   print("Settings opened while listening:",controlsOpened)
  }
- guard let stop=windows().compactMap({find($0,{["Stop listening", "Stop voice session"].contains(attr($0,"AXDescription") as? String ?? "")})}).first else {
-  print("Stop control unavailable"); exit(1)
+ guard let stop=windows().compactMap({find($0,{["Cancel task", "Stop listening", "Stop voice session"].contains(attr($0,"AXDescription") as? String ?? "")})}).first else {
+  print("Cancel control unavailable"); exit(1)
  }
- print("Stop press", AXUIElementPerformAction(stop,kAXPressAction as CFString).rawValue)
+ print("Cancel press", AXUIElementPerformAction(stop,kAXPressAction as CFString).rawValue)
  var stopped = false
  for _ in 0..<30 {
   stopped = !voiceStatuses().contains { $0.contains("Listening") }

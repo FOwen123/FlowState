@@ -5,6 +5,14 @@ import Testing
 
 private let registryActions: Set<DesktopActionKind> = [.openApplication, .scroll, .focus, .select, .press]
 
+@Test("installed app names derive only safe generic-suffix aliases")
+func applicationRegistryDerivesGenericSuffixAliases() {
+    #expect(ApplicationRegistry.derivedAliases(for: "Brave Browser") == ["Brave"])
+    #expect(ApplicationRegistry.derivedAliases(for: "Example App") == ["Example"])
+    #expect(ApplicationRegistry.derivedAliases(for: "Mail") == [])
+    #expect(ApplicationRegistry.derivedAliases(for: "Microsoft Word") == [])
+}
+
 @Test("registry resolves a closed Brave entry through an exact alias")
 func applicationRegistryResolvesClosedAlias() {
     let brave = ApplicationRegistryEntry(

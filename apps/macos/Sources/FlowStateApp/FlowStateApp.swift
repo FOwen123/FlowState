@@ -1833,7 +1833,9 @@ final class FlowStateAppModel: ObservableObject {
                 self.isListening = false
                 self.activeSpeechPurpose = nil
                 self.listeningPurpose = nil
-                self.voiceStatus = "Voice session finished"
+                if self.latestTranscript.isEmpty {
+                    self.voiceStatus = "No speech detected. Try again."
+                }
             }
             return
         }

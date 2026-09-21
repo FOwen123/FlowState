@@ -153,3 +153,31 @@ Checks passed: 26 web component tests, TypeScript checking, formatting, and thre
 - Voice settings and missing-model feedback now identify Apple's on-device English SpeechTranscriber assets and the Download English speech model button. Jev is not the transcription engine.
 - Observed the compact-layout tests fail before implementation, then all 111 Core, 9 Cloud, and 36 App tests pass with Swift compilation. Stable-signed debug app repackaged and relaunched; live menu → Settings check passed. Signature verification passed.
 - No model download or new audio-recognition check was performed. Waveform animation indicates listening, not measured microphone amplitude.
+
+## September 21, 2026 — separate Dictation and Mac Control assistant
+
+Branch: local `main`. No push, production deployment, or message send was performed.
+
+- FlowState now exposes two independently configurable hold-only shortcuts. Dictation locks the focused non-secure editable field at key-down and never enters control routing. Mac Control cannot emit generic text insertion and directs `type`, `write`, and `dictate` requests to the Dictation shortcut.
+- Speech recognition uses Apple's on-device English `SpeechTranscriber`. Spoken assistant output uses `AVSpeechSynthesizer` with the selected installed English macOS voice; no cloud TTS model is used. Automated policy checks cover completion timing, mute/replay, and redaction, but an automated test cannot establish perceived audio quality.
+- The installed-app registry includes closed apps, deterministic aliases, explicit capabilities, and ambiguity handling. A live failure showed that “Open Brave” did not derive the “Brave” alias from “Brave Browser”; a failing regression preceded the generic-suffix alias fix. The opt-in synthetic Brave test then passed opening Brave plus verified down/up scrolling.
+- A live disposable TextEdit test passed activation, select-all, arrow input, scrolling, geometry revalidation, and bounded in-memory capture with no upload. Finder and Notes routes are covered by registry/driver tests; no destructive live file or note changes were made.
+- The first packaged voice smoke exposed a fresh-task nil unwrap in `ControlConversationSession.beginHoldIfCurrent`. A focused regression reproduced the crash, the task is now created before a token is returned, and the repackaged app passed live Settings, Mac Control listening, persistent X cancellation, and HUD-to-settings checks.
+- Structured URL and Gmail-compose handoffs require exact advertised browser targets. Gmail handoff prepares a reviewed compose URL and never sends. External-effect receipts are persisted before launch, deduplicated across plans with an opaque action fingerprint, and reconciled idempotently after response loss.
+- The Jev v3 main route and stages A–E were evaluated using the checked-in development/calibration/holdout reports. None passed every release gate, so all remain disabled; deterministic routing and review remain authoritative. Exact measurements and gate failures are recorded in `docs/testing/intent-evaluation.md`.
+
+Final automated evidence after integration:
+
+| Check | Result |
+|---|---|
+| `swift test --package-path apps/macos` | 132 Core, 19 Cloud, and 76 App tests passed; two opt-in OS tests skipped in the ordinary run |
+| `pnpm test` | 169 tests passed across 27 files |
+| `pnpm typecheck` | Passed |
+| `pnpm format:check` | Passed |
+| `git diff --check` | Passed |
+| Independent pre-commit review | No findings after the final recovery/idempotency repair |
+| Local debug package | Apple Development signature passed strict verification; app reopened from `apps/macos/.build/FlowState.app` |
+| Live UI smoke | Settings opened; Mac Control reached Listening; X ended listening; settings opened from the HUD while listening |
+| Opt-in desktop smoke | Disposable TextEdit fixture passed; synthetic local Brave page passed open plus both scroll directions |
+
+Authenticated cloud planning, real Gmail account selection, visual-computer-use routing, file attachment, and sending remain unavailable or unverified and are not advertised as supported. Jev stages that missed correctness or latency gates remain disabled rather than being counted as shipped capabilities.

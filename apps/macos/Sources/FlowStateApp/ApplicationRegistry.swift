@@ -145,13 +145,23 @@ struct ApplicationRegistry: Sendable {
             return ApplicationRegistryEntry(
                 bundleIdentifier: app.bundleIdentifier,
                 displayName: app.name,
-                aliases: (aliases[app.bundleIdentifier] ?? []) + learnedAliases,
+                aliases: (aliases[app.bundleIdentifier] ?? []) + learnedAliases + derivedAliases(for: app.name),
                 isRunning: running.contains(app.bundleIdentifier),
                 supportedActions: nativeSupportedActions(for: app.bundleIdentifier, integrations: integrations),
                 integrations: integrations
             )
         }
         return ApplicationRegistry(entries: entries)
+    }
+
+    static func derivedAliases(for displayName: String) -> [String] {
+        var words = displayName.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        guard words.count > 1,
+              let suffix = words.last?.lowercased(),
+              ["app", "application", "browser"].contains(suffix) else { return [] }
+        words.removeLast()
+        let alias = words.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        return alias.isEmpty ? [] : [alias]
     }
 
     private static func explicitMemoryAliases(defaults: UserDefaults) -> [(trigger: String, value: String)] {

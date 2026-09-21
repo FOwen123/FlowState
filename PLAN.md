@@ -2,7 +2,7 @@
 
 Updated September 20, 2026. Current implementation scope: sections 1–11. Product authority: [PRODUCT.md](PRODUCT.md). Contributor rules: [AGENTS.md](AGENTS.md). Account/configuration checklist: [ENVIRONMENT.md](ENVIRONMENT.md).
 
-**Next priority:** [English-only intent recognition](docs/intent-recognition-plan.md). This evaluation-first plan supersedes the earlier bilingual/manual-mode direction and defines the file-level work for automatic utterance completion, Jev routing, measured fallback thresholds and contextual execution. English migration and the core routing path are implemented; the measured policy requires review of cloud proposals. Live acceptance and release gates remain open.
+**Next priority:** [Two-shortcut dictation and conversational Mac assistant](docs/flowstate-assistant-todo.md). That TODO supersedes this document's Auto mode, session toggle, wake phrase, generic control-mode text insertion, and physical-takeover pause steps. It contains the file-level sequence and acceptance gates. [English-only intent recognition](docs/intent-recognition-plan.md) remains the evaluation record and reusable Jev test foundation.
 
 Implementation has started. See [verification results](docs/testing/results.md) for completed evidence and [setup instructions](docs/setup.md) for configuration. Unchecked items remain open acceptance gates; some contain partial implementation. Paths below are planning targets and may be consolidated in the actual code. Keep modules together until their responsibilities justify splitting them. Complete each slice with failing behavioral tests, implementation, relevant checks, and observed user-facing behavior. Do not start servers, production builds, or deployments merely to check this document.
 

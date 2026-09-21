@@ -22,15 +22,15 @@ Examples include Brave and Substack reading, Spotify, messaging, and creative AI
 
 ## Voice and visible interaction
 
-Use a native menu-bar app with a compact, transient heads-up display (HUD) and a separate settings window. Show what was heard, interpreted intent, current step, local/cloud processing, and accessible controls to stop, confirm, retry, or undo.
+Use a native menu-bar app with a compact heads-up display (HUD) and a separate settings window. Show what was heard, the current task and step, local/cloud processing, spoken assistant responses, and accessible controls to cancel, confirm, retry, mute, or undo.
 
-- Offer configurable push-to-talk and a locally detected wake phrase. A hands-free session must not require holding a key. Validate microphone, battery, false activation, and interruption behavior before shipping wake activation.
-- Default to Auto intent recognition, with optional Dictation only and Commands only overrides. Finalize complete utterances automatically within an active session. Releasing the shortcut in push-to-talk mode, or pressing it again in toggle mode, finishes transcription; do not require a Finish button. Dictating a sentence containing “delete” must not execute a delete command.
-- Support voice correction and clarification in English. Preserve meaning during dictation cleanup; do not invent or silently remove substantive content.
-- States: idle, listening, resolving, acting, awaiting confirmation, paused, completed, failed, cancelled. Screen capture is off while idle.
-- A local stop path remains available while cloud calls or actions are running. Cancellation invalidates queued actions and late replies. Report already completed external effects accurately.
-- Physical mouse or keyboard input pauses desktop execution immediately at the next safe interruption point. Distinguish real user input from injected events. Independent cloud work may continue under its existing grants.
-- Resume only after the user requests it and FlowState rechecks focus, screen state, permissions, and pending actions. Never steal focus when a background result arrives.
+- Provide exactly two configurable hold-only shortcuts: Dictation and Mac Control. Holding starts capture and releasing finalizes it. Toggle and wake activation are deferred.
+- Dictation is a hard text-entry boundary. It captures the focused editable field at activation, conservatively cleans the transcript, and inserts only into that same non-secure field. It never invokes Jev, screen observation, planning, or Mac actions.
+- Mac Control is a task-scoped conversational assistant. It remembers bounded follow-up context across shortcut presses, asks short clarification questions, and speaks milestones, failures, and verified completion. It never falls back to generic typing; text is allowed only as a parameter of a registered action.
+- Preserve meaning during dictation cleanup; do not invent or silently remove substantive content. A focus change keeps the transcript in a temporary recovery card and local history instead of inserting it elsewhere.
+- States: idle, listening, resolving, acting, awaiting confirmation, completed, failed, and cancelled. Screen capture is off while idle.
+- A persistent X provides the local cancellation path while cloud calls or actions run. Cancellation invalidates queued actions and late replies. Report already completed external effects accurately.
+- Unrelated physical input does not cancel a separate automation. Reobserve before every visible step. If the user changes the expected target, replan the remaining safe work or ask for clarification; never act on stale state.
 
 ## Reference workflows
 
@@ -51,7 +51,7 @@ Long workflows run step by step with visible progress. A result from one app is 
 | Mac application | Swift, SwiftUI, Swift Package Manager | Menu bar, HUD, onboarding, settings, local execution |
 | Speech | Current local Apple speech path; evaluate alternatives only where measured English failures justify them | English transcription, utterance completion, local activation and stop |
 | Mac context | NSWorkspace, macOS Accessibility, ScreenCaptureKit, Vision OCR where useful | Relevant app state, permitted screenshots, text and control candidates |
-| Semantic decisions | Jev through TypeSafe's documented API/SDK | Bounded intent and candidate selection using textual state and explicit preferences |
+| Semantic decisions | Jev through TypeSafe's documented API/SDK | Bounded app/action/tool/target selection, missing-slot checks, risk suggestions and measured validation using textual state |
 | Vision and planning | Managed OpenAI models initially, invoked server-side | Interpret screenshots, generate language, construct typed multi-step plans |
 | Execution | Native APIs, Accessibility actions, approved Shortcuts/Apple Events, bounded keyboard/mouse events | Execute the most reliable permitted mechanism and verify effects |
 | Local storage | SwiftData and Keychain | Preferences/cache, action recovery data; device credentials in Keychain |
@@ -67,20 +67,22 @@ Authentication provider, exact speech/vision models, minimum macOS version, and 
 ### Decision and action pipeline
 
 ```text
-Local activation → transcription → utterance completion → Auto intent routing
-                                    ↓
-Minimal permitted text context + explicit preferences; screenshot only when needed
-                                    ↓
-Exact local match / Jev bounded choice / vision + language-model plan
-                                    ↓
-Validated registered action → deterministic permission check
-                                    ↓
-Confirmation when required → local or authorized service execution
-                                    ↓
+Hold Dictation → transcription → cleanup → revalidate original field → paste/recover
+
+Hold Mac Control → transcription → local match / Jev bounded choice
+                                      ↓
+App registry + minimal permitted text context; screenshot only when needed
+                                      ↓
+Validated direct action / vision + language-model multi-step plan
+                                      ↓
+Deterministic permission and risk checks → confirmation when required
+                                      ↓
+Structured integration / native Accessibility / bounded visual control
+                                      ↓
 Observe and verify → checkpoint → next step / clarification / recovery
 ```
 
-Cancellation and physical takeover bypass cloud reasoning and directly gate the local executor. Serialize desktop actions per Mac. Independent cloud tasks can proceed without owning the desktop.
+The local X bypasses cloud reasoning and directly gates the executor. Serialize visible desktop actions per Mac. Reobserve after physical input and before each step; independent cloud tasks can proceed without owning the desktop.
 
 Screenshots are central visual context, not a requirement to click coordinates for every operation. Prefer reliable native/service APIs and Accessibility controls when available. For visual clicks, refresh stale observations and validate the app, window, display scaling, and target immediately before input.
 
@@ -88,9 +90,9 @@ Screenshots are central visual context, not a requirement to click coordinates f
 
 Implement the evaluation-first sequence in [English-only intent recognition](docs/intent-recognition-plan.md). The current code still needs migration; this direction is not a completion claim.
 
-Use Jev to choose between known intents, resolve references such as “that file,” and rank a bounded set of app/control/file candidates. Exact local commands and saved aliases can bypass it. Jev does not transcribe speech, interpret screenshots, generate rewritten sentences, or grant permission.
+Use Jev only in Mac Control to select bounded apps, actions, tools and targets, identify missing slots, suggest risk/clarification, rank permitted memories, and validate plan steps or textual results when measured evidence supports that role. Exact local commands and saved aliases can bypass it. Dictation bypasses Jev. Jev does not transcribe speech, interpret screenshots, generate text or plans, execute effects, or grant permission.
 
-The documented models accept text. Convert visual context into bounded textual candidates using vision/OCR before calling Jev. Customize requests with explicit preferences and rules rather than assuming per-user training. Use documented response shapes, pin evaluated model versions, and calibrate decisions on FlowState's own examples. Evaluate English utterances, including ambiguity, quoted commands, corrections and speech-recognition errors. Choose intent/action/target thresholds from calibration data and verify on untouched holdout data. Escalate to a text or vision-capable LLM when the missing context can resolve uncertainty; otherwise clarify. Never treat confidence as a permission grant. See the [TypeSafe model documentation](https://docs.typesafe.ai/models.md).
+The documented models accept text. Convert visual context into bounded textual candidates using vision/OCR before calling Jev. Customize requests with explicit preferences and rules rather than assuming per-user training. Use documented response shapes and pin evaluated model versions. Before assigning Jev a new decision, compare its held-out correctness and p50/p95 latency with the route it replaces; ship the Jev stage only when it is at least as correct, faster at p95, and has no accepted consequential wrong action in the holdout. Escalate to a text or vision-capable LLM when missing context can resolve uncertainty; otherwise clarify. Never treat confidence as a permission grant. See the [TypeSafe model documentation](https://docs.typesafe.ai/models.md).
 
 ### Convex and external services
 
@@ -142,9 +144,9 @@ Every registered action declares parameter validation, preconditions, required g
 
 Implement coherent end-to-end slices under the English-only scope while preserving permission controls. The complete product roadmap remains broader than what can be demonstrated at submission.
 
-1. **English automatic control foundation:** evaluate Jev routing and fallback thresholds, validate English speech, automatic utterance completion and local stop; deliver navigation, dictation, corrections, onboarding, and HUD in representative native and browser apps.
-2. **Context and personalization:** add approved screenshots, verified visual targets, explicit memory, Jev routing, per-action grants, and takeover/resume.
-3. **Durable workflows:** add managed planning, Convex progress, file attachment, bounded recovery and undo, public research, and both email paths.
+1. **Purpose split:** deliver two hold-only shortcuts, isolated field-bound dictation, control-mode text refusal, recovery, and local history.
+2. **Conversational control:** add the application registry, measured Jev routing, spoken task context, approved screenshots, and verified visual targets.
+3. **Durable workflows:** connect voice requests to cross-app planning, Convex progress, risk checkpoints, X cancellation, bounded recovery and undo, public research, and both email paths.
 4. **Release readiness:** exercise clean installation, authentication, revoked permissions, provider failures, deletion, signed distribution, and reproducible setup.
 
 For each slice, record task completion, required physical interventions, corrections, unintended actions, end-to-end latency, and stop latency. Test English intent categories, speech errors, literal dictation and ambiguity separately. Measure recognition-to-stop independently from spoken-word-to-stop; never claim instant acoustic recognition. Establish performance targets from measured baselines rather than undocumented model guarantees.
@@ -152,7 +154,7 @@ For each slice, record task completion, required physical interventions, correct
 Release acceptance includes:
 
 - A non-developer can install, understand permissions, and perform the core navigation/dictation flow in English.
-- Voice stop and physical takeover prevent further desktop steps; stale cloud responses and reconnects cannot restart them.
+- X cancellation prevents further desktop steps; target changes force reobservation and stale cloud responses or reconnects cannot restart work.
 - A creative file-attachment workflow and a research/email workflow complete with visible verification and recovery.
 - Undo works for supported actions and accurately explains unsupported reversal.
 - Account/device isolation, expired approvals, focus changes, duplicate requests, untrusted page instructions, and permission revocation are tested.

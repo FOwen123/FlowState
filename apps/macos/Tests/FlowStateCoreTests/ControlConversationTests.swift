@@ -2,6 +2,22 @@ import Foundation
 import Testing
 @testable import FlowStateCore
 
+@Test("a first hold creates a task before returning its token")
+@MainActor func firstHoldCreatesConversationTask() {
+    let session = ControlConversationSession()
+    let expiry = Date().addingTimeInterval(60)
+
+    let token = session.beginHoldIfCurrent(
+        targetBundleIdentifier: "com.example.Editor",
+        grantExpiresAt: expiry
+    )
+
+    #expect(token != nil)
+    #expect(session.taskID == token?.taskID)
+    #expect(session.targetBundleIdentifier == "com.example.Editor")
+    #expect(session.grantExpiresAt == expiry)
+}
+
 @Test("control conversation keeps one task ID across hold activations")
 @MainActor func conversationTaskIDIsStableAcrossHolds() {
     let session = ControlConversationSession(maxTurns: 4)

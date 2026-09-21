@@ -1,8 +1,8 @@
 # Flow State
 
-A voice controller for macOS, built to reduce repeated typing, clicking, and scrolling. Formerly ProWhisper.
+A voice assistant for macOS with separate paths for focused-field dictation and Mac control. Formerly ProWhisper.
 
-Flow State opens apps, scrolls, types and handles supported controls by voice. A Convex-backed web workspace supports public-article research and reviewed assistant-email workflows.
+Hold the Dictation shortcut to enter speech in the field that was focused when capture began. Hold the Mac Control shortcut to open apps, navigate supported controls, or run a visible reviewed task; control requests never fall back to typing the utterance. A Convex-backed web workspace supports public-article research and reviewed assistant-email workflows.
 
 **Status:** working development prototype with a local macOS debug app and a configured Convex development deployment. It is not a notarized release. See [verification results](docs/testing/results.md) for tested behavior and remaining acceptance work.
 

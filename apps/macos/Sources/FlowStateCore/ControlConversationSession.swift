@@ -82,6 +82,7 @@ public final class ControlConversationSession {
             clear()
             return nil
         }
+        if taskID == nil { taskID = UUID() }
         if self.targetBundleIdentifier == nil, let targetBundleIdentifier {
             self.targetBundleIdentifier = targetBundleIdentifier
         }

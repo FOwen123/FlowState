@@ -149,10 +149,10 @@ private actor FinalizationDriver: DesktopDriver {
     }
     #expect(await driver.recordedInputs() == [.scroll(lines: -3)])
     for _ in 0..<100 {
-        if model.voiceStatus == "Voice session finished" { break }
+        if model.voiceStatus.hasPrefix("Completed:") { break }
         try await Task.sleep(for: .milliseconds(2))
     }
-    #expect(model.voiceStatus == "Voice session finished")
+    #expect(model.voiceStatus == "Completed: Scroll")
 }
 
 @Test("Stop invalidates a finalized command before automatic setup can begin")
@@ -256,5 +256,28 @@ private actor FinalizationDriver: DesktopDriver {
     model.consume(SpeechRecognitionResult(transcript: "Resume", language: .english, isFinal: true, utteranceID: UUID(), sessionEnded: false), token: 0)
     try await Task.sleep(for: .milliseconds(50))
     #expect(model.pendingIntentSummary == nil)
+    model.cancelInputTask()
+}
+
+@Test("ending capture does not discard an already finalized command", arguments: [false, true], [
+    ("Open TextEdit.", DesktopAction.openApplication(bundleIdentifier: "com.apple.TextEdit")),
+    ("Scroll down.", .scroll(lines: -3)),
+    ("Scroll up.", .scroll(lines: 3)),
+    ("Press tab.", .press(key: "Tab", modifiers: nil))
+])
+@MainActor func sessionEndPreservesFinalCommand(waitForAction: Bool, command: (String, DesktopAction)) async throws {
+    let driver = AutomaticTargetDriver()
+    let coordinator = SpeechSessionCoordinator(settings: SpeechSettings(mode: .command), purpose: .control)
+    await coordinator.pushToTalkDown(purpose: .control)
+    let model = FlowStateAppModel(desktopController: DesktopAutomationController(driver: driver), accessibilityGranted: { true }, frontmostApplication: { "com.example.Editor" }, speechCoordinator: coordinator)
+    model.speechSettings = SpeechSettings(mode: .command)
+    model.consume(SpeechRecognitionResult(transcript: command.0, language: .english, isFinal: true, utteranceID: UUID(), sessionEnded: false, purpose: .control), token: 0)
+    if waitForAction {
+        for _ in 0..<100 { if model.voiceStatus.hasPrefix("Completed:") { break }; try await Task.sleep(for: .milliseconds(5)) }
+    }
+    model.consume(SpeechRecognitionResult(transcript: "", language: .english, isFinal: true, utteranceID: UUID(), sessionEnded: true, purpose: .control), token: 0)
+    for _ in 0..<100 { if model.voiceStatus.hasPrefix("Completed:") { break }; try await Task.sleep(for: .milliseconds(5)) }
+    #expect(await driver.inputs == [command.1])
+    #expect(model.voiceStatus.hasPrefix("Completed:"))
     model.cancelInputTask()
 }
