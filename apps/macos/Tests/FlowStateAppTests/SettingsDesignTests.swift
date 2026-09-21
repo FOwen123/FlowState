@@ -8,6 +8,20 @@ func settingsNavigationFollowsPaperOrder() {
     #expect(FlowStateSettingsSection.allCases.map(\.title) == ["General", "Models", "History", "Memory", "Permissions", "Account"])
 }
 
+@Test("models settings distinguishes the active engine from the planned download")
+func modelsSettingsDistinguishesAvailableEngines() {
+    #expect(SettingsSpeechModel.allCases.map(\.title) == ["Apple Speech", "Parakeet Unified English"])
+    #expect(SettingsSpeechModel.appleSpeech.isSelected)
+    #expect(!SettingsSpeechModel.parakeet.isSelected)
+    #expect(SettingsSpeechModel.parakeet.source == "Hugging Face")
+}
+
+@Test("models settings uses status dedicated to speech assets")
+@MainActor func modelsSettingsUsesDedicatedSpeechAssetStatus() {
+    let model = FlowStateAppModel()
+    #expect(model.speechModelStatus == "Apple Speech is selected")
+}
+
 @Test("personal mail keeps a readable message editor")
 @MainActor func personalMailKeepsReadableMessageEditor() {
     let view = NSHostingView(rootView: PersonalMailView())
