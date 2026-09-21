@@ -14,26 +14,18 @@ final class VoiceHUDController {
         purpose: SpeechSessionPurpose? = nil,
         onStop: @escaping () -> Void,
         onConfirm: (() -> Void)? = nil,
-        isMuted: Bool = false,
         lastResponse: String? = nil,
-        currentStep: String? = nil,
-        onReplay: @escaping () -> Void = {},
-        onMute: @escaping () -> Void = {},
-        onSettings: @escaping () -> Void = {}
+        currentStep: String? = nil
     ) {
         model.status = status
         model.transcript = transcript
         model.isListening = isListening
         model.purpose = purpose
         model.onStop = onStop
-        model.onSettings = onSettings
         model.onConfirm = onConfirm
         model.canConfirm = onConfirm != nil
-        model.isMuted = isMuted
         model.lastResponse = lastResponse
         model.currentStep = currentStep
-        model.onReplay = onReplay
-        model.onMute = onMute
 
         let panel = makePanelIfNeeded()
         if let host = panel.contentView as? NSHostingView<VoiceHUDView> {
@@ -96,14 +88,10 @@ final class VoiceHUDModel: ObservableObject {
     @Published var isListening = false
     @Published var purpose: SpeechSessionPurpose?
     var onStop: () -> Void = {}
-    var onSettings: () -> Void = {}
     var onConfirm: (() -> Void)?
     @Published var canConfirm = false
-    @Published var isMuted = false
     @Published var lastResponse: String?
     @Published var currentStep: String?
-    var onReplay: () -> Void = {}
-    var onMute: () -> Void = {}
 }
 
 private final class VoiceHUDPanel: NSPanel {
@@ -112,13 +100,12 @@ private final class VoiceHUDPanel: NSPanel {
 }
 
 struct VoiceHUDView: View {
-    @Environment(\.openSettings) private var openSettings
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @ObservedObject var model: VoiceHUDModel
 
     private var showsDetails: Bool {
         model.canConfirm || !model.isListening ||
-            model.currentStep != nil || model.lastResponse != nil ||
+            model.currentStep != nil ||
             !(model.status.hasPrefix("Listening —") || model.status.hasPrefix("Listening for "))
     }
 
@@ -155,7 +142,8 @@ struct VoiceHUDView: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityLabel(L10n.text("Latest transcript"))
                     }
-                    Text(L10n.text(model.status))
+                    Text(L10n.text(model.status == "The focused control is not editable."
+                        ? "Click a text field, then dictate again." : model.status))
                         .font(.custom("Helvetica Neue", size: 14))
                         .foregroundStyle(.white)
                         .fixedSize(horizontal: false, vertical: true)
@@ -167,41 +155,28 @@ struct VoiceHUDView: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityLabel(L10n.text("Current plan step"))
                     }
-                    if let lastResponse = model.lastResponse {
+                    if let lastResponse = model.lastResponse, lastResponse != model.status {
                         Text(lastResponse)
                             .font(.custom("Helvetica Neue", size: 13))
                             .foregroundStyle(PaperStyle.muted)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityLabel(L10n.text("Last spoken response"))
                     }
-                    HStack(spacing: 12) {
-                        if model.canConfirm {
-                            Button(L10n.text("Confirm action")) { model.onConfirm?() }
-                                .accessibilityLabel(L10n.text("Confirm proposed action"))
-                        }
-                        Button(L10n.text("Replay")) { model.onReplay() }
-                            .disabled(model.lastResponse == nil)
-                            .accessibilityLabel(L10n.text("Replay last spoken response"))
-                        Button(model.isMuted ? L10n.text("Unmute") : L10n.text("Mute")) { model.onMute() }
-                            .accessibilityLabel(L10n.text(model.isMuted ? "Unmute spoken responses" : "Mute spoken responses"))
-                        Button(L10n.text("Settings…")) {
-                            model.onSettings()
-                            NSApplication.shared.activate()
-                            openSettings()
-                        }
-                        .accessibilityLabel(L10n.text("Open control settings"))
+                    if model.canConfirm {
+                        Button(L10n.text("Confirm action")) { model.onConfirm?() }
+                            .accessibilityLabel(L10n.text("Confirm proposed action"))
+                            .buttonStyle(VoiceHUDActionStyle())
                     }
-                    .buttonStyle(VoiceHUDActionStyle())
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
             }
         }
         .frame(width: showsDetails ? 360 : 140)
-        .glassEffect(reduceTransparency ? .identity : .regular.tint(PaperStyle.hud),
+        .glassEffect(showsDetails || reduceTransparency ? .identity : .regular.tint(PaperStyle.hud),
                      in: .rect(cornerRadius: showsDetails ? 20 : 28))
         .background {
-            if reduceTransparency {
+            if showsDetails || reduceTransparency {
                 RoundedRectangle(cornerRadius: showsDetails ? 20 : 28)
                     .fill(PaperStyle.hud)
                     .overlay { RoundedRectangle(cornerRadius: showsDetails ? 20 : 28).stroke(PaperStyle.controlBorder, lineWidth: 1) }

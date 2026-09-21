@@ -1236,15 +1236,8 @@ final class FlowStateAppModel: ObservableObject {
                     self?.confirmPendingExternalEffect()
                 }
             },
-            isMuted: spokenResponsesMuted,
             lastResponse: lastSpokenResponse,
-            currentStep: currentPlanStep,
-            onReplay: { [weak self] in self?.replayLastSpokenResponse() },
-            onMute: { [weak self] in self?.setSpokenResponsesMuted(!(self?.spokenResponsesMuted ?? false)) },
-            onSettings: { [weak self] in
-                guard let self else { return }
-                self.settingsSection = self.accessibilityGranted() ? .tasks : .permissions
-            })
+            currentStep: currentPlanStep)
     }
 
     func startVoiceSession() {

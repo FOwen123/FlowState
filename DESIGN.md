@@ -321,3 +321,7 @@ Before shipping an interface built from this document, verify that:
 - Preview labels, release availability, completion messages, and delivery claims match implemented evidence.
 
 These are implementation acceptance checks. Updating this document does not establish that the application passes them.
+
+### Feedback panel refinement — September 21, 2026
+
+Ordinary listening stays a minimal waveform and cancel strip. Expanded feedback uses an opaque dark HUD surface for consistent text contrast over other apps. Keep only the cancel control and conditional action confirmation in the panel; Replay, spoken-response preferences, and Settings belong in the settings window reached from the menu bar. Avoid repeating the same spoken response as the status.
