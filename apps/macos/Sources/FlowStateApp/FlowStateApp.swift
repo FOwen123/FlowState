@@ -53,8 +53,7 @@ final class FlowStateAppModel: ObservableObject {
     @Published var useManagedCommands = UserDefaults.standard.object(forKey: "FlowState.managedCommands") as? Bool ?? true {
         didSet {
             if !useManagedCommands {
-                intentTask?.cancel(); cloudSession?.cancelIntent()
-                pendingIntent = nil; pendingIntentSummary = nil
+                cancelInputTask()
             }
         }
     }
@@ -460,7 +459,7 @@ final class FlowStateAppModel: ObservableObject {
     /// Called only for a new finalized user command, never by a late model response.
     func prepareAutomaticTarget(for command: VoiceCommand, activeBundleIdentifier: String?, utteranceToken: UInt64? = nil) async throws -> DesktopObservation? {
         switch command {
-        case .stop, .resume, .undo, .research: return nil
+        case .stop, .resume, .undo: return nil
         default: break
         }
         guard accessibilityGranted() else { throw DesktopExecutionError.accessibilityDenied }
@@ -674,14 +673,24 @@ final class FlowStateAppModel: ObservableObject {
     }
 
     func prepareCloudCommand(_ command: String) {
-        guard let cloudSession, cloudSession.signedIn else { cloudStatus = "Sign in before managed commands"; return }
+        guard useManagedCommands else {
+            voiceStatus = "Turn on Use AI for commands in Settings → Account to run this request."
+            cloudStatus = voiceStatus
+            return
+        }
+        guard let cloudSession, cloudSession.signedIn else {
+            voiceStatus = "Sign in to run this request. Open Settings → Account."
+            cloudStatus = voiceStatus
+            return
+        }
         cloudPreparationTask?.cancel()
         cloudPreparationTask = nil
         cloudPreparationGeneration &+= 1
         let preparationGeneration = cloudPreparationGeneration
         structuredControlGeneration.invalidate()
         cloudSession.cancelIntent()
-        cloudStatus = "Preparing a plan for review"
+        cloudStatus = "Planning your request…"
+        voiceStatus = cloudStatus
         cloudPlanTarget = nil
         cloudPlanRegistrySnapshot.removeAll()
         cloudExecutionStartedPlanID = nil
@@ -711,6 +720,9 @@ final class FlowStateAppModel: ObservableObject {
                 let observation: DesktopObservation
                 if let prepared { observation = prepared } else { observation = try await desktopController.observeCurrent() }
                 guard !Task.isCancelled, cloudPreparationGeneration == preparationGeneration else { return }
+                guard !observation.isSecure else {
+                    throw DesktopExecutionError.nativeFailure("Use system autofill for protected fields.")
+                }
                 let target = inputBundleIdentifier
                 let epoch = inputEpoch.current
                 let registry = ApplicationRegistry.installed(defaults: preferences ?? .standard)
@@ -729,7 +741,8 @@ final class FlowStateAppModel: ObservableObject {
                     contextRevision: contextRevision,
                     supportedTools: supportedTools,
                     integrations: integrations,
-                    applicationCandidates: candidates
+                    applicationCandidates: candidates,
+                    recentInteraction: controlConversation.recentInteraction
                 )
                 guard !Task.isCancelled, cloudPreparationGeneration == preparationGeneration else { return }
                 guard inputEpoch.isCurrent(epoch), let proposal = cloudSession.proposal else { return }
@@ -749,7 +762,16 @@ final class FlowStateAppModel: ObservableObject {
             }
             catch {
                 guard !Task.isCancelled, cloudPreparationGeneration == preparationGeneration else { return }
-                cloudStatus = "This request needs clarification or could not be planned."
+                cloudStatus = (error as? LocalizedError)?.errorDescription
+                    ?? "Could not plan this request. Try again."
+                voiceStatus = cloudStatus
+                if case CloudSessionError.clarificationRequired = error {
+                    controlConversation.setPendingClarification(cloudStatus)
+                    controlConversation.appendTurn(role: .assistant, text: cloudStatus)
+                    speakQuestion(cloudStatus)
+                } else {
+                    speakFailure(cloudStatus)
+                }
             }
         }
     }
@@ -1908,7 +1930,14 @@ final class FlowStateAppModel: ObservableObject {
             if result.isFinal, !result.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 do {
                     let rawCommand = VoiceCommandRouter.resolve(result.transcript, mode: .command)
-                    if case .unknown = rawCommand {
+                    // Only complete local commands may bypass planning. Prefix-based
+                    // selection/research would swallow the rest of a workflow.
+                    let needsPlanning: Bool
+                    switch rawCommand {
+                    case .unknown, .select, .research: needsPlanning = true
+                    default: needsPlanning = false
+                    }
+                    if needsPlanning {
                         let registry = ApplicationRegistry.installed(defaults: preferences ?? .standard)
                         switch registry.resolveApplicationCommand(result.transcript) {
                         case let .resolved(entry):
@@ -1922,12 +1951,13 @@ final class FlowStateAppModel: ObservableObject {
                                 await actionTask.value
                             }
                             return
-                        case .ambiguous, .unknown:
+                        case .ambiguous:
                             voiceStatus = "Please clarify which installed app you want to open."
                             speakQuestion("Please clarify which installed app you want to open.")
                             return
-                        case .notAnApplicationCommand:
-                            break
+                        case .unknown, .notAnApplicationCommand:
+                            prepareCloudCommand(result.transcript)
+                            return
                         }
                     }
                     arrivalObservation = try await prepareAutomaticTarget(for: rawCommand, activeBundleIdentifier: activeAtArrival, utteranceToken: utteranceToken)
@@ -1999,7 +2029,7 @@ final class FlowStateAppModel: ObservableObject {
                 undoLastDesktopAction()
             case .unknown:
                 guard result.isFinal else { return }
-                if shouldInterpret(command) { resolveManagedUtterance(personalized, utteranceID: result.utteranceID ?? UUID(), token: token, originalObservation: arrivalObservation) }
+                if shouldInterpret(command) { prepareCloudCommand(personalized) }
                 else { voiceStatus = "I could not match that request. Turn on cloud interpretation for natural-language controls." }
             }
         }
@@ -2008,160 +2038,6 @@ final class FlowStateAppModel: ObservableObject {
 
     func shouldInterpret(_ command: VoiceCommand) -> Bool {
         useManagedCommands && command == .unknown
-    }
-
-    private func isCompoundControlRequest(_ transcript: String) -> Bool {
-        let normalized = transcript.lowercased()
-        return normalized.contains(" then ") || normalized.contains("and then") || normalized.contains(";")
-    }
-
-    private func resolveManagedUtterance(_ transcript: String, utteranceID: UUID, token: UInt64, originalObservation: DesktopObservation?) {
-        if isCompoundControlRequest(transcript) {
-            prepareCloudCommand(transcript)
-            return
-        }
-        guard let session = cloudSession, session.signedIn else {
-            voiceStatus = "Sign in to use Auto interpretation, or choose Commands only for local controls."
-            return
-        }
-        pendingIntent = nil; pendingIntentSummary = nil
-        let previous = intentTask
-        let sessionID = voiceSessionID
-        let epoch = inputEpoch.current
-        let conversationToken = activeControlConversationToken
-        intentTask = Task { [weak self] in
-            guard let self, !Task.isCancelled, token == voiceGeneration, inputEpoch.isCurrent(epoch) else { return }
-            guard let conversationToken, controlConversation.accepts(conversationToken) else { return }
-            do {
-                guard let observation = originalObservation else { throw DesktopExecutionError.targetChanged }
-                await previous?.value
-                guard !Task.isCancelled, token == voiceGeneration, inputEpoch.isCurrent(epoch) else { return }
-                guard !observation.isSecure else {
-                    voiceStatus = "Use system autofill for protected fields."
-                    return
-                }
-                contextRevision += 1
-                var revision = contextRevision
-                guard let inputGrant = currentInputGrant, inputGrant.expiresAt > Date(), desktopState == .ready else {
-                    voiceStatus = "The active app changed. Repeat your command."
-                    return
-                }
-                let registry = ApplicationRegistry.installed(defaults: preferences ?? .standard)
-                let integrations = StructuredControlExecutor.availableIntegrations(registry: registry)
-                var supportedTools = [NativePlanRoute.nativeAccessibility.rawValue]
-                if !integrations.isEmpty {
-                    supportedTools.append(NativePlanRoute.structuredIntegration.rawValue)
-                }
-                let prefiltered = registry.candidates(for: transcript)
-                let apps = (prefiltered.isEmpty ? Array(registry.entries.prefix(ApplicationRegistry.defaultCandidateLimit)) : prefiltered).sorted {
-                    let left = inputGrant.allowedBundleIdentifiers.contains($0.bundleIdentifier) || $0.bundleIdentifier == observation.bundleIdentifier
-                    let right = inputGrant.allowedBundleIdentifiers.contains($1.bundleIdentifier) || $1.bundleIdentifier == observation.bundleIdentifier
-                    return left != right ? left : $0.bundleIdentifier.localizedStandardCompare($1.bundleIdentifier) == .orderedAscending
-                }
-                var candidates = apps.prefix(99).map {
-                    CloudIntentCandidate(
-                        id: "app:" + $0.bundleIdentifier,
-                        label: $0.displayName,
-                        bundleIdentifier: $0.bundleIdentifier,
-                        kind: "app",
-                        normalizedNames: $0.normalizedNames,
-                        isRunning: $0.isRunning,
-                        supportedActions: $0.supportedActions.map(\.rawValue).sorted(),
-                        integrations: $0.integrations.sorted()
-                    )
-                }
-                if let element = observation.focusedElementID {
-                    candidates.append(CloudIntentCandidate(id: element,
-                        label: observation.focusedLabel ?? "Focused control", bundleIdentifier: observation.bundleIdentifier, kind: "control"))
-                }
-                let routingGrant = DesktopExecutionGrant(
-                    allowedBundleIdentifiers: Set(candidates.compactMap(\.bundleIdentifier)).union([observation.bundleIdentifier]),
-                    allowedActions: inputGrant.allowedActions, generation: inputGrant.generation, expiresAt: inputGrant.expiresAt)
-                try await desktopController.begin(grant: routingGrant, lifecycleEpoch: epoch)
-                guard !Task.isCancelled, inputEpoch.isCurrent(epoch) else { return }
-                currentInputGrant = routingGrant
-                let context = CloudIntentContext(focusedAppBundleIdentifier: observation.bundleIdentifier,
-                    focusedRole: observation.focusedRole, editable: observation.isEditable, targetCandidates: candidates,
-                    recentInteraction: controlConversation.recentInteraction)
-                voiceStatus = "Understanding your request…"
-                let captureGrant = await prepareAutomaticObservation(bundle: observation.bundleIdentifier)
-                var screenObservation: CaptureObservation?
-                var decision = try await session.routeIntent(utterance: transcript, sessionID: sessionID,
-                    utteranceID: utteranceID.uuidString, contextRevision: revision,
-                    mode: "control",
-                    context: context, grant: currentInputGrant, observationAllowedUntil: captureGrant?.expiresAt,
-                    supportedTools: supportedTools)
-                guard !Task.isCancelled, token == voiceGeneration, inputEpoch.isCurrent(epoch),
-                      controlConversation.accepts(conversationToken),
-                      sessionID == voiceSessionID, revision == contextRevision else { return }
-                if decision.requiresObservation {
-                    guard let captureGrant, captureGrantForCloud(bundleIdentifier: observation.bundleIdentifier) == captureGrant else {
-                        voiceStatus = "Enable screen context in Settings and allow Screen Recording to use visual commands."
-                        return
-                    }
-                    voiceStatus = "Looking at the approved window…"
-                    let frame = try await controller.capture(bundleIdentifier: observation.bundleIdentifier, grant: captureGrant)
-                    try await controller.revalidate(frame.observation, grant: captureGrant, forUpload: true)
-                    guard !Task.isCancelled, token == voiceGeneration, inputEpoch.isCurrent(epoch),
-                          controlConversation.accepts(conversationToken),
-                          captureGrantForCloud(bundleIdentifier: observation.bundleIdentifier) == captureGrant else { throw CancellationError() }
-                    screenObservation = frame.observation
-                    let bounds = frame.observation.windowFrame
-                    let cloudImage = CloudIntentObservation(id: frame.observation.id.uuidString,
-                        displayId: String(frame.observation.displayID), windowId: String(frame.observation.windowID),
-                        observedAt: frame.observation.capturedAt.timeIntervalSince1970 * 1000,
-                        geometry: .init(x: bounds.minX, y: bounds.minY, width: bounds.width, height: bounds.height, scale: frame.observation.scale),
-                        imageDataUrl: try frame.pngDataURL(uploadApproved: true))
-                    contextRevision += 1; revision = contextRevision
-                    decision = try await session.routeIntent(utterance: transcript, sessionID: sessionID,
-                        utteranceID: utteranceID.uuidString, contextRevision: revision,
-                        mode: "control",
-                        context: context, grant: currentInputGrant, observation: cloudImage,
-                        observationAllowedUntil: captureGrant.expiresAt, supportedTools: supportedTools)
-                    guard !Task.isCancelled, token == voiceGeneration, inputEpoch.isCurrent(epoch),
-                          controlConversation.accepts(conversationToken),
-                          sessionID == voiceSessionID, revision == contextRevision else { throw CancellationError() }
-                    try await revalidateScreen(frame.observation)
-
-                }
-                guard decision.decision == .execute || decision.decision == .dictation,
-                      let action = decision.action?.nativePlanAction else {
-                    let clarification = decision.clarification ?? "Please clarify what you want Flow State to do."
-                    controlConversation.setPendingClarification(clarification)
-                    controlConversation.appendTurn(role: .assistant, text: clarification)
-                    speakQuestion(clarification)
-                    voiceStatus = clarification
-                    return
-                }
-                if action.requiresApproval {
-                    pendingIntent = (action, observation, epoch, screenObservation)
-                    pendingIntentSummary = action.route == .structuredIntegration
-                        ? redactedPlanSummary(action)
-                        : L10n.planSummary(action.parameters, appName: action.targetBundleIdentifier.map(L10n.appName) ?? "Selected app")
-                    currentPlanStep = pendingIntentSummary
-                    _ = controlConversation.requireApproval()
-                    controlConversation.setPendingClarification("Confirm: " + (pendingIntentSummary ?? "this action"))
-                    voiceStatus = "Confirm: " + (pendingIntentSummary ?? "this action") + ". Say confirm or cancel."
-                    speakQuestion(voiceStatus)
-                    return
-                }
-                try await executeResolvedIntent(action, observation: observation, epoch: epoch, screen: screenObservation)
-            } catch is CancellationError {
-                // A newer session, Stop, or physical takeover owns the UI now.
-            } catch {
-                guard !Task.isCancelled, token == voiceGeneration, inputEpoch.isCurrent(epoch),
-                      controlConversation.accepts(conversationToken) else { return }
-                desktopState = await desktopController.state
-                let message = (error as? DesktopExecutionError)?.localizedDescription
-                    ?? (error as? CaptureError)?.localizedDescription
-                    ?? "This request could not be completed. Check your connection, permissions, and target app."
-                voiceStatus = message
-                controlConversation.setPendingClarification(nil)
-                controlConversation.appendTurn(role: .assistant, text: message)
-                speakFailure(message)
-                appendControlHistory(failure: message)
-            }
-        }
     }
 
     func prepareLocalKeyConfirmation(key: String, modifiers: String?, expectedObservation: DesktopObservation? = nil) {

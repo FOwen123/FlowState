@@ -530,3 +530,23 @@ it("legacy planning cannot bypass the authorized screenshot intent path", async 
   const { planId } = await user.mutation(api.plans.createActionPlan, { deviceId: "legacy-screen", command: "scroll down", locale: "en" });
   await expect(user.action(api.plans.resolveActionPlan, { planId, screenshot: "data:image/png;base64,AAAA" })).rejects.toThrow("authorized intent");
 });
+
+it("returns a specific clarification without approving or exposing a partial workflow", async () => {
+  vi.stubEnv("OPENAI_API_KEY", "test-key");
+  vi.stubEnv("FLOWSTATE_PLANNER_MODEL", "test-model");
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({id: "clarify", output_text: JSON.stringify({
+    actions: [], explanation: "Deleting files is not supported.", clarificationNeeded: true,
+  })}), {status: 200})));
+  const t = convexTest(schema, modules);
+  const user = t.withIdentity(ownerA);
+  await user.mutation(api.workflows.registerDevice, {deviceId: "workflow-device"});
+  const {planId} = await user.mutation(api.plans.createActionPlan, {
+    deviceId: "workflow-device", command: "Open Brave and delete my files", locale: "en",
+  });
+  const response = await user.action(api.plans.resolveActionPlan, {planId});
+  await expect(user.query(api.plans.getActionPlan, {planId})).resolves.toMatchObject({
+    actions: [], error: "clarification_required", explanation: "Deleting files is not supported.",
+  });
+  await expect(user.mutation(api.plans.approveActionPlan, {planId, fingerprint: response.fingerprint}))
+    .rejects.toThrow("needs clarification");
+});

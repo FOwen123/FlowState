@@ -11,6 +11,7 @@ import { GenericId, v } from "convex/values";
 
 import { requireIdentity } from "./lib/identity";
 import { createOpenAIClient } from "./lib/openai";
+import { buildPlannerRequest } from "./lib/plan_request";
 import {
   containsLegacyInsertTextJson,
   parsePlanAvailability,
@@ -378,28 +379,11 @@ export const resolveActionPlan = actionGeneric({
         plan.integrationsJson,
         plan.applicationCandidatesJson ?? "[]",
       );
-      const supportedTools = availability?.supportedTools.join(", ") ?? "none";
-      const integrations = availability?.integrations.join(", ") ?? "none";
-      const applicationCandidates = JSON.stringify(
-        availability?.applicationCandidates ?? [],
-      );
-      // Voice classification belongs to the evaluated intent endpoint. This
-      // explicit planning surface always returns a proposal for human review.
       const openai = createOpenAIClient({
         apiKey: process.env.OPENAI_API_KEY,
         model: process.env.FLOWSTATE_PLANNER_MODEL,
       });
-      const inputParts: Array<Record<string, unknown>> = [
-        {
-          type: "input_text",
-          text: `Locale: en\nCommand: ${plan.command}\nAdvertised tools: ${supportedTools}\nAdvertised integrations: ${integrations}\nAdvertised application candidates: ${applicationCandidates}\nReturn only JSON with actions, explanation, and clarificationNeeded. Use only registered action kinds: openApplication, scroll, focus, select, press, openURL, attachFile, sendEmail, draftMessage. Generic text entry belongs to the separate Dictation shortcut and is unsupported here. Never invent permissions, app bundle identifiers, or file paths. Every app target must exactly match an advertised application candidate bundleIdentifier and supportedActions entry.`,
-        },
-      ];
-      const response = await openai.createResponse({
-        input: [{ role: "user", content: inputParts }],
-        instructions:
-          "You are a constrained planner. Model output is a proposal only. Return strict JSON: {actions:[{kind,targetBundleIdentifier,parameters}],explanation,clarificationNeeded}. Every desktop action requires its own targetBundleIdentifier; repeat the selected app identifier on each step. Parameters: openApplication {}; scroll {lines: integer from -100 to 100, negative means down}; focus {role: string, label?: string}; select {label: string}; press {key: ArrowUp|ArrowDown|ArrowLeft|ArrowRight|PageUp|PageDown|Home|End|Tab|Escape|Enter|A|C|V, modifiers?: Shift|Command}; openURL {targetBundleIdentifier: required advertised app, url}; attachFile {fileId: existing approved ID}; sendEmail {recipient,subject,body}; draftMessage {targetBundleIdentifier: required advertised app, recipient,subject,body} and never sends. An openURL target must advertise openURL and a matching structured integration; a draftMessage target must advertise draftMessage and requires user approval. Use only the advertised tools, application candidates, and integrations; do not invent an unavailable route. Generic text entry is unsupported because Dictation has its own shortcut. Use 1 to 12 actions. Do not include executor, capability or requiresApproval; the server supplies them. Omit visualTarget unless supplied with verified current geometry. Never infer unknown file IDs or permissions. Do not include markdown.",
-      });
+      const response = await openai.createResponse(buildPlannerRequest(plan.command, availability));
       const normalized = parsePlannerText(response.outputText, availability);
       await ctx.runMutation(internalSavePlan, {
         planId: args.planId,
@@ -585,7 +569,7 @@ export const savePlan = internalMutationGeneric({
     await ctx.db.patch(args.planId, {
       status: "awaiting_approval",
       explanation: normalized.explanation,
-      actionsJson: JSON.stringify(normalized.actions),
+      actionsJson: normalized.clarificationNeeded ? undefined : JSON.stringify(normalized.actions),
       capabilitiesJson: JSON.stringify(normalized.capabilities),
       planFingerprint: normalized.fingerprint,
       errorCode: normalized.clarificationNeeded ? "clarification_required" : undefined,

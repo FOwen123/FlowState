@@ -580,8 +580,10 @@ export function normalizeModelPlan(
 ): NormalizedPlan {
   if (!isRecord(value)) throw new Error("planner output must be an object");
   exactKeys(value, ["actions", "explanation", "clarificationNeeded"]);
-  if (!Array.isArray(value.actions) || value.actions.length === 0 || value.actions.length > 12) {
-    throw new Error("planner must return between 1 and 12 actions");
+  const needsClarification = value.clarificationNeeded === true;
+  if (!Array.isArray(value.actions) || value.actions.length > 12 ||
+      (needsClarification ? value.actions.length !== 0 : value.actions.length === 0)) {
+    throw new Error("planner must return 1 to 12 actions, or zero actions when clarification is needed");
   }
   const actions = value.actions.map((action) =>
     normalizeAction(action, availability),

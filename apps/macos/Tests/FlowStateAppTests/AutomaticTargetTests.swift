@@ -40,7 +40,7 @@ private actor FinalizationDriver: DesktopDriver {
 }
 
 @Test("Accessibility access automatically targets the active app without a user grant", arguments: [
-    VoiceCommand.scroll(-3), .scroll(3), .dictate("literal"), .focus(role: "AXTextField", label: nil), .select(label: "Editor"), .press(key: "Tab", modifiers: nil), .unknown
+    VoiceCommand.scroll(-3), .scroll(3), .dictate("literal"), .focus(role: "AXTextField", label: nil), .select(label: "Editor"), .press(key: "Tab", modifiers: nil), .research("solar panels"), .unknown
 ])
 @MainActor func automaticActiveTarget(command: VoiceCommand) async throws {
     let model = FlowStateAppModel(desktopController: DesktopAutomationController(driver: AutomaticTargetDriver()), accessibilityGranted: { true })
@@ -280,4 +280,57 @@ private actor FinalizationDriver: DesktopDriver {
     #expect(await driver.inputs == [command.1])
     #expect(model.voiceStatus.hasPrefix("Completed:"))
     model.cancelInputTask()
+}
+
+@Test("unmatched complete requests reach planning instead of app-name clarification", arguments: [
+    "Open Brave and search Hello World",
+    "Open Brave then search for cats",
+    "Scroll down and open Safari",
+    "Launch Notes, find my shopping list, and read it",
+    "Can you open Brave and search Hello World?",
+    "Search for Hello World in Brave",
+    "Select the title and copy it",
+    "Research solar panels and draft an email"
+])
+@MainActor func workflowRequestsReachPlanning(transcript: String) async throws {
+    let driver = AutomaticTargetDriver()
+    let coordinator = SpeechSessionCoordinator()
+    await coordinator.pushToTalkDown()
+    let model = FlowStateAppModel(desktopController: DesktopAutomationController(driver: driver),
+        accessibilityGranted: { true }, frontmostApplication: { "com.example.Editor" }, speechCoordinator: coordinator)
+    model.useManagedCommands = true
+    model.consume(SpeechRecognitionResult(transcript: transcript, language: .english, isFinal: true,
+        utteranceID: UUID(), sessionEnded: true), token: 0)
+    for _ in 0..<100 {
+        if model.voiceStatus == "Sign in to run this request. Open Settings → Account." { break }
+        try await Task.sleep(for: .milliseconds(5))
+    }
+    #expect(model.voiceStatus == "Sign in to run this request. Open Settings → Account.")
+    #expect(await driver.inputs.isEmpty)
+    model.cancelInputTask()
+}
+
+@Test("workflow setup failures are visible in the voice HUD")
+@MainActor func workflowSetupFailureIsVisible() {
+    let model = FlowStateAppModel()
+    model.useManagedCommands = false
+    model.prepareCloudCommand("Open Brave and search Hello World")
+    #expect(model.voiceStatus == "Turn on Use AI for commands in Settings → Account to run this request.")
+    #expect(model.cloudStatus == model.voiceStatus)
+    model.useManagedCommands = true
+    model.prepareCloudCommand("Open Brave and search Hello World")
+    #expect(model.voiceStatus == "Sign in to run this request. Open Settings → Account.")
+    #expect(model.cloudStatus == model.voiceStatus)
+}
+
+@Test @MainActor func disablingAIRevokesPendingDesktopExecution() async throws {
+    let model = FlowStateAppModel(desktopController: DesktopAutomationController(driver: AutomaticTargetDriver()), accessibilityGranted: { true })
+    model.useManagedCommands = true
+    _ = try await model.prepareAutomaticTarget(for: .scroll(-3), activeBundleIdentifier: "com.example.Editor")
+    var cancelled = false
+    model.onCancelCloud = { cancelled = true }
+    model.useManagedCommands = false
+    #expect(cancelled)
+    #expect(model.currentInputGrant == nil)
+    #expect(model.desktopState == .cancelled)
 }

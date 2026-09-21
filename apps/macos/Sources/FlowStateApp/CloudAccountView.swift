@@ -468,6 +468,8 @@ private struct CloudConnectedView: View {
             return "account.error.request"
         }
         switch cloudError {
+        case .clarificationRequired:
+            return "account.error.request"
         case .signInRequired:
             return "account.status.signin_required"
         case .reviewChanged:

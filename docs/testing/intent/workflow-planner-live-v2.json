@@ -1,0 +1,287 @@
+{
+  "model": "gpt-5.6-luna",
+  "executed": false,
+  "rows": [
+    {
+      "id": "brave-search",
+      "command": "Open Brave and search Hello World",
+      "passed": true,
+      "latencyMs": 2847,
+      "usage": {
+        "input_tokens": 548,
+        "output_tokens": 127,
+        "total_tokens": 675
+      },
+      "plan": {
+        "actions": [
+          {
+            "kind": "openApplication",
+            "targetBundleIdentifier": "com.brave.Browser",
+            "parameters": {},
+            "capability": "app.open",
+            "executor": "desktop",
+            "requiresApproval": false,
+            "route": "nativeAccessibility",
+            "riskClass": "reversible",
+            "preconditions": {
+              "targetBundleIdentifier": "com.brave.Browser",
+              "requiresFreshObservation": false
+            },
+            "verifier": {
+              "kind": "boundedAction"
+            },
+            "reversal": {
+              "kind": "none",
+              "supported": false
+            }
+          },
+          {
+            "kind": "openURL",
+            "targetBundleIdentifier": "com.brave.Browser",
+            "parameters": {
+              "url": "https://search.brave.com/search?q=Hello%20World"
+            },
+            "capability": "app.control",
+            "executor": "service",
+            "requiresApproval": false,
+            "route": "structuredIntegration",
+            "riskClass": "reversible",
+            "preconditions": {
+              "targetBundleIdentifier": "com.brave.Browser",
+              "requiresFreshObservation": false
+            },
+            "verifier": {
+              "kind": "externalEffectReconciled"
+            },
+            "reversal": {
+              "kind": "none",
+              "supported": false
+            }
+          }
+        ],
+        "explanation": "Opened Brave and searched for “Hello World” using Brave Search.",
+        "clarificationNeeded": false,
+        "capabilities": [
+          "app.control",
+          "app.open"
+        ],
+        "fingerprint": "{\"actions\":[{\"capability\":\"app.open\",\"executor\":\"desktop\",\"kind\":\"openApplication\",\"parameters\":{},\"preconditions\":{\"requiresFreshObservation\":false,\"targetBundleIdentifier\":\"com.brave.Browser\"},\"requiresApproval\":false,\"reversal\":{\"kind\":\"none\",\"supported\":false},\"riskClass\":\"reversible\",\"route\":\"nativeAccessibility\",\"targetBundleIdentifier\":\"com.brave.Browser\",\"verifier\":{\"kind\":\"boundedAction\"}},{\"capability\":\"app.control\",\"executor\":\"service\",\"kind\":\"openURL\",\"parameters\":{\"url\":\"https://search.brave.com/search?q=Hello%20World\"},\"preconditions\":{\"requiresFreshObservation\":false,\"targetBundleIdentifier\":\"com.brave.Browser\"},\"requiresApproval\":false,\"reversal\":{\"kind\":\"none\",\"supported\":false},\"riskClass\":\"reversible\",\"route\":\"structuredIntegration\",\"targetBundleIdentifier\":\"com.brave.Browser\",\"verifier\":{\"kind\":\"externalEffectReconciled\"}}],\"capabilities\":[\"app.control\",\"app.open\"]}"
+      }
+    },
+    {
+      "id": "three-step",
+      "command": "Open Brave, search for indoor plants, then open TextEdit",
+      "passed": true,
+      "latencyMs": 2559,
+      "usage": {
+        "input_tokens": 554,
+        "output_tokens": 171,
+        "total_tokens": 725
+      },
+      "plan": {
+        "actions": [
+          {
+            "kind": "openApplication",
+            "targetBundleIdentifier": "com.brave.Browser",
+            "parameters": {},
+            "capability": "app.open",
+            "executor": "desktop",
+            "requiresApproval": false,
+            "route": "nativeAccessibility",
+            "riskClass": "reversible",
+            "preconditions": {
+              "targetBundleIdentifier": "com.brave.Browser",
+              "requiresFreshObservation": false
+            },
+            "verifier": {
+              "kind": "boundedAction"
+            },
+            "reversal": {
+              "kind": "none",
+              "supported": false
+            }
+          },
+          {
+            "kind": "openURL",
+            "targetBundleIdentifier": "com.brave.Browser",
+            "parameters": {
+              "url": "https://search.brave.com/search?q=indoor%20plants"
+            },
+            "capability": "app.control",
+            "executor": "service",
+            "requiresApproval": false,
+            "route": "structuredIntegration",
+            "riskClass": "reversible",
+            "preconditions": {
+              "targetBundleIdentifier": "com.brave.Browser",
+              "requiresFreshObservation": false
+            },
+            "verifier": {
+              "kind": "externalEffectReconciled"
+            },
+            "reversal": {
+              "kind": "none",
+              "supported": false
+            }
+          },
+          {
+            "kind": "openApplication",
+            "targetBundleIdentifier": "com.apple.TextEdit",
+            "parameters": {},
+            "capability": "app.open",
+            "executor": "desktop",
+            "requiresApproval": false,
+            "route": "nativeAccessibility",
+            "riskClass": "reversible",
+            "preconditions": {
+              "targetBundleIdentifier": "com.apple.TextEdit",
+              "requiresFreshObservation": false
+            },
+            "verifier": {
+              "kind": "boundedAction"
+            },
+            "reversal": {
+              "kind": "none",
+              "supported": false
+            }
+          }
+        ],
+        "explanation": "Opened Brave, searched Brave Search for indoor plants, then opened TextEdit.",
+        "clarificationNeeded": false,
+        "capabilities": [
+          "app.control",
+          "app.open"
+        ],
+        "fingerprint": "{\"actions\":[{\"capability\":\"app.open\",\"executor\":\"desktop\",\"kind\":\"openApplication\",\"parameters\":{},\"preconditions\":{\"requiresFreshObservation\":false,\"targetBundleIdentifier\":\"com.brave.Browser\"},\"requiresApproval\":false,\"reversal\":{\"kind\":\"none\",\"supported\":false},\"riskClass\":\"reversible\",\"route\":\"nativeAccessibility\",\"targetBundleIdentifier\":\"com.brave.Browser\",\"verifier\":{\"kind\":\"boundedAction\"}},{\"capability\":\"app.control\",\"executor\":\"service\",\"kind\":\"openURL\",\"parameters\":{\"url\":\"https://search.brave.com/search?q=indoor%20plants\"},\"preconditions\":{\"requiresFreshObservation\":false,\"targetBundleIdentifier\":\"com.brave.Browser\"},\"requiresApproval\":false,\"reversal\":{\"kind\":\"none\",\"supported\":false},\"riskClass\":\"reversible\",\"route\":\"structuredIntegration\",\"targetBundleIdentifier\":\"com.brave.Browser\",\"verifier\":{\"kind\":\"externalEffectReconciled\"}},{\"capability\":\"app.open\",\"executor\":\"desktop\",\"kind\":\"openApplication\",\"parameters\":{},\"preconditions\":{\"requiresFreshObservation\":false,\"targetBundleIdentifier\":\"com.apple.TextEdit\"},\"requiresApproval\":false,\"reversal\":{\"kind\":\"none\",\"supported\":false},\"riskClass\":\"reversible\",\"route\":\"nativeAccessibility\",\"targetBundleIdentifier\":\"com.apple.TextEdit\",\"verifier\":{\"kind\":\"boundedAction\"}}],\"capabilities\":[\"app.control\",\"app.open\"]}"
+      }
+    },
+    {
+      "id": "cross-app",
+      "command": "Open Brave, scroll down, then open TextEdit and scroll up",
+      "passed": true,
+      "latencyMs": 1915,
+      "usage": {
+        "input_tokens": 555,
+        "output_tokens": 149,
+        "total_tokens": 704
+      },
+      "plan": {
+        "actions": [
+          {
+            "kind": "openApplication",
+            "targetBundleIdentifier": "com.brave.Browser",
+            "parameters": {},
+            "capability": "app.open",
+            "executor": "desktop",
+            "requiresApproval": false,
+            "route": "nativeAccessibility",
+            "riskClass": "reversible",
+            "preconditions": {
+              "targetBundleIdentifier": "com.brave.Browser",
+              "requiresFreshObservation": false
+            },
+            "verifier": {
+              "kind": "boundedAction"
+            },
+            "reversal": {
+              "kind": "none",
+              "supported": false
+            }
+          },
+          {
+            "kind": "scroll",
+            "targetBundleIdentifier": "com.brave.Browser",
+            "parameters": {
+              "lines": -3
+            },
+            "capability": "app.control",
+            "executor": "desktop",
+            "requiresApproval": false,
+            "route": "nativeAccessibility",
+            "riskClass": "reversible",
+            "preconditions": {
+              "targetBundleIdentifier": "com.brave.Browser",
+              "requiresFreshObservation": false
+            },
+            "verifier": {
+              "kind": "boundedAction"
+            },
+            "reversal": {
+              "kind": "none",
+              "supported": false
+            }
+          },
+          {
+            "kind": "openApplication",
+            "targetBundleIdentifier": "com.apple.TextEdit",
+            "parameters": {},
+            "capability": "app.open",
+            "executor": "desktop",
+            "requiresApproval": false,
+            "route": "nativeAccessibility",
+            "riskClass": "reversible",
+            "preconditions": {
+              "targetBundleIdentifier": "com.apple.TextEdit",
+              "requiresFreshObservation": false
+            },
+            "verifier": {
+              "kind": "boundedAction"
+            },
+            "reversal": {
+              "kind": "none",
+              "supported": false
+            }
+          },
+          {
+            "kind": "scroll",
+            "targetBundleIdentifier": "com.apple.TextEdit",
+            "parameters": {
+              "lines": 3
+            },
+            "capability": "app.control",
+            "executor": "desktop",
+            "requiresApproval": false,
+            "route": "nativeAccessibility",
+            "riskClass": "reversible",
+            "preconditions": {
+              "targetBundleIdentifier": "com.apple.TextEdit",
+              "requiresFreshObservation": false
+            },
+            "verifier": {
+              "kind": "boundedAction"
+            },
+            "reversal": {
+              "kind": "none",
+              "supported": false
+            }
+          }
+        ],
+        "explanation": "Open Brave and scroll down, then open TextEdit and scroll up.",
+        "clarificationNeeded": false,
+        "capabilities": [
+          "app.control",
+          "app.open"
+        ],
+        "fingerprint": "{\"actions\":[{\"capability\":\"app.open\",\"executor\":\"desktop\",\"kind\":\"openApplication\",\"parameters\":{},\"preconditions\":{\"requiresFreshObservation\":false,\"targetBundleIdentifier\":\"com.brave.Browser\"},\"requiresApproval\":false,\"reversal\":{\"kind\":\"none\",\"supported\":false},\"riskClass\":\"reversible\",\"route\":\"nativeAccessibility\",\"targetBundleIdentifier\":\"com.brave.Browser\",\"verifier\":{\"kind\":\"boundedAction\"}},{\"capability\":\"app.control\",\"executor\":\"desktop\",\"kind\":\"scroll\",\"parameters\":{\"lines\":-3},\"preconditions\":{\"requiresFreshObservation\":false,\"targetBundleIdentifier\":\"com.brave.Browser\"},\"requiresApproval\":false,\"reversal\":{\"kind\":\"none\",\"supported\":false},\"riskClass\":\"reversible\",\"route\":\"nativeAccessibility\",\"targetBundleIdentifier\":\"com.brave.Browser\",\"verifier\":{\"kind\":\"boundedAction\"}},{\"capability\":\"app.open\",\"executor\":\"desktop\",\"kind\":\"openApplication\",\"parameters\":{},\"preconditions\":{\"requiresFreshObservation\":false,\"targetBundleIdentifier\":\"com.apple.TextEdit\"},\"requiresApproval\":false,\"reversal\":{\"kind\":\"none\",\"supported\":false},\"riskClass\":\"reversible\",\"route\":\"nativeAccessibility\",\"targetBundleIdentifier\":\"com.apple.TextEdit\",\"verifier\":{\"kind\":\"boundedAction\"}},{\"capability\":\"app.control\",\"executor\":\"desktop\",\"kind\":\"scroll\",\"parameters\":{\"lines\":3},\"preconditions\":{\"requiresFreshObservation\":false,\"targetBundleIdentifier\":\"com.apple.TextEdit\"},\"requiresApproval\":false,\"reversal\":{\"kind\":\"none\",\"supported\":false},\"riskClass\":\"reversible\",\"route\":\"nativeAccessibility\",\"targetBundleIdentifier\":\"com.apple.TextEdit\",\"verifier\":{\"kind\":\"boundedAction\"}}],\"capabilities\":[\"app.control\",\"app.open\"]}"
+      }
+    },
+    {
+      "id": "unsupported-tail",
+      "command": "Open Brave and delete all files in my Downloads folder",
+      "passed": true,
+      "latencyMs": 2589,
+      "usage": {
+        "input_tokens": 552,
+        "output_tokens": 82,
+        "total_tokens": 634
+      },
+      "plan": {
+        "actions": [],
+        "explanation": "Deleting all files in the Downloads folder is not supported by the available applications and tools.",
+        "clarificationNeeded": true,
+        "capabilities": [],
+        "fingerprint": "{\"actions\":[],\"capabilities\":[]}"
+      }
+    }
+  ]
+}

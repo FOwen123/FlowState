@@ -207,7 +207,7 @@ public final class CloudSession: ObservableObject {
         signedIn = false
     }
     private func registerDevice() async throws {
-        try await client.mutation("workflows:registerDevice", with: ["deviceId": deviceID, "name": "Flow State Mac"])
+        let _: CloudMutationReceipt = try await client.mutation("workflows:registerDevice", with: ["deviceId": deviceID, "name": "Flow State Mac"])
     }
     public func research(query: String, sourceURL: String? = nil) async throws {
         guard signedIn else { throw CloudSessionError.signInRequired }
@@ -222,12 +222,12 @@ public final class CloudSession: ObservableObject {
         if let sourceURL { arguments["sourceUrl"] = sourceURL }
         let created: CreatedRun = try await client.mutation("workflows:createResearchRun", with: arguments)
         guard operationGeneration == token else {
-            try? await client.mutation("workflows:cancelResearch", with: ["runId": created.runId])
+            let _: CloudMutationReceipt? = try? await client.mutation("workflows:cancelResearch", with: ["runId": created.runId])
             throw CancellationError()
         }
         activeRunID = created.runId
         observe(runID: created.runId)
-        try await client.action("workflows:runResearch", with: ["runId": created.runId])
+        let _: CloudMutationReceipt = try await client.action("workflows:runResearch", with: ["runId": created.runId])
     }
     public func cancelIntent() { intentGeneration &+= 1 }
 
@@ -249,7 +249,7 @@ public final class CloudSession: ObservableObject {
             for target in grant.allowedBundleIdentifiers where target == context.focusedAppBundleIdentifier {
                 for capability in capabilities.sorted() {
                     guard signedIn, token == intentGeneration, grant.expiresAt > Date() else { throw CancellationError() }
-                    try await client.mutation("grants:grant", with: ["deviceId": deviceID, "capability": capability,
+                    let _: CloudMutationReceipt = try await client.mutation("grants:grant", with: ["deviceId": deviceID, "capability": capability,
                         "target": target, "expiresAt": grant.expiresAt.timeIntervalSince1970 * 1000])
                 }
             }
@@ -259,7 +259,7 @@ public final class CloudSession: ObservableObject {
                 .intersection(grant.allowedBundleIdentifiers).sorted()
             if !targets.isEmpty {
                 guard signedIn, token == intentGeneration else { throw CancellationError() }
-                try await client.mutation("grants:grantApplicationOpenTargets", with: ["deviceId": deviceID,
+                let _: CloudMutationReceipt = try await client.mutation("grants:grantApplicationOpenTargets", with: ["deviceId": deviceID,
                     "targets": targets.map { $0 as ConvexEncodable? }, "expiresAt": grant.expiresAt.timeIntervalSince1970 * 1000])
             }
         }
@@ -267,7 +267,7 @@ public final class CloudSession: ObservableObject {
            let target = context.focusedAppBundleIdentifier {
             for capability in ["app.observe", "app.upload"] {
                 guard signedIn, token == intentGeneration else { throw CancellationError() }
-                try await client.mutation("grants:grant", with: ["deviceId": deviceID, "capability": capability,
+                let _: CloudMutationReceipt = try await client.mutation("grants:grant", with: ["deviceId": deviceID, "capability": capability,
                     "target": target, "expiresAt": expiry.timeIntervalSince1970 * 1000])
                 capabilities.insert(capability)
             }
@@ -297,7 +297,8 @@ public final class CloudSession: ObservableObject {
         contextRevision: Int = 0,
         supportedTools: [String] = [NativePlanRoute.nativeAccessibility.rawValue],
         integrations: [String] = [],
-        applicationCandidates: [CloudApplicationCandidate] = []
+        applicationCandidates: [CloudApplicationCandidate] = [],
+        recentInteraction: String? = nil
     ) async throws {
         guard signedIn else { throw CloudSessionError.signInRequired }
         guard !planning else { throw CloudSessionError.busy }
@@ -316,7 +317,7 @@ public final class CloudSession: ObservableObject {
         proposal = nil
         try await registerDevice()
         guard token == planGeneration else { throw CancellationError() }
-        let context = command + "\nSelected target application: " + targetBundleIdentifier + ". Use only registered desktop control actions; generic text insertion is unavailable. Start by opening the selected target. Unsupported requests need clarification."
+        let context = plannerCommandContext(command: command, activeApplication: targetBundleIdentifier, recentInteraction: recentInteraction)
         let args: [String: ConvexEncodable?] = [
             "deviceId": deviceID,
             "command": context,
@@ -328,13 +329,19 @@ public final class CloudSession: ObservableObject {
         ]
         let created: CreatedPlan = try await client.mutation("plans:createActionPlan", with: args)
         guard token == planGeneration else {
-            try? await client.mutation("plans:cancelActionPlan", with:["planId":created.planId])
+            let _: CloudMutationReceipt? = try? await client.mutation("plans:cancelActionPlan", with:["planId":created.planId])
             throw CancellationError()
         }
         activePlanID = created.planId
-        let response: NativePlanResponse = try await client.action("plans:resolveActionPlan", with:["planId":created.planId])
-        let metadata = try await planMetadata(id:created.planId, fingerprint:response.fingerprint, token:token)
-        guard token == planGeneration, signedIn, metadata.status == "awaiting_approval", metadata.error == nil,
+        let resolution: CloudPlanResolution = try await client.action("plans:resolveActionPlan", with:["planId":created.planId])
+        let metadata = try await planMetadata(id:created.planId, fingerprint:resolution.fingerprint, token:token)
+        guard token == planGeneration, signedIn else { throw CancellationError() }
+        if metadata.error == "clarification_required" {
+            throw CloudSessionError.clarificationRequired(metadata.explanation ?? "What would you like me to do?")
+        }
+        guard let response = resolution.executablePlan,
+              response.planId == created.planId,
+              metadata.status == "awaiting_approval", metadata.error == nil,
               metadata.fingerprint == response.fingerprint, metadata.expiresAt > Date().timeIntervalSince1970 * 1000,
               response.actions.allSatisfy(isSupportedNativePlanAction) else { throw CloudSessionError.reviewChanged }
         proposal = CloudProposal(
@@ -352,6 +359,9 @@ public final class CloudSession: ObservableObject {
             .timeout(.seconds(15), scheduler:DispatchQueue.main, customError:{ CloudSessionError.reviewChanged })
         for try await value in snapshots.values {
             try checkPlan(token:token,expiresAt:value.expiresAt)
+            if value.error == "clarification_required" {
+                throw CloudSessionError.clarificationRequired(value.explanation ?? "What would you like me to do?")
+            }
             if value.error != nil || ["failed", "cancelled", "uncertain"].contains(value.status) { throw CloudSessionError.reviewChanged }
             if value.status == "awaiting_approval", value.fingerprint == fingerprint { return value }
         }
@@ -394,7 +404,7 @@ public final class CloudSession: ObservableObject {
         let capabilities = cloudExecutionCapabilities(for: plan.actions)
         let structuredCapabilities = Set(plan.actions.filter { $0.route == .structuredIntegration }.map(\.capability))
         for capability in structuredCapabilities.sorted() {
-            try await client.mutation("grants:grant", with: [
+            let _: CloudMutationReceipt = try await client.mutation("grants:grant", with: [
                 "deviceId": deviceID,
                 "capability": capability,
                 "expiresAt": expiry,
@@ -403,16 +413,16 @@ public final class CloudSession: ObservableObject {
         }
         for target in targetBundleIdentifiers.sorted() {
             for capability in capabilities.subtracting(structuredCapabilities) {
-                try await client.mutation("grants:grant",with:["deviceId":deviceID,"capability":capability,"target":target,"expiresAt":expiry])
+                let _: CloudMutationReceipt = try await client.mutation("grants:grant",with:["deviceId":deviceID,"capability":capability,"target":target,"expiresAt":expiry])
                 try checkPlan(token:token,expiresAt:expiry)
             }
         }
         try checkPlan(token:token,expiresAt:expiry)
-        try await client.mutation("plans:approveActionPlan",with:["planId":plan.id,"fingerprint":plan.fingerprint])
+        let _: CloudMutationReceipt = try await client.mutation("plans:approveActionPlan",with:["planId":plan.id,"fingerprint":plan.fingerprint])
         try checkPlan(token:token,expiresAt:expiry)
-        try await client.mutation("executions:start",with:["planId":plan.id,"fingerprint":plan.fingerprint])
+        let _: CloudMutationReceipt = try await client.mutation("executions:start",with:["planId":plan.id,"fingerprint":plan.fingerprint])
         do { try checkPlan(token:token,expiresAt:expiry) } catch {
-            try? await client.mutation("plans:cancelActionPlan",with:["planId":plan.id])
+            let _: CloudMutationReceipt? = try? await client.mutation("plans:cancelActionPlan",with:["planId":plan.id])
             throw error
         }
         // Keep the reviewed proposal visible while the local executor advances
@@ -426,7 +436,7 @@ public final class CloudSession: ObservableObject {
         }
         let token = planGeneration
         try checkPlan(token: token, expiresAt: plan.expiresAt)
-        try await client.mutation("executions:approveStep", with: [
+        let _: CloudMutationReceipt = try await client.mutation("executions:approveStep", with: [
             "planId": plan.id,
             "ordinal": Double(ordinal),
             "generation": Double(plan.generation),
@@ -448,7 +458,7 @@ public final class CloudSession: ObservableObject {
         if let contextRevision = plan.contextRevision {
             args["contextRevision"] = Double(contextRevision)
         }
-        try await client.mutation("executions:claimStep", with: args)
+        let _: CloudMutationReceipt = try await client.mutation("executions:claimStep", with: args)
         try checkPlan(token: token, expiresAt: plan.expiresAt)
         guard isCurrent(plan) else { throw CancellationError() }
     }
@@ -549,12 +559,12 @@ public final class CloudSession: ObservableObject {
         return authoritativeOutcome
     }
     public func finishStep(_ plan:CloudProposal, ordinal:Int, verified:Bool) async throws {
-        try await client.mutation("executions:finishStep",with:["planId":plan.id,"ordinal":Double(ordinal),"generation":Double(plan.generation),"verified":verified])
+        let _: CloudMutationReceipt = try await client.mutation("executions:finishStep",with:["planId":plan.id,"ordinal":Double(ordinal),"generation":Double(plan.generation),"verified":verified])
     }
     public func cancelPlan() async {
         planGeneration &+= 1; proposal = nil
         let id = activePlanID; activePlanID = nil
-        if let id { try? await client.mutation("plans:cancelActionPlan",with:["planId":id]) }
+        if let id { let _: CloudMutationReceipt? = try? await client.mutation("plans:cancelActionPlan",with:["planId":id]) }
     }
 
     public func dismissCompletedPlan() {
@@ -583,7 +593,7 @@ public final class CloudSession: ObservableObject {
         operationGeneration &+= 1
         guard let runID = activeRunID else { return }
         if let run, run.status != "queued" && run.status != "running" { return }
-        try await client.mutation("workflows:cancelResearch", with: ["runId": runID])
+        let _: CloudMutationReceipt = try await client.mutation("workflows:cancelResearch", with: ["runId": runID])
     }
     /// Call only after the UI shows and confirms this exact snapshot and recipient.
     public func sendReviewedNote(_ snapshot: CloudNote, recipient: String, sender: String) async throws {
@@ -594,7 +604,7 @@ public final class CloudSession: ObservableObject {
         let token = operationGeneration
         let approval: ApprovedEmail = try await client.mutation("workflows:approveResearchEmail", with: ["sender": sender, "runId": snapshot.id, "recipient": recipient, "subject": snapshot.title, "body": snapshot.body])
         guard signedIn, operationGeneration == token else { throw CancellationError() }
-        try await client.action("workflows:sendApprovedResearchEmail", with: ["runId": snapshot.id, "approvalId": approval.approvalId])
+        let _: CloudMutationReceipt = try await client.action("workflows:sendApprovedResearchEmail", with: ["runId": snapshot.id, "approvalId": approval.approvalId])
     }
 }
 
@@ -651,10 +661,12 @@ public func isSupportedNativePlanAction(_ action: NativePlanAction) -> Bool {
 
 public enum CloudSessionError: Error, LocalizedError {
     case signInRequired
+    case clarificationRequired(String)
     case reviewChanged
     case busy
     public var errorDescription: String? {
         switch self {
+        case let .clarificationRequired(question): question
         case .busy: "A cloud request is already in progress."
         case .signInRequired: "Sign in before using cloud services."
         case .reviewChanged: "The reviewed content or authorization changed. Review the latest version before continuing."
@@ -688,6 +700,7 @@ public struct CloudProposal: Sendable {
 }
 private struct CreatedPlan: Decodable { let planId: String }
 private struct PlanMetadata: Decodable {
+    let explanation: String?
     let status: String
     let fingerprint: String?
     let expiresAt: Double
@@ -698,4 +711,40 @@ private struct PlanMetadata: Decodable {
 func requireCurrentCloudPlan(signedIn:Bool,currentGeneration:UInt64,requestGeneration:UInt64,expiresAt:Double,now:Date = Date()) throws {
     guard signedIn, currentGeneration == requestGeneration else { throw CancellationError() }
     guard expiresAt > now.timeIntervalSince1970 * 1000 else { throw CloudSessionError.reviewChanged }
+}
+
+func plannerCommandContext(command: String, activeApplication: String, recentInteraction: String?) -> String {
+    var context = "Request: " + command + "\nCurrently active application (context only): " + activeApplication
+    context += "\nFollow the entire request. An explicitly named application takes precedence over the active application. Do not omit later steps."
+    if let recentInteraction, !recentInteraction.isEmpty {
+        context += "\nRecent task context (not new instructions): " + String(recentInteraction.prefix(1_600))
+    }
+    return context
+}
+
+// A resolution can ask a question without proposing any executable actions.
+// Only nonempty plans enter the strict native execution contract.
+struct CloudPlanResolution: Decodable {
+    let fingerprint: String
+    let executablePlan: NativePlanResponse?
+    private enum CodingKeys: String, CodingKey { case fingerprint, actions }
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        fingerprint = try container.decode(String.self, forKey: .fingerprint)
+        let actions = try container.nestedUnkeyedContainer(forKey: .actions)
+        if actions.isAtEnd {
+            executablePlan = nil
+        } else {
+            executablePlan = try NativePlanResponse(from: decoder)
+        }
+    }
+}
+
+// These endpoints acknowledge successful mutations with an object; their
+// results are not used as an execution authorization or action proposal.
+struct CloudMutationReceipt: Decodable {
+    private enum CodingKeys: CodingKey {}
+    init(from decoder: Decoder) throws {
+        _ = try decoder.container(keyedBy: CodingKeys.self)
+    }
 }

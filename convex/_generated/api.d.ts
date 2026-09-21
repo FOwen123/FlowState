@@ -10,6 +10,7 @@
 
 import type * as deliveries from "../deliveries.js";
 import type * as devices from "../devices.js";
+import type * as dictation from "../dictation.js";
 import type * as executions from "../executions.js";
 import type * as grants from "../grants.js";
 import type * as history from "../history.js";
@@ -26,6 +27,7 @@ import type * as lib_intent_policy from "../lib/intent_policy.js";
 import type * as lib_intent_questions from "../lib/intent_questions.js";
 import type * as lib_locale_migration from "../lib/locale_migration.js";
 import type * as lib_openai from "../lib/openai.js";
+import type * as lib_plan_request from "../lib/plan_request.js";
 import type * as lib_policy from "../lib/policy.js";
 import type * as lib_preferences from "../lib/preferences.js";
 import type * as lib_strict_typesafe from "../lib/strict_typesafe.js";
@@ -46,6 +48,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   deliveries: typeof deliveries;
   devices: typeof devices;
+  dictation: typeof dictation;
   executions: typeof executions;
   grants: typeof grants;
   history: typeof history;
@@ -62,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   "lib/intent_questions": typeof lib_intent_questions;
   "lib/locale_migration": typeof lib_locale_migration;
   "lib/openai": typeof lib_openai;
+  "lib/plan_request": typeof lib_plan_request;
   "lib/policy": typeof lib_policy;
   "lib/preferences": typeof lib_preferences;
   "lib/strict_typesafe": typeof lib_strict_typesafe;
