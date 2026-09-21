@@ -1,5 +1,8 @@
 import { writeFile } from "node:fs/promises";
-import { buildPlannerRequest } from "../convex/lib/plan_request.ts";
+import {
+  buildPlannerRequest,
+  resolveJevSingleAction,
+} from "../convex/lib/plan_request.ts";
 import { createOpenAIClient } from "../convex/lib/openai.ts";
 import {
   parsePlannerText,
@@ -7,7 +10,7 @@ import {
 } from "../convex/lib/action_plan.ts";
 if (!process.argv.includes("--live"))
   throw new Error(
-    "Pass --live to run four synthetic planner requests. No actions are executed.",
+    "Pass --live to run synthetic Jev and planner requests. No actions are executed.",
   );
 process.loadEnvFile(process.env.FLOWSTATE_EVALUATION_ENV_FILE ?? ".env.local");
 const available: PlanAvailability = {
@@ -35,6 +38,9 @@ const client = createOpenAIClient({
   model: process.env.FLOWSTATE_PLANNER_MODEL,
 });
 const cases = [
+  { id: "single-key", command: "Hit the Escape key" },
+  { id: "single-scroll", command: "Move down a little" },
+  { id: "single-open", command: "Please open TextEdit" },
   { id: "brave-search", command: "Open Brave and search Hello World" },
   {
     id: "three-step",
@@ -53,13 +59,29 @@ const rows = [];
 for (const c of cases) {
   const started = performance.now();
   try {
-    const reply = await client.createResponse({
-      ...buildPlannerRequest(c.command, available),
-      maxOutputTokens: 1800,
-    });
-    const plan = parsePlannerText(reply.outputText, available);
+    const command = `Request: ${c.command}\nCurrently active application (context only): com.brave.Browser`;
+    const direct = await resolveJevSingleAction(command, available);
+    const reply = direct
+      ? null
+      : await client.createResponse({
+          ...buildPlannerRequest(command, available),
+          maxOutputTokens: 1800,
+        });
+    const plan = direct ?? parsePlannerText(reply!.outputText, available);
     const actions = plan.actions;
     let passed = false;
+    if (c.id === "single-key")
+      passed =
+        direct !== null &&
+        actions.length === 1 &&
+        actions[0].parameters.key === "Escape";
+    if (c.id === "single-scroll")
+      passed = actions.length === 1 && actions[0].parameters.lines === -3;
+    if (c.id === "single-open")
+      passed =
+        direct !== null &&
+        actions.length === 1 &&
+        actions[0].targetBundleIdentifier === "com.apple.TextEdit";
     if (c.id === "brave-search")
       passed =
         !plan.clarificationNeeded &&
@@ -95,7 +117,8 @@ for (const c of cases) {
       command: c.command,
       passed,
       latencyMs: Math.round(performance.now() - started),
-      usage: reply.usage,
+      route: direct ? "jev_single_action" : "llm_planner",
+      usage: reply?.usage,
       plan,
     });
   } catch {

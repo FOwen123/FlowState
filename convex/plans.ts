@@ -11,7 +11,7 @@ import { GenericId, v } from "convex/values";
 
 import { requireIdentity } from "./lib/identity";
 import { createOpenAIClient } from "./lib/openai";
-import { buildPlannerRequest } from "./lib/plan_request";
+import { buildPlannerRequest, resolveJevSingleAction } from "./lib/plan_request";
 import {
   containsLegacyInsertTextJson,
   parsePlanAvailability,
@@ -379,12 +379,16 @@ export const resolveActionPlan = actionGeneric({
         plan.integrationsJson,
         plan.applicationCandidatesJson ?? "[]",
       );
-      const openai = createOpenAIClient({
-        apiKey: process.env.OPENAI_API_KEY,
-        model: process.env.FLOWSTATE_PLANNER_MODEL,
-      });
-      const response = await openai.createResponse(buildPlannerRequest(plan.command, availability));
-      const normalized = parsePlannerText(response.outputText, availability);
+      let normalized = await resolveJevSingleAction(plan.command, availability);
+      console.info("intent_route", normalized === null ? "llm_planner" : "jev_single_action");
+      if (normalized === null) {
+        const openai = createOpenAIClient({
+          apiKey: process.env.OPENAI_API_KEY,
+          model: process.env.FLOWSTATE_PLANNER_MODEL,
+        });
+        const response = await openai.createResponse(buildPlannerRequest(plan.command, availability));
+        normalized = parsePlannerText(response.outputText, availability);
+      }
       await ctx.runMutation(internalSavePlan, {
         planId: args.planId,
         cancellationGeneration: plan.cancellationGeneration,

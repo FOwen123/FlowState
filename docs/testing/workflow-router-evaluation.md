@@ -1,5 +1,13 @@
 # Top-level workflow router evaluation
 
+## Current integration
+
+The production plan endpoint now calls Jev before the LLM. `resolveJevSingleAction` in `convex/lib/plan_request.ts` asks for the route and one registered action in the same request. A single action is accepted only when both decisions meet probability 0.80 and margin 0.30. All actions pass the existing plan validator and execution/approval checks. Complex requests, missing candidates, uncertainty, malformed answers, and provider failures use the existing LLM planner. The Jev request has a three-second timeout. Exact native commands and local Stop remain offline; Dictation stays separate.
+
+The live connected smoke check passed seven requests: Escape and opening TextEdit used Jev directly; an ambiguous small movement used the planner, as did browser search, three-step navigation, cross-app scrolling, and an unsupported request. See [connected results](intent/jev-connected-live.json). These are smoke checks, not a claim that all utterances are supported.
+
+## Earlier classifier-only evaluation
+
 This is a bounded, synthetic dry-run evaluation of the role dispatcher in
 `convex/lib/workflow_router.ts`. The experimental dispatcher makes one typed decision:
 `direct_action` for the intent of one bounded action, or `workflow` for the
@@ -78,4 +86,12 @@ The request shape follows the current TypeSafe System One API: a structured
 choice distribution. See the [TypeSafe API reference](https://docs.typesafe.ai/api)
 for the request and response contract.
 
-The production app does not import this experimental dispatcher. Exact recognized commands stay local; other complete requests go to the existing planner. No user setting enables this candidate. Provider or budget stops now retain their partial row as invalid evidence, and incomplete evaluations fail a separate completeness gate.
+The earlier classifier-only evaluator still reports its own incomplete execution/latency gates. That historical disabled result is not a feature flag for the connected production path above. Provider or budget stops retain their partial row as invalid evidence, and incomplete evaluations fail a separate completeness gate.
+
+## Running app verification
+
+On September 22, 2026, the signed-in macOS debug app against the Convex development deployment completed a typed “Please open TextEdit” request through Jev's candidate route. A typed “Open Brave and search Hello World” request completed through the planner; Brave's active tab was verified as the expected search URL. These exercised the app's planning and execution path, not microphone recognition.
+
+The browser check exposed a previous successful URL receipt being reused across new plans. New URL requests now receive a fresh receipt; pending/uncertain effects and non-URL duplicate protection remain unchanged. A regression test failed before the fix and passed afterward. All 190 TypeScript tests and typechecking passed.
+
+Review identified an existing separate limitation: recovery of a pending/uncertain effect from a different plan can reconcile the old receipt but fail completion of the new plan. Such requests remain blocked rather than being repeated automatically. This integration does not change that recovery path.

@@ -32,6 +32,7 @@ import type * as lib_policy from "../lib/policy.js";
 import type * as lib_preferences from "../lib/preferences.js";
 import type * as lib_strict_typesafe from "../lib/strict_typesafe.js";
 import type * as lib_typesafe from "../lib/typesafe.js";
+import type * as lib_workflow_router from "../lib/workflow_router.js";
 import type * as migrations from "../migrations.js";
 import type * as plans from "../plans.js";
 import type * as preferences from "../preferences.js";
@@ -70,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   "lib/preferences": typeof lib_preferences;
   "lib/strict_typesafe": typeof lib_strict_typesafe;
   "lib/typesafe": typeof lib_typesafe;
+  "lib/workflow_router": typeof lib_workflow_router;
   migrations: typeof migrations;
   plans: typeof plans;
   preferences: typeof preferences;

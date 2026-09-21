@@ -406,7 +406,7 @@ describe("typed action-plan contracts", () => {
     vi.stubEnv("FLOWSTATE_JEV_MODEL", "jev-1.13.0");
     process.env.OPENAI_API_KEY = "sk-test";
     process.env.FLOWSTATE_PLANNER_MODEL = "gpt-5-mini";
-    const fetch = vi.fn(async () =>
+    const fetch = vi.fn(async (_url: unknown, _init?: RequestInit) =>
       new Response(
         JSON.stringify({
           id: "resp_plan",
@@ -449,10 +449,10 @@ describe("typed action-plan contracts", () => {
       status: "awaiting_approval",
       actions: [{ kind: "scroll", executor: "desktop" }],
     });
-    expect(JSON.stringify(fetch.mock.calls[0])).toContain(
+    expect(JSON.stringify(fetch.mock.calls.find(([url]) => String(url).includes("openai.com")))).toContain(
       "openURL {targetBundleIdentifier: required advertised app, url",
     );
-    expect(JSON.stringify(fetch.mock.calls[0])).toContain(
+    expect(JSON.stringify(fetch.mock.calls.find(([url]) => String(url).includes("openai.com")))).toContain(
       "draftMessage {targetBundleIdentifier: required advertised app, recipient,subject,body}",
     );
     const view = await user.query(api.plans.getActionPlan, { planId });
@@ -474,7 +474,7 @@ describe("typed action-plan contracts", () => {
     await expect(
       user.mutation(api.plans.approveActionPlan, { planId, fingerprint: view.fingerprint ?? "" }),
     ).rejects.toThrow("missing active grant");
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it("rejects missing desktop targets, unsafe key presses, and fractional scrolls", () => {
