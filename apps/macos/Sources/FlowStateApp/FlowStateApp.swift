@@ -103,6 +103,7 @@ final class FlowStateAppModel: ObservableObject {
     @Published private(set) var permissionStatus = "Checking Screen Recording permission…"
     @Published private(set) var taskStatus = "Idle — screen capture is off"
     @Published private(set) var voiceStatus = "Voice session is idle" { didSet { updateVoiceHUD() } }
+    @Published private(set) var speechModelStatus = "Apple Speech is selected"
     @Published private(set) var latestTranscript = "" { didSet { updateVoiceHUD() } }
     @Published private(set) var dictationRecovery: DictationRecoveryCard?
     @Published private(set) var dictationHistory: [DictationHistoryEntry] = []
@@ -1400,11 +1401,20 @@ final class FlowStateAppModel: ObservableObject {
     }
 
     func installSpeechLanguage() {
-        voiceStatus = "Downloading Apple’s English speech model…"
+        let downloading = "Downloading Apple’s English speech model…"
+        speechModelStatus = downloading
+        voiceStatus = downloading
         let language = speechSettings.language
         Task {
-            do { try await AnalyzerSpeechCapture.installLanguage(language); voiceStatus = "English speech model ready" }
-            catch { voiceStatus = "Could not download the English speech model. Check your internet connection and try again." }
+            let result: String
+            do {
+                try await AnalyzerSpeechCapture.installLanguage(language)
+                result = "English speech model ready"
+            } catch {
+                result = "Could not download the English speech model. Check your internet connection and try again."
+            }
+            speechModelStatus = result
+            voiceStatus = result
         }
     }
 
@@ -2448,33 +2458,11 @@ struct FlowStateMenuView: View {
                 NSApplication.shared.terminate(nil)
             }
         }
-        .buttonStyle(FlowStateMenuRowStyle())
+        .buttonStyle(FlowStateNavigationRowStyle(isSelected: false, height: 32))
         .padding(6)
         .frame(width: 280)
-        .background(PaperStyle.hud, in: .rect(cornerRadius: 12))
+        .flowStateGlassSurface(cornerRadius: 12)
         .preferredColorScheme(.dark)
-    }
-}
-
-private struct FlowStateMenuRowStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        Row(configuration: configuration)
-    }
-
-    private struct Row: View {
-        let configuration: ButtonStyleConfiguration
-        @State private var hovering = false
-        var body: some View {
-            configuration.label
-                .font(.custom("Helvetica Neue", size: 14))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 10)
-                .frame(height: 32)
-                .foregroundStyle(.white)
-                .background(hovering || configuration.isPressed ? Color.white.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 6))
-                .contentShape(Rectangle())
-                .onHover { hovering = $0 }
-        }
     }
 }
 

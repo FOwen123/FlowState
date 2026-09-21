@@ -5,10 +5,25 @@ import Testing
 
 @Test("settings navigation follows the Paper screen order")
 func settingsNavigationFollowsPaperOrder() {
-    #expect(FlowStateSettingsSection.allCases == [.voice, .cloud, .personalMail, .tasks, .memory, .permissions])
+    #expect(FlowStateSettingsSection.allCases == [.voice, .models, .cloud, .personalMail, .tasks, .memory, .permissions])
     #expect(FlowStateSettingsSection.voice.title == "Voice & activation")
+    #expect(FlowStateSettingsSection.models.title == "Models")
     #expect(FlowStateSettingsSection.cloud.title == "Account")
     #expect(FlowStateSettingsSection.personalMail.title == "Gmail in Brave")
+}
+
+@Test("models settings distinguishes the active engine from the planned download")
+func modelsSettingsDistinguishesAvailableEngines() {
+    #expect(SettingsSpeechModel.allCases.map(\.title) == ["Apple Speech", "Parakeet Unified English"])
+    #expect(SettingsSpeechModel.appleSpeech.isSelected)
+    #expect(!SettingsSpeechModel.parakeet.isSelected)
+    #expect(SettingsSpeechModel.parakeet.source == "Hugging Face")
+}
+
+@Test("models settings uses status dedicated to speech assets")
+@MainActor func modelsSettingsUsesDedicatedSpeechAssetStatus() {
+    let model = FlowStateAppModel()
+    #expect(model.speechModelStatus == "Apple Speech is selected")
 }
 
 @Test("personal mail keeps a readable message editor")

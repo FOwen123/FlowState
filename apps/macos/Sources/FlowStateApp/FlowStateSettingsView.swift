@@ -3,6 +3,7 @@ import SwiftUI
 
 enum FlowStateSettingsSection: String, CaseIterable, Identifiable {
     case voice
+    case models
     case cloud
     case personalMail
     case tasks
@@ -13,6 +14,7 @@ enum FlowStateSettingsSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .models: "Models"
         case .personalMail: "Gmail in Brave"
         case .cloud: "Account"
         case .voice: "Voice & activation"
@@ -24,6 +26,7 @@ enum FlowStateSettingsSection: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .models: "cpu"
         case .personalMail: "envelope"
         case .cloud: "cloud"
         case .voice: "gearshape"
@@ -32,6 +35,50 @@ enum FlowStateSettingsSection: String, CaseIterable, Identifiable {
         case .permissions: "checkmark.shield"
         }
     }
+}
+
+enum SettingsSpeechModel: String, CaseIterable, Identifiable {
+    case appleSpeech
+    case parakeet
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .appleSpeech: "Apple Speech"
+        case .parakeet: "Parakeet Unified English"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .appleSpeech: "Built into macOS and managed by Apple."
+        case .parakeet: "A 731 MB English model that runs locally after download."
+        }
+    }
+
+    var source: String {
+        switch self {
+        case .appleSpeech: "Apple"
+        case .parakeet: "Hugging Face"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .appleSpeech: "waveform"
+        case .parakeet: "arrow.down.circle"
+        }
+    }
+
+    var status: String {
+        switch self {
+        case .appleSpeech: "Selected"
+        case .parakeet: "Coming soon"
+        }
+    }
+
+    var isSelected: Bool { self == .appleSpeech }
 }
 
 enum PaperStyle {
@@ -67,13 +114,13 @@ struct FlowStateSettingsView: View {
     @ObservedObject private var localization = UILocalization.shared
 
     var body: some View {
-        GlassEffectContainer(spacing: 8) {
-            HStack(spacing: 0) {
+        GlassEffectContainer(spacing: 12) {
+            HStack(spacing: 12) {
                 sidebar
-                Divider().overlay(PaperStyle.divider)
                 content
             }
         }
+        .padding(12)
         .frame(minWidth: 960, idealWidth: 960, minHeight: 680, idealHeight: 680)
         .background(PaperStyle.appCanvas)
         .foregroundStyle(PaperStyle.text)
@@ -105,14 +152,8 @@ struct FlowStateSettingsView: View {
                             .font(.system(size: 14))
                         Spacer()
                     }
-                    .padding(.horizontal, 12)
-                    .frame(height: 44)
-                    .foregroundStyle(model.settingsSection == item ? PaperStyle.accent : PaperStyle.text)
-                    .background(model.settingsSection == item ? PaperStyle.selected : .clear)
-                    .clipShape(RoundedRectangle(cornerRadius: PaperStyle.selectionRadius))
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(FlowStateNavigationRowStyle(isSelected: model.settingsSection == item, height: 44))
                 .accessibilityLabel(L10n.text(item.title))
                 .accessibilityAddTraits(model.settingsSection == item ? .isSelected : [])
             }
@@ -128,14 +169,16 @@ struct FlowStateSettingsView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 28)
-        .background(PaperStyle.surface.opacity(0.72))
-        .frame(width: 232)
+        .frame(width: 220)
         .frame(maxHeight: .infinity)
+        .flowStateGlassSurface(cornerRadius: 16)
     }
 
     @ViewBuilder
     private var content: some View {
         switch model.settingsSection {
+        case .models:
+            ModelsSettingsView(model: model)
         case .personalMail:
             PersonalMailView()
         case .cloud:
@@ -150,6 +193,117 @@ struct FlowStateSettingsView: View {
             PermissionsSettingsView(model: model)
         }
     }
+}
+
+private struct ModelsSettingsView: View {
+    @ObservedObject var model: FlowStateAppModel
+
+    var body: some View {
+        settingsColumn {
+            pageHeading(title: "Speech models", subtitle: "Choose how Flow State recognizes your voice.")
+            settingsPanel {
+                PickerRow(
+                    title: "Language",
+                    subtitle: "Choose the language you speak.",
+                    selection: Binding(
+                        get: { model.speechSettings.language },
+                        set: {
+                            var settings = model.speechSettings
+                            settings.language = $0
+                            model.updateSpeechSettings(settings)
+                        }
+                    ),
+                    options: SpeechLanguage.allCases
+                )
+            }
+            settingsPanel {
+                ForEach(Array(SettingsSpeechModel.allCases.enumerated()), id: \.element.id) { index, option in
+                    SpeechModelRow(option: option, model: model)
+                    if index < SettingsSpeechModel.allCases.count - 1 {
+                        Divider().overlay(PaperStyle.divider)
+                    }
+                }
+            }
+            Text(L10n.text(model.speechModelStatus))
+                .font(.system(size: 13))
+                .foregroundStyle(PaperStyle.muted)
+            settingsPanel {
+                SettingRow(
+                    title: "Microphone",
+                    subtitle: "Use the Mac's selected audio input.",
+                    trailing: { permissionBadge(model.permissionSnapshot.microphone) }
+                )
+                SettingRow(
+                    title: "Speech processing",
+                    subtitle: "The selected model processes audio on this Mac.",
+                    trailing: { Text(L10n.text("On-device")).foregroundStyle(PaperStyle.muted) }
+                )
+            }
+
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "lock.shield")
+                Text(L10n.text("Audio stays on this Mac during transcription. Downloading a local model contacts its model host once for the model file."))
+            }
+            .font(.system(size: 13))
+            .foregroundStyle(PaperStyle.muted)
+        }
+    }
+}
+
+private struct SpeechModelRow: View {
+    let option: SettingsSpeechModel
+    @ObservedObject var model: FlowStateAppModel
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 16) {
+            Image(systemName: option.symbol)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(option.isSelected ? PaperStyle.accent : PaperStyle.secondary)
+                .frame(width: 24)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 8) {
+                    Text(L10n.text(option.title))
+                        .font(PaperStyle.textFont(size: 16, weight: .medium))
+                    modelStatusBadge(option.status, emphasized: option.isSelected)
+                }
+                Text(L10n.text(option.summary))
+                    .font(.system(size: 14))
+                    .foregroundStyle(PaperStyle.muted)
+                Text(L10n.format("Source: %@", option.source))
+                    .font(.system(size: 12))
+                    .foregroundStyle(PaperStyle.muted)
+            }
+
+            Spacer(minLength: 20)
+
+            if option == .appleSpeech {
+                Button(L10n.text("Install language asset")) { model.installSpeechLanguage() }
+                    .buttonStyle(PaperBorderButtonStyle())
+                    .accessibilityLabel(L10n.text("Install Apple Speech language asset"))
+                    .accessibilityHint(L10n.text("Downloads Apple’s English speech asset if it is not already installed."))
+            } else {
+                Button(L10n.text("Download model")) { }
+                    .buttonStyle(PaperBorderButtonStyle())
+                    .disabled(true)
+                    .help(L10n.text("Download support is coming next."))
+                    .accessibilityLabel(L10n.text("Download Parakeet Unified English model"))
+                    .accessibilityHint(L10n.text("Download support is coming next."))
+            }
+        }
+        .padding(.vertical, 14)
+    }
+}
+
+private func modelStatusBadge(_ text: String, emphasized: Bool) -> some View {
+    Text(L10n.text(text))
+        .font(.system(size: 11, weight: .medium))
+        .foregroundStyle(emphasized ? PaperStyle.accent : PaperStyle.muted)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .background(emphasized ? PaperStyle.selected : PaperStyle.appCanvas, in: Capsule())
+        .overlay(Capsule().stroke(emphasized ? PaperStyle.accent.opacity(0.35) : PaperStyle.panelBorder))
 }
 
 private struct VoiceSettingsView: View {
@@ -181,19 +335,6 @@ private struct VoiceSettingsView: View {
                         set: { updateControlShortcut($0) }
                     ),
                     options: VoiceShortcut.allCases
-                )
-                PickerRow(
-                    title: "Language",
-                    subtitle: "Choose the language you speak.",
-                    selection: Binding(
-                        get: { model.speechSettings.language },
-                        set: {
-                            var settings = model.speechSettings
-                            settings.language = $0
-                            model.updateSpeechSettings(settings)
-                        }
-                    ),
-                    options: SpeechLanguage.allCases
                 )
                 if let error = model.shortcutError {
                     Text(L10n.text(error)).font(.caption).foregroundStyle(.orange)
@@ -256,22 +397,6 @@ private struct VoiceSettingsView: View {
                         .disabled(model.isListening || model.isFinishingVoice)
                     Button(L10n.text("Stop")) { model.stopVoiceSession() }
                 }
-            }
-
-            settingsPanel {
-                Button(L10n.text("Download English speech model")) { model.installSpeechLanguage() }
-                Text(L10n.text("Uses Apple’s on-device English speech recognition (SpeechTranscriber). Download the speech model once with an internet connection; transcription then runs on this Mac."))
-                    .font(.caption).foregroundStyle(PaperStyle.muted)
-                SettingRow(
-                    title: "Microphone",
-                    subtitle: "Use the Mac's selected audio input.",
-                    trailing: { permissionBadge(model.permissionSnapshot.microphone) }
-                )
-                SettingRow(
-                    title: "Speech & output",
-                    subtitle: "Your speech is processed on this Mac.",
-                    trailing: { Text(L10n.text("On-device")).foregroundStyle(PaperStyle.muted) }
-                )
             }
 
             HStack(alignment: .top, spacing: 12) {
@@ -736,15 +861,78 @@ private func permissionBadge(_ status: MacPermissionStatus) -> some View {
 }
 
 struct PaperBorderButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(PaperStyle.textFont(size: PaperStyle.controlFontSize))
             .foregroundStyle(PaperStyle.text)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
-            .glassEffect(.regular.tint(PaperStyle.surface).interactive(), in: RoundedRectangle(cornerRadius: PaperStyle.controlRadius))
+            .contentShape(RoundedRectangle(cornerRadius: PaperStyle.controlRadius))
             .overlay(RoundedRectangle(cornerRadius: PaperStyle.controlRadius).stroke(PaperStyle.controlBorder))
-            .opacity(configuration.isPressed ? 0.65 : 1)
+            .glassEffect(
+                .regular
+                    .tint(configuration.isPressed ? PaperStyle.selected : PaperStyle.surface)
+                    .interactive(),
+                in: RoundedRectangle(cornerRadius: PaperStyle.controlRadius)
+            )
+            .opacity(isEnabled ? (configuration.isPressed ? 0.65 : 1) : 0.4)
+    }
+}
+
+struct FlowStateNavigationRowStyle: ButtonStyle {
+    let isSelected: Bool
+    let height: CGFloat
+
+    func makeBody(configuration: Configuration) -> some View {
+        Row(configuration: configuration, isSelected: isSelected, height: height)
+    }
+
+    private struct Row: View {
+        let configuration: ButtonStyleConfiguration
+        let isSelected: Bool
+        let height: CGFloat
+        @State private var isHovering = false
+
+        private var isHighlighted: Bool { isSelected || isHovering || configuration.isPressed }
+
+        var body: some View {
+            configuration.label
+                .font(PaperStyle.textFont(size: PaperStyle.controlFontSize, weight: .medium))
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, minHeight: height, maxHeight: height, alignment: .leading)
+                .foregroundStyle(isHighlighted ? PaperStyle.accent : PaperStyle.text)
+                .background(isHighlighted ? PaperStyle.selected : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .contentShape(Rectangle())
+                .onHover { isHovering = $0 }
+        }
+    }
+}
+
+private struct FlowStateGlassSurface: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    let cornerRadius: CGFloat
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius)
+        if reduceTransparency {
+            content
+                .background(PaperStyle.hud, in: shape)
+                .overlay(shape.stroke(PaperStyle.controlBorder.opacity(0.7)))
+        } else {
+            content
+                .background(PaperStyle.hud.opacity(0.5), in: shape)
+                .overlay(shape.stroke(PaperStyle.controlBorder.opacity(0.55)))
+                .glassEffect(.regular.tint(PaperStyle.hud), in: shape)
+        }
+    }
+}
+
+extension View {
+    func flowStateGlassSurface(cornerRadius: CGFloat) -> some View {
+        modifier(FlowStateGlassSurface(cornerRadius: cornerRadius))
     }
 }
 
