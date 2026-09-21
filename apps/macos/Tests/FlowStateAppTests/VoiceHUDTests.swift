@@ -83,3 +83,23 @@ import Testing
     #expect(listening.minY == feedback.minY)
     #expect(listening.midX == screen.midX)
 }
+
+@Test("the waveform fills the listening bar instead of leaving an empty center")
+@MainActor func waveformFillsListeningBar() throws {
+    let model = VoiceHUDModel()
+    model.isListening = true
+    model.status = "Listening — say a command or press Stop"
+    let renderer = ImageRenderer(content: VoiceHUDView(model: model))
+    renderer.scale = 1
+    let raster = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+    let brightColumns = (12..<220).filter { x in
+        (10..<46).contains { y in
+            guard let pixel = raster.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { return false }
+            return min(pixel.redComponent, pixel.greenComponent, pixel.blueComponent) > 0.8
+        }
+    }
+    #expect(brightColumns.count >= 60)
+    if let path = ProcessInfo.processInfo.environment["FLOWSTATE_WAVE_PREVIEW"] {
+        try raster.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+    }
+}

@@ -133,11 +133,11 @@ struct VoiceHUDView: View {
             }
             HStack(alignment: .center, spacing: 16) {
                 VoiceHUDWaveform(isListening: model.isListening)
-                    .frame(width: 48, height: 26)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 30)
                     .accessibilityLabel(model.isListening
                         ? L10n.format("Listening %@", model.purpose?.displayName ?? "")
                         : L10n.text("Processing"))
-                Spacer(minLength: 0)
                 Button(action: model.onStop) {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .semibold))
@@ -185,14 +185,15 @@ private struct VoiceHUDWaveform: View {
     let isListening: Bool
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 0.12, paused: !isListening || reduceMotion)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !isListening || reduceMotion)) { timeline in
             HStack(alignment: .center, spacing: 4) {
-                ForEach(0..<7, id: \.self) { index in
-                    let phase = timeline.date.timeIntervalSinceReferenceDate * 4 + Double(index) * 0.7
-                    let level = isListening && !reduceMotion ? 0.25 + 0.75 * ((sin(phase) + 1) / 2) : [0.2, 0.6, 0.85, 0.7, 1, 0.5, 0.2][index]
+                ForEach(0..<25, id: \.self) { index in
+                    let phase = timeline.date.timeIntervalSinceReferenceDate * 3 + Double(index) * 0.45
+                    let envelope = sin(Double(index + 1) / 26 * .pi)
+                    let level = envelope * (isListening && !reduceMotion ? 0.3 + 0.7 * ((sin(phase) + 1) / 2) : 0.65)
                     Capsule()
                         .fill(Color.white)
-                        .frame(width: 3, height: 4 + CGFloat(level * 20))
+                        .frame(width: 3, height: 4 + CGFloat(level * 26))
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
