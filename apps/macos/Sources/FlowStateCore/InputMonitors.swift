@@ -112,11 +112,12 @@ public final class GlobalVoiceShortcutMonitor {
     private var shortcut = VoiceShortcut.controlShiftSpace
     private var hotKeyRef: EventHotKeyRef?
     private var handlerRef: EventHandlerRef?
-    private var registrationID: UInt32 = 0
+    private(set) var registrationID: UInt32 = 0
 
+    private static var nextRegistrationID: UInt32 = 0
     private static let carbonSignature: OSType = 0x46535448 // FSTH
     private static let carbonHandler: EventHandlerUPP = { _, event, userData in
-        guard let event, let userData else { return noErr }
+        guard let event, let userData else { return OSStatus(eventNotHandledErr) }
         let monitor = Unmanaged<GlobalVoiceShortcutMonitor>
             .fromOpaque(userData)
             .takeUnretainedValue()
@@ -130,7 +131,15 @@ public final class GlobalVoiceShortcutMonitor {
             nil,
             &identifier
         )
-        guard status == noErr, identifier.signature == carbonSignature else { return noErr }
+        guard status == noErr, identifier.signature == carbonSignature else {
+            return OSStatus(eventNotHandledErr)
+        }
+        // Carbon walks the handler chain synchronously on the main thread.
+        // An unrelated handler must decline before dispatching any callback.
+        let matchesRegistration = MainActor.assumeIsolated {
+            monitor.isRegistered && monitor.registrationID == identifier.id
+        }
+        guard matchesRegistration else { return OSStatus(eventNotHandledErr) }
         let kind = GetEventKind(event)
         let id = identifier.id
         Task { @MainActor [weak monitor] in
@@ -170,7 +179,8 @@ public final class GlobalVoiceShortcutMonitor {
         self.shortcut = shortcut
         keyDown = onKeyDown
         keyUp = onKeyUp
-        registrationID &+= 1
+        Self.nextRegistrationID += 1
+        registrationID = Self.nextRegistrationID
         let identifier = EventHotKeyID(signature: Self.carbonSignature, id: registrationID)
         var registeredHotKey: EventHotKeyRef?
         let registrationStatus = RegisterEventHotKey(

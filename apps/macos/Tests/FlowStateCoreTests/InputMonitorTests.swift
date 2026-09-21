@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import Testing
 @testable import FlowStateCore
 
@@ -168,4 +169,37 @@ func nativeHotkeyRegistrationDetectsConflictAndReleasesOnDeinit() throws {
     first = nil
     #expect(second.start(onKeyDown: {}, onKeyUp: {}))
     #expect(second.registrationError == nil)
+}
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["FLOWSTATE_HOTKEY_SMOKE"] == "1"))
+@MainActor
+func nativeControlAndDictationHotkeysStaySeparate() async throws {
+    let control = GlobalVoiceShortcutMonitor()
+    let dictation = GlobalVoiceShortcutMonitor()
+    var received: [String] = []
+    defer { control.stop(); dictation.stop() }
+    try #require(control.start(shortcut: .controlShiftSpace,
+        onKeyDown: { received.append("control down") }, onKeyUp: { received.append("control up") }))
+    try #require(dictation.start(shortcut: .optionSpace,
+        onKeyDown: { received.append("dictation down") }, onKeyUp: { received.append("dictation up") }))
+
+    func send(_ monitor: GlobalVoiceShortcutMonitor, kind: UInt32) throws {
+        var event: EventRef?
+        try #require(CreateEvent(nil, OSType(kEventClassKeyboard), kind, 0, 0, &event) == noErr)
+        let created = try #require(event)
+        defer { ReleaseEvent(created) }
+        var id = EventHotKeyID(signature: 0x46535448, id: monitor.registrationID)
+        try #require(SetEventParameter(created, EventParamName(kEventParamDirectObject),
+            EventParamType(typeEventHotKeyID), MemoryLayout<EventHotKeyID>.size, &id) == noErr)
+        try #require(SendEventToEventTarget(created, GetApplicationEventTarget()) == noErr)
+    }
+    try send(control, kind: UInt32(kEventHotKeyPressed))
+    try send(control, kind: UInt32(kEventHotKeyReleased))
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(received == ["control down", "control up"])
+    received.removeAll()
+    try send(dictation, kind: UInt32(kEventHotKeyPressed))
+    try send(dictation, kind: UInt32(kEventHotKeyReleased))
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(received == ["dictation down", "dictation up"])
 }

@@ -194,3 +194,9 @@ Authenticated cloud planning, real Gmail account selection, visual-computer-use 
 
 - Sign in now disables only during an active sign-in attempt, rather than background account hydration. A physical mouse click near the button padding showed the browser sign-in guidance. Full account authentication remains awaiting the user’s browser login.
 - Final native suite passed (132 Core, 19 Cloud, 82 App tests, including opt-in tests skipped in the ordinary run). Independent review found no blocking issues; concise browser guidance appears during login instead of a permanent explanatory paragraph.
+
+### Control shortcut routing — September 22, 2026
+
+- Reproduced the reported bug through the installed Carbon handler chain: Control–Shift–Space delivered dictation down/up callbacks. Both monitor instances reused the same event identifier, and the last-installed handler consumed the event.
+- Assigned process-wide unique registration IDs and returned `eventNotHandledErr` synchronously for another registration. The opt-in `nativeControlAndDictationHotkeysStaySeparate` test failed before the fix and passed afterward for both press/release paths.
+- The ordinary native suite passed. After packaging/relaunch, a synthetic Control–Shift–Space key-down in the running app exposed the accessibility label `Listening Mac Control`; the test cancelled capture before release. This verifies live shortcut routing, not a new spoken-command execution test.
